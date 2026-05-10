@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "typeorm": "typeorm-ts-node-commonjs",
-    "migration:generate": "npm run typeorm migration:generate -- -d src/config/typeorm.config.ts",
+    "migration:generate": "npm run typeorm migration:generate -- src/migrations/InitSchema -d src/config/typeorm.config.ts",
     "migration:run": "npm run typeorm migration:run -- -d src/config/typeorm.config.ts",
     "db:check": "ts-node src/scripts/check-db-connection.ts",
     "build": "nest build",

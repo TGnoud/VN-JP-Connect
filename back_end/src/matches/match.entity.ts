@@ -19,13 +19,13 @@ export enum MatchStatus {
 @Entity('matches')
 export class Match {
   @PrimaryGeneratedColumn({ type: 'bigint' })
-  id: number;
+  id: string;
 
   @Column({ type: 'bigint' })
-  requester_id: number;
+  requester_id: string;
 
   @Column({ type: 'bigint' })
-  receiver_id: number;
+  receiver_id: string;
 
   @Column({
     type: 'enum',

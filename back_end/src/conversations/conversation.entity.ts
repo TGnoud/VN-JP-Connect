@@ -13,10 +13,10 @@ import { Message } from '../messages/message.entity';
 @Entity('conversations')
 export class Conversation {
   @PrimaryGeneratedColumn({ type: 'bigint' })
-  id: number;
+  id: string;
 
   @Column({ type: 'bigint' })
-  match_id: number;
+  match_id: string;
 
   @CreateDateColumn()
   created_at: Date;

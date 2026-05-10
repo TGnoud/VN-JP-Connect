@@ -8,7 +8,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       host: 'localhost',
       port: 3306,
       username: 'root',
-      password: '',
+      password: 'Root@1234',
       database: 'vn_jp_connect',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: false,

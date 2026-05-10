@@ -12,10 +12,10 @@ import { EventParticipant } from '../event-participants/event-participant.entity
 @Entity('events')
 export class Event {
   @PrimaryGeneratedColumn({ type: 'bigint' })
-  id: number;
+  id: string;
 
   @Column({ type: 'bigint' })
-  organizer_id: number;
+  organizer_id: string;
 
   @Column({ length: 200 })
   title: string;

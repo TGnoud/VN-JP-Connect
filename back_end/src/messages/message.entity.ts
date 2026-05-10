@@ -12,13 +12,13 @@ import { User } from '../users/user.entity';
 @Entity('messages')
 export class Message {
   @PrimaryGeneratedColumn({ type: 'bigint' })
-  id: number;
+  id: string;
 
   @Column({ type: 'bigint' })
-  conversation_id: number;
+  conversation_id: string;
 
   @Column({ type: 'bigint' })
-  sender_id: number;
+  sender_id: string;
 
   @Column({ type: 'text' })
   content: string;

@@ -5,7 +5,7 @@ import { Tag } from '../tags/tag.entity';
 @Entity('user_interests')
 export class UserInterest {
   @PrimaryColumn({ type: 'bigint' })
-  user_id: number;
+  user_id: string;
 
   @PrimaryColumn({ type: 'int' })
   tag_id: number;

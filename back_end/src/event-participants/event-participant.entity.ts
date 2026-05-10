@@ -11,10 +11,10 @@ import { User } from '../users/user.entity';
 @Entity('event_participants')
 export class EventParticipant {
   @PrimaryColumn({ type: 'bigint' })
-  event_id: number;
+  event_id: string;
 
   @PrimaryColumn({ type: 'bigint' })
-  user_id: number;
+  user_id: string;
 
   @CreateDateColumn({ name: 'joined_at' })
   joined_at: Date;
