@@ -96,8 +96,9 @@ function PencilIcon({ size = 3.5 }: { size?: number }) {
 }
 function CameraIcon({ className = "size-3.5" }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
-      <path fillRule="evenodd" d="M1 8a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 018.07 3h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0016.07 6H17a2 2 0 012 2v7a2 2 0 01-2 2H3a2 2 0 01-2-2V8zm13.5 3a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM10 14a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+      <path d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
     </svg>
   );
 }
@@ -138,16 +139,20 @@ function CheckIcon() {
 }
 function UserIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
-    </svg>
+    <span className="inline-flex items-center justify-center w-7 h-7 rounded-md shrink-0" style={{ backgroundColor: "#ecfdf5" }}>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+      </svg>
+    </span>
   );
 }
 function LanguageIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-    </svg>
+    <span className="inline-flex items-center justify-center w-7 h-7 rounded-md shrink-0" style={{ backgroundColor: "#ecfdf5" }}>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+      </svg>
+    </span>
   );
 }
 function StarIcon() {
@@ -172,7 +177,7 @@ function SectionHeader({ icon, title, action }: { icon?: React.ReactNode; title:
 }
 function EditBtn({ onClick }: { onClick?: () => void }) {
   return (
-    <button onClick={onClick} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">
+    <button onClick={onClick} className="flex items-center gap-1 text-xs font-medium text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1 hover:bg-gray-50 transition-colors">
       <PencilIcon /> 編集
     </button>
   );
@@ -409,10 +414,11 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
               ) : (
                 <span style={{ color: l.dotColor }} className="text-sm leading-none shrink-0">●</span>
               )}
-              <span className="text-sm font-semibold text-gray-800 flex-1">{l.name}</span>
+              <span className="text-sm font-semibold text-gray-800">{l.name}</span>
               <span className="text-xs font-bold px-1.5 py-0.5 rounded border" style={{ color: "#1B4332", borderColor: "#bbf7d0", backgroundColor: "#f0fdf4" }}>
                 {l.level}
               </span>
+              <span className="flex-1" />
               <button onClick={() => removeLang(l.name)} className="ml-1 p-1 rounded hover:bg-red-50 text-red-500 transition-colors">
                 <TrashIcon />
               </button>
@@ -421,6 +427,7 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
         </div>
 
         {/* Add new language form */}
+        <div className="bg-gray-50 rounded-xl p-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1.5 block">言語</label>
@@ -459,11 +466,12 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
           <button
             onClick={addLang}
             disabled={!newLang || !newLevel}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-white disabled:opacity-40 transition-colors"
-            style={{ backgroundColor: "#1B4332" }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-white transition-colors"
+            style={{ backgroundColor: (!newLang || !newLevel) ? "#9ca3af" : "#1B4332" }}
           >
             + 追加
           </button>
+        </div>
         </div>
       </div>
       <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(list)).then(onClose)} saveLabel="保存する" />
@@ -942,8 +950,8 @@ export default function ProfilePage() {
                   onError={() => setFailedMedia((current) => ({ ...current, avatarUrl: profile.avatarUrl }))}
                 />
               </div>
-              <button onClick={() => setModal("changeAvatar")} className="absolute bottom-0.5 right-0.5 bg-white rounded-full p-1 shadow border border-gray-200 hover:bg-gray-50 transition-colors text-gray-600">
-                <CameraIcon />
+              <button onClick={() => setModal("changeAvatar")} className="absolute bottom-0.5 right-0.5 rounded-full p-1.5 shadow transition-colors text-white" style={{ backgroundColor: "#1B4332" }}>
+                <CameraIcon className="size-3.5" />
               </button>
             </div>
 
@@ -1017,7 +1025,7 @@ export default function ProfilePage() {
           <SectionHeader icon={<LanguageIcon />} title="言語スキル" action={<AddBtn onClick={() => setModal("editLanguages")} />} />
           <div className="flex flex-wrap gap-2">
             {languages.map((l) => (
-              <div key={l.name} className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2">
+              <div key={l.name} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 {l.useFlag ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={l.flagSrc} alt={l.name} className="w-5 h-auto rounded-sm shrink-0" />
@@ -1035,7 +1043,7 @@ export default function ProfilePage() {
 
         {/* ── 趣味 ── */}
         <SectionCard>
-          <SectionHeader icon={<StarIcon />} title="趣味" action={<EditBtn onClick={() => setModal("selectInterests")} />} />
+          <SectionHeader title="趣味" action={<EditBtn onClick={() => setModal("selectInterests")} />} />
           <p className="text-xs text-gray-500 mb-2">選択されている趣味({interests.length}):</p>
           <div className="flex flex-wrap gap-1.5 mb-3">
             {interests.map((i) => (

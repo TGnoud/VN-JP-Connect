@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
@@ -56,8 +56,8 @@ function ProfileCard({
           unoptimized
         />
         {/* Like rate badge */}
-        <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur rounded-full px-2.5 py-1 shadow text-xs font-bold text-gray-800">
-          <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+        <div className="absolute top-3 left-3 flex items-center gap-1 bg-white rounded-full px-2.5 py-1 shadow text-xs font-bold text-gray-800">
+          <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5" style={{ color: "#1B4332" }} viewBox="0 0 20 20" fill="currentColor">
             <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
           </svg>
           {user.likeRate}%
@@ -155,11 +155,86 @@ function SectionHeader({ label, open, onToggle }: { label: string; open: boolean
   return (
     <button
       onClick={onToggle}
-      className="w-full flex items-center justify-between px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 transition-colors"
+      className="w-full flex items-center justify-between py-2.5 hover:opacity-70 transition-opacity"
     >
-      <span className="text-xs font-semibold text-gray-700">{label}</span>
-      <span className="text-gray-500 text-xs" style={{ transform: open ? "rotate(180deg)" : "none", display: "inline-block", transition: "transform 0.2s" }}>▽</span>
+      <span className="text-sm font-semibold text-gray-800">{label}</span>
+      <span
+        className="text-gray-400 text-xs"
+        style={{ display: "inline-block", transition: "transform 0.2s", transform: open ? "none" : "rotate(180deg)" }}
+      >
+        △
+      </span>
     </button>
+  );
+}
+
+const THUMB_SIZE = 16;
+const TRACK_TOP = 8;
+const TRACK_H = 4;
+const CONTAINER_H = 20;
+
+function thumbStyle(pctValue: number): React.CSSProperties {
+  return {
+    position: "absolute",
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    top: (CONTAINER_H - THUMB_SIZE) / 2,
+    left: `${pctValue}%`,
+    transform: "translateX(-50%)",
+    borderRadius: "50%",
+    backgroundColor: "#fff",
+    border: "2px solid #1B4332",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+    pointerEvents: "none",
+    zIndex: 5,
+  };
+}
+
+function DualRangeSlider({
+  min, max, valueMin, valueMax, onChangeMin, onChangeMax,
+}: {
+  min: number; max: number;
+  valueMin: number; valueMax: number;
+  onChangeMin: (v: number) => void;
+  onChangeMax: (v: number) => void;
+}) {
+  const pct = (v: number) => ((v - min) / (max - min)) * 100;
+  return (
+    <div className="relative w-full" style={{ height: CONTAINER_H }}>
+      <div className="absolute inset-x-0 rounded-full bg-gray-200"
+        style={{ height: TRACK_H, top: TRACK_TOP }} />
+      <div className="absolute rounded-full"
+        style={{ left: `${pct(valueMin)}%`, right: `${100 - pct(valueMax)}%`, height: TRACK_H, top: TRACK_TOP, backgroundColor: "#1B4332" }} />
+      <div style={thumbStyle(pct(valueMin))} />
+      <div style={thumbStyle(pct(valueMax))} />
+      <input type="range" min={min} max={max} value={valueMin}
+        onChange={(e) => onChangeMin(Math.min(Number(e.target.value), valueMax - 1))}
+        className="absolute inset-0 w-full cursor-pointer opacity-0"
+        style={{ height: "100%", zIndex: valueMin > (min + max) / 2 ? 4 : 3 }} />
+      <input type="range" min={min} max={max} value={valueMax}
+        onChange={(e) => onChangeMax(Math.max(Number(e.target.value), valueMin + 1))}
+        className="absolute inset-0 w-full cursor-pointer opacity-0"
+        style={{ height: "100%", zIndex: valueMin > (min + max) / 2 ? 3 : 4 }} />
+    </div>
+  );
+}
+
+function SingleRangeSlider({ min, max, value, onChange }: {
+  min: number; max: number; value: number; onChange: (v: number) => void;
+}) {
+  const pct = ((value - min) / (max - min)) * 100;
+  return (
+    <div className="relative w-full" style={{ height: CONTAINER_H }}>
+      <div className="absolute inset-x-0 rounded-full bg-gray-200"
+        style={{ height: TRACK_H, top: TRACK_TOP }} />
+      <div className="absolute rounded-full"
+        style={{ left: 0, right: `${100 - pct}%`, height: TRACK_H, top: TRACK_TOP, backgroundColor: "#1B4332" }} />
+      <div style={thumbStyle(pct)} />
+      <input type="range" min={min} max={max} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="absolute inset-0 w-full cursor-pointer opacity-0"
+        style={{ height: "100%" }} />
+    </div>
   );
 }
 
@@ -179,6 +254,8 @@ function FilterPanel({
     filter.nationality === "all" ? [] : [filter.nationality as string]
   );
   const [open, setOpen] = useState({ gender: true, age: true, distance: true, jpLevel: true, nationality: true, interests: true });
+  const AGE_MIN = 18, AGE_MAX = 65;
+  const DIST_MIN = 0, DIST_MAX = 200;
 
   function toggleSection(key: keyof typeof open) {
     setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -245,13 +322,13 @@ function FilterPanel({
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto py-2 flex flex-col gap-1">
+      <div className="flex-1 overflow-y-auto px-4 py-2 flex flex-col gap-1">
 
         {/* 性別 */}
         <div>
           <SectionHeader label="性別" open={open.gender} onToggle={() => toggleSection("gender")} />
           {open.gender && (
-            <div className="flex gap-1.5 px-3 pt-2 pb-3">
+            <div className="flex gap-1.5 pt-2 pb-3">
               {[{ v: "all", l: "すべて" }, { v: "male", l: "男性" }, { v: "female", l: "女性" }].map((o) => (
                 <button
                   key={o.v}
@@ -270,16 +347,18 @@ function FilterPanel({
         <div>
           <SectionHeader label="年齢範囲" open={open.age} onToggle={() => toggleSection("age")} />
           {open.age && (
-            <div className="px-3 pt-2 pb-3">
-              <div className="flex justify-center text-xs font-medium text-gray-700 mb-2">
-                {local.ageMin} - {local.ageMax} 歳
+            <div className="pt-1 pb-3">
+              <div className="flex items-center justify-between text-xs mb-3">
+                <span className="text-gray-400">{AGE_MIN}</span>
+                <span className="font-medium text-gray-700">{local.ageMin} - {local.ageMax} 歳</span>
+                <span className="text-gray-400">{AGE_MAX}</span>
               </div>
-              <div className="flex flex-col gap-1">
-                <input type="range" min={18} max={local.ageMax - 1} value={local.ageMin}
-                  onChange={(e) => update("ageMin", Number(e.target.value))} className="w-full" />
-                <input type="range" min={local.ageMin + 1} max={60} value={local.ageMax}
-                  onChange={(e) => update("ageMax", Number(e.target.value))} className="w-full" />
-              </div>
+              <DualRangeSlider
+                min={AGE_MIN} max={AGE_MAX}
+                valueMin={local.ageMin} valueMax={local.ageMax}
+                onChangeMin={(v) => update("ageMin", v)}
+                onChangeMax={(v) => update("ageMax", v)}
+              />
             </div>
           )}
         </div>
@@ -288,12 +367,14 @@ function FilterPanel({
         <div>
           <SectionHeader label="距離" open={open.distance} onToggle={() => toggleSection("distance")} />
           {open.distance && (
-            <div className="px-3 pt-2 pb-3">
-              <div className="flex justify-center text-xs font-medium text-gray-700 mb-2">
-                {local.distanceMax} km
+            <div className="pt-1 pb-3">
+              <div className="flex items-center justify-between text-xs mb-3">
+                <span className="text-gray-400">{DIST_MIN}</span>
+                <span className="font-medium text-gray-700">{local.distanceMax} km</span>
+                <span className="text-gray-400">{DIST_MAX}</span>
               </div>
-              <input type="range" min={1} max={100} value={local.distanceMax}
-                onChange={(e) => update("distanceMax", Number(e.target.value))} className="w-full" />
+              <SingleRangeSlider min={DIST_MIN} max={DIST_MAX} value={local.distanceMax}
+                onChange={(v) => update("distanceMax", v)} />
             </div>
           )}
         </div>
@@ -302,7 +383,7 @@ function FilterPanel({
         <div>
           <SectionHeader label="日本語レベル" open={open.jpLevel} onToggle={() => toggleSection("jpLevel")} />
           {open.jpLevel && (
-            <div className="flex gap-1.5 flex-wrap px-3 pt-2 pb-3">
+            <div className="flex gap-1.5 flex-wrap pt-2 pb-3">
               {JP_FILTER_LEVELS.map((lv) => (
                 <button
                   key={lv}
@@ -321,7 +402,7 @@ function FilterPanel({
         <div>
           <SectionHeader label="国籍" open={open.nationality} onToggle={() => toggleSection("nationality")} />
           {open.nationality && (
-            <div className="flex gap-1.5 flex-wrap px-3 pt-2 pb-3">
+            <div className="flex gap-1.5 flex-wrap pt-2 pb-3">
               {[{ v: "Vietnamese", l: "ベトナム" }, { v: "Japanese", l: "日本" }, { v: "other", l: "その他" }].map((o) => (
                 <button
                   key={o.v}
@@ -345,7 +426,7 @@ function FilterPanel({
         <div>
           <SectionHeader label="興味" open={open.interests} onToggle={() => toggleSection("interests")} />
           {open.interests && (
-            <div className="flex gap-1.5 flex-wrap px-3 pt-2 pb-3">
+            <div className="flex gap-1.5 flex-wrap pt-2 pb-3">
               {FILTER_INTERESTS.map((interest) => (
                 <button
                   key={interest}

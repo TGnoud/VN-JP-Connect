@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { MOCK_USERS } from "@/lib/mock-data";
@@ -94,44 +94,64 @@ function CalendarIcon() {
 }
 function ThumbsUpIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-    </svg>
+    <span className="inline-flex items-center justify-center size-6 rounded-full bg-green-50">
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-green-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+      </svg>
+    </span>
   );
 }
 function PeopleGroupIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
-    </svg>
+    <span className="inline-flex items-center justify-center size-6 rounded-full bg-green-50">
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-green-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    </span>
+  );
+}
+function SectionIconWrap({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-center w-7 h-7 rounded-md shrink-0" style={{ backgroundColor: "#ecfdf5" }}>
+      {children}
+    </div>
   );
 }
 function UserInfoIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
-    </svg>
+    <SectionIconWrap>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+      </svg>
+    </SectionIconWrap>
   );
 }
 function LanguageGlobeIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-    </svg>
+    <SectionIconWrap>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+      </svg>
+    </SectionIconWrap>
   );
 }
 function HeartIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M9.653 16.915l-.005-.003-.019-.01a20.759 20.759 0 01-1.162-.682 22.045 22.045 0 01-2.582-2.184C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.536a22.049 22.049 0 01-3.744 2.18l-.019.01-.005.003h-.002a.739.739 0 01-.69.001l-.002-.001z" />
-    </svg>
+    <SectionIconWrap>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+      </svg>
+    </SectionIconWrap>
   );
 }
 function CameraIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-      <path fillRule="evenodd" d="M1 8a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 018.07 3h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0016.07 6H17a2 2 0 012 2v7a2 2 0 01-2 2H3a2 2 0 01-2-2V8zm13.5 3a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM10 14a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-    </svg>
+    <SectionIconWrap>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+        <path d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+      </svg>
+    </SectionIconWrap>
   );
 }
 function XIcon() {
@@ -219,10 +239,12 @@ function ReportModal({ onClose }: { onClose: () => void }) {
               <span className="text-sm font-medium text-gray-700">証拠をアップロード（任意）</span>
               <span className="text-xs text-gray-400">{files.length}/5 ファイル</span>
             </div>
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl py-5 cursor-pointer hover:border-gray-300 hover:bg-gray-50 transition-all">
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-7 mb-1.5" style={{ color: "#1B4332" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-              </svg>
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl py-5 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all">
+              <span className="inline-flex items-center justify-center size-10 rounded-full mb-2" style={{ backgroundColor: "#ecfdf5" }}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-5" style={{ color: "#1B4332" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+              </span>
               <span className="text-sm font-medium text-gray-700">クリックしてファイルを選択</span>
               <span className="text-xs text-gray-400 mt-0.5">画像・スクリーンショット（PNG, JPG, PDF）最大5MB・各10MBまで</span>
               <input
@@ -385,24 +407,31 @@ export default function UserDetailPage() {
               <h2 className="text-sm font-semibold text-gray-900">言語スキル</h2>
             </div>
             <div className="flex flex-wrap gap-2">
-              {languages.map((l) => (
-                <div key={l.name} className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2">
-                  {l.useFlag ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={l.flagSrc} alt={l.name} className="w-5 h-auto rounded-sm shrink-0" />
-                  ) : (
-                    <span style={{ color: l.dotColor }} className="text-sm leading-none shrink-0">●</span>
-                  )}
-                  <span className="text-xs font-semibold text-gray-800">{l.name}</span>
-                  <div className="flex flex-col items-start gap-0.5">
-                    <span className="text-xs font-bold px-1.5 py-0.5 rounded border leading-tight"
-                      style={{ color: "#1B4332", borderColor: "#bbf7d0", backgroundColor: "#f0fdf4" }}>
-                      {l.level}
-                    </span>
-                    {l.sub && <span className="text-xs text-gray-400">{l.sub}</span>}
+              {languages.map((l) => {
+                const badgeStyle =
+                  l.name === "日本語"
+                    ? { color: "#1B4332", borderColor: "#bbf7d0", backgroundColor: "#f0fdf4" }
+                    : l.name === "ベトナム語"
+                    ? { color: "#c2410c", borderColor: "#fed7aa", backgroundColor: "#fff7ed" }
+                    : { color: "#1d4ed8", borderColor: "#bfdbfe", backgroundColor: "#eff6ff" };
+                return (
+                  <div key={l.name} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                    {l.useFlag ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={l.flagSrc} alt={l.name} className="w-5 h-auto rounded-sm shrink-0" />
+                    ) : (
+                      <span style={{ color: l.dotColor }} className="text-sm leading-none shrink-0">●</span>
+                    )}
+                    <span className="text-xs font-semibold text-gray-800">{l.name}</span>
+                    <div className="flex flex-col items-start gap-0.5">
+                      <span className="text-xs font-bold px-1.5 py-0.5 rounded border leading-tight" style={badgeStyle}>
+                        {l.level}
+                      </span>
+                      {l.sub && <span className="text-xs text-gray-400">{l.sub}</span>}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -415,7 +444,7 @@ export default function UserDetailPage() {
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {user.interests.map((interest) => (
-                  <span key={interest} className="text-xs px-3 py-1 rounded-full border border-gray-200 text-gray-600 font-medium">
+                  <span key={interest} className="text-xs px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
                     {interest}
                   </span>
                 ))}

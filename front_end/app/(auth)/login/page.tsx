@@ -151,10 +151,13 @@ export default function LoginPage() {
 
           {/* 7 - Forgot password */}
           <div className="text-center mt-4">
-            <Link href="/forgot-password" className="text-sm text-gray-500 hover:text-gray-700 border-b border-gray-400 border-dotted">
+            <Link href="/forgot-password" className="text-sm text-gray-500 hover:text-gray-700">
               パスワードを忘れましたか？
             </Link>
           </div>
+
+          {/* Divider */}
+          <hr className="border-t border-gray-300 mt-6 mx-2" />
 
           {/* 8 - Register link */}
           <p className="text-center text-sm text-gray-600 mt-6">

@@ -55,16 +55,16 @@ input[type="range"]::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #1B4332;
+  background: #fff;
   cursor: pointer;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  border: 2px solid #1B4332;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #1B4332;
+  background: #fff;
   cursor: pointer;
-  border: 2px solid #fff;
+  border: 2px solid #1B4332;
 }
