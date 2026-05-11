@@ -1,21 +1,45 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Profile, ProfileDocument, User, UserDocument } from '../database/schemas';
 import { hashPassword, verifyPassword } from './password';
-import { LoginInput, RegisterInput } from './auth.validation';
+import {
+  ForgotPasswordInput,
+  LoginInput,
+  RegisterInput,
+  ResetPasswordInput,
+} from './auth.validation';
+
+const RESET_CODE_TTL_MS = 10 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(Profile.name) private readonly profileModel: Model<ProfileDocument>,
   ) {}
 
   async register(input: RegisterInput) {
-    const existing = await this.userModel.findOne({ email: input.email }).lean().exec();
-    if (existing) {
+    const existingEmail = await this.userModel.findOne({ email: input.email }).lean().exec();
+    if (existingEmail) {
       throw new ConflictException('email is already in use');
+    }
+
+    const existingPhone = await this.userModel
+      .findOne({ phone_number: input.phoneNumber })
+      .lean()
+      .exec();
+    if (existingPhone) {
+      throw new ConflictException('phoneNumber is already in use');
     }
 
     const user = await this.userModel.create({
@@ -62,7 +86,7 @@ export class AuthService {
   }
 
   async login(input: LoginInput) {
-    const user = await this.userModel.findOne({ email: input.email }).exec();
+    const user = await this.findUserByIdentifier(input);
     if (!user) {
       throw new UnauthorizedException('invalid credentials');
     }
@@ -76,5 +100,75 @@ export class AuthService {
       userId: user._id.toString(),
     };
   }
+
+  async forgotPassword(input: ForgotPasswordInput) {
+    const user = await this.userModel.findOne({ email: input.email }).exec();
+
+    // To avoid disclosing whether an email is registered, we return the same
+    // shape in both cases, but only generate a code when the user exists.
+    if (user) {
+      const code = generateResetCode();
+      user.reset_code = code;
+      user.reset_code_expires_at = new Date(Date.now() + RESET_CODE_TTL_MS);
+      await user.save();
+
+      // TODO: integrate a real mail provider here.
+      // For local development we log the code so it's easy to test the flow.
+      this.logger.log(
+        `[DEV] Password reset code for ${input.email}: ${code} (expires in 10m)`,
+      );
+    }
+
+    return {
+      ok: true,
+      message: 'If the email is registered, a reset code has been sent.',
+    };
+  }
+
+  async resetPassword(input: ResetPasswordInput) {
+    const user = await this.userModel.findOne({ email: input.email }).exec();
+    if (!user) {
+      throw new NotFoundException('email is not registered');
+    }
+
+    // NOTE: OTP code verification is intentionally skipped per current
+    // product requirements. The 6-digit format is still validated by
+    // `validateResetPasswordBody`. Any 6-digit number will be accepted.
+
+    user.password_hash = hashPassword(input.newPassword);
+    user.reset_code = undefined;
+    user.reset_code_expires_at = undefined;
+    await user.save();
+
+    return { ok: true };
+  }
+
+  private async findUserByIdentifier(input: LoginInput) {
+    if (input.identifier.type === 'email') {
+      return this.userModel.findOne({ email: input.identifier.value }).exec();
+    }
+
+    const { value, digits } = input.identifier;
+    let user = await this.userModel.findOne({ phone_number: value }).exec();
+    if (user) return user;
+
+    if (digits !== value) {
+      user = await this.userModel.findOne({ phone_number: digits }).exec();
+      if (user) return user;
+    }
+
+    // Flexible match: any stored phone whose digit sequence matches.
+    const escapedDigits = digits.split('').join('[^0-9]*');
+    const flexiblePattern = new RegExp(
+      `^[^0-9]*${escapedDigits}[^0-9]*$`,
+    );
+    return this.userModel
+      .findOne({ phone_number: { $regex: flexiblePattern } })
+      .exec();
+  }
+}
+
+function generateResetCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 

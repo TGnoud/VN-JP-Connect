@@ -57,6 +57,12 @@ export class User {
 
   @Prop({ required: true, default: Date.now })
   created_at: Date;
+
+  @Prop({ trim: true })
+  reset_code?: string;
+
+  @Prop()
+  reset_code_expires_at?: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

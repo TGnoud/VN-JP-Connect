@@ -24,6 +24,17 @@ function requireEmail(email: string) {
   return email;
 }
 
+function requirePhoneFormat(value: string) {
+  if (!/^[\d\s\-+()]+$/.test(value)) {
+    throw new BadRequestException('phoneNumber format is invalid');
+  }
+  const digits = value.replace(/\D/g, '');
+  if (digits.length < 9 || digits.length > 15) {
+    throw new BadRequestException('phoneNumber format is invalid');
+  }
+  return value;
+}
+
 function requireNationality(value: string): Nationality {
   if (!(NATIONALITIES as readonly string[]).includes(value)) {
     throw new BadRequestException(`nationality must be one of: ${NATIONALITIES.join(', ')}`);
@@ -70,7 +81,7 @@ export function validateRegisterBody(body: unknown): RegisterInput {
   }
 
   const email = requireEmail(requireString(body.email, 'email').toLowerCase());
-  const phoneNumber = requireString(body.phoneNumber, 'phoneNumber');
+  const phoneNumber = requirePhoneFormat(requireString(body.phoneNumber, 'phoneNumber'));
   const password = requireString(body.password, 'password');
   if (password.length < 6) {
     throw new BadRequestException('password must be at least 6 characters');
@@ -82,18 +93,78 @@ export function validateRegisterBody(body: unknown): RegisterInput {
   return { email, phoneNumber, password, fullName, nationality, birthDate };
 }
 
+export type LoginIdentifier =
+  | { type: 'email'; value: string }
+  | { type: 'phone'; value: string; digits: string };
+
 export type LoginInput = {
-  email: string;
+  identifier: LoginIdentifier;
   password: string;
 };
+
+function parseLoginIdentifier(raw: string): LoginIdentifier {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    throw new BadRequestException('identifier is required');
+  }
+  if (trimmed.includes('@')) {
+    return { type: 'email', value: requireEmail(trimmed.toLowerCase()) };
+  }
+  if (!/^[\d\s\-+()]+$/.test(trimmed)) {
+    throw new BadRequestException(
+      'identifier must be a valid email or phone number',
+    );
+  }
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 9 || digits.length > 15) {
+    throw new BadRequestException(
+      'identifier must be a valid email or phone number',
+    );
+  }
+  return { type: 'phone', value: trimmed, digits };
+}
 
 export function validateLoginBody(body: unknown): LoginInput {
   if (!isRecord(body)) {
     throw new BadRequestException('body must be an object');
   }
 
-  const email = requireEmail(requireString(body.email, 'email').toLowerCase());
+  // Accept both `identifier` (preferred) and `email` (legacy) fields.
+  const raw = body.identifier ?? body.email;
+  const identifier = parseLoginIdentifier(requireString(raw, 'identifier'));
   const password = requireString(body.password, 'password');
-  return { email, password };
+  return { identifier, password };
+}
+
+export type ForgotPasswordInput = { email: string };
+
+export function validateForgotPasswordBody(body: unknown): ForgotPasswordInput {
+  if (!isRecord(body)) {
+    throw new BadRequestException('body must be an object');
+  }
+  const email = requireEmail(requireString(body.email, 'email').toLowerCase());
+  return { email };
+}
+
+export type ResetPasswordInput = {
+  email: string;
+  code: string;
+  newPassword: string;
+};
+
+export function validateResetPasswordBody(body: unknown): ResetPasswordInput {
+  if (!isRecord(body)) {
+    throw new BadRequestException('body must be an object');
+  }
+  const email = requireEmail(requireString(body.email, 'email').toLowerCase());
+  const code = requireString(body.code, 'code');
+  if (!/^\d{6}$/.test(code)) {
+    throw new BadRequestException('code must be a 6-digit number');
+  }
+  const newPassword = requireString(body.newPassword, 'newPassword');
+  if (newPassword.length < 6) {
+    throw new BadRequestException('newPassword must be at least 6 characters');
+  }
+  return { email, code, newPassword };
 }
 

@@ -50,7 +50,7 @@ async function requestAuth(path: string, payload: unknown) {
   return response.json() as Promise<AuthResponse>;
 }
 
-export function login(payload: { email: string; password: string }) {
+export function login(payload: { identifier: string; password: string }) {
   return requestAuth("/auth/login", payload);
 }
 
@@ -63,6 +63,18 @@ export function register(payload: {
   birthDate: string;
 }) {
   return requestAuth("/auth/register", payload);
+}
+
+export function forgotPassword(payload: { email: string }) {
+  return requestAuth("/auth/forgot-password", payload);
+}
+
+export function resetPassword(payload: {
+  email: string;
+  code: string;
+  newPassword: string;
+}) {
+  return requestAuth("/auth/reset-password", payload);
 }
 
 export function setStoredUserId(userId: string) {

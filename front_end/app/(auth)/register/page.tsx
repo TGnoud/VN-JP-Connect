@@ -41,6 +41,13 @@ function selectCls(value: string, extra?: string) {
   return clsx(SELECT_CLS, !value && "text-gray-400", extra);
 }
 
+function isValidPhone(value: string): boolean {
+  const trimmed = value.trim();
+  if (!/^[\d\s\-+()]+$/.test(trimmed)) return false;
+  const digits = trimmed.replace(/\D/g, "");
+  return digits.length >= 9 && digits.length <= 15;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
 
@@ -78,6 +85,8 @@ export default function RegisterPage() {
     if (!fullName.trim()) e.fullName = "氏名を入力してください。";
     if (!email.trim()) e.email = "メールアドレスを入力してください。";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "有効なメールアドレスを入力してください。";
+    if (!phone.trim()) e.phone = "電話番号を入力してください";
+    else if (!isValidPhone(phone)) e.phone = "電話番号の形式が正しくありません";
     if (!password) e.password = "パスワードを入力してください。";
     else if (password.length < 8) e.password = "英数字を含む8文字以上必要です。";
     if (!gender) e.gender = "性別を選択してください。";
@@ -108,7 +117,7 @@ export default function RegisterPage() {
       const response = await register({
         fullName: fullName.trim(),
         email: email.trim(),
-        phoneNumber: phone.trim() || `no-phone-${Date.now()}`,
+        phoneNumber: phone.trim(),
         password,
         nationality: nationality === "日本" ? "JP" : "VN",
         birthDate,
@@ -116,12 +125,19 @@ export default function RegisterPage() {
       setStoredUserId(response.userId);
       router.push("/profile");
     } catch (error) {
-      setErrors({
-        submit:
-          error instanceof Error
-            ? error.message
-            : "登録に失敗しました。",
-      });
+      const rawMessage =
+        error instanceof Error ? error.message : "登録に失敗しました。";
+      const lower = rawMessage.toLowerCase();
+
+      if (lower.includes("phone") && lower.includes("already")) {
+        setErrors({ phone: "この電話番号は既に使用されています" });
+      } else if (lower.includes("phone") && lower.includes("format")) {
+        setErrors({ phone: "電話番号の形式が正しくありません" });
+      } else if (lower.includes("email") && lower.includes("already")) {
+        setErrors({ email: "このメールアドレスは既に使用されています" });
+      } else {
+        setErrors({ submit: rawMessage });
+      }
     } finally {
       setLoading(false);
     }
@@ -225,7 +241,9 @@ export default function RegisterPage() {
                     <FieldError msg={errors.email} />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-700 mb-1 block">電話番号</label>
+                    <label className="text-xs font-semibold text-gray-700 mb-1 block">
+                      電話番号<Req />
+                    </label>
                     <input
                       type="tel"
                       placeholder="電話番号を入力"

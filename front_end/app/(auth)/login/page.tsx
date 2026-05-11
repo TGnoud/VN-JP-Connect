@@ -35,18 +35,31 @@ export default function LoginPage() {
 
     try {
       const response = await login({
-        email: identifier.trim(),
+        identifier: identifier.trim(),
         password,
       });
       setStoredUserId(response.userId);
       router.push("/profile");
     } catch (error) {
-      setErrors({
-        submit:
-          error instanceof Error
-            ? error.message
-            : "ログインに失敗しました。",
-      });
+      const rawMessage =
+        error instanceof Error ? error.message : "ログインに失敗しました。";
+      const lower = rawMessage.toLowerCase();
+
+      if (lower.includes("invalid credentials")) {
+        setErrors({
+          submit:
+            "メールアドレス（または電話番号）もしくはパスワードが正しくありません。",
+        });
+      } else if (
+        lower.includes("identifier") ||
+        (lower.includes("email") && lower.includes("valid"))
+      ) {
+        setErrors({
+          identifier: "メールアドレスまたは電話番号の形式が正しくありません。",
+        });
+      } else {
+        setErrors({ submit: rawMessage });
+      }
     } finally {
       setLoading(false);
     }
@@ -91,7 +104,7 @@ export default function LoginPage() {
               </label>
               <input
                 type="text"
-                placeholder="name@example.com"
+                placeholder="name@example.com または 09012345678"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 className="w-full border border-gray-300 rounded-md px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-800 focus:border-transparent placeholder:text-gray-400"

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
+import { forgotPassword, resetPassword } from "@/lib/auth-api";
 
 type Step = "email" | "reset";
 
@@ -95,24 +96,39 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError("");
 
-    if (!email.trim()) {
+    const trimmed = email.trim();
+    if (!trimmed) {
       setError("メールアドレスを入力してください。");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError("有効なメールアドレスを入力してください。");
       return;
     }
 
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setLoading(false);
-    setStep("reset");
-    setCountdown(180);
-    window.setTimeout(() => codeRefs.current[0]?.focus(), 0);
+    try {
+      await forgotPassword({ email: trimmed });
+      setStep("reset");
+      setCountdown(180);
+      window.setTimeout(() => codeRefs.current[0]?.focus(), 0);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "確認コードの送信に失敗しました。",
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    if (code.join("").length !== 6) {
+    const codeStr = code.join("");
+    if (codeStr.length !== 6) {
       setError("6桁の確認コードを入力してください。");
       return;
     }
@@ -128,8 +144,24 @@ export default function ForgotPasswordPage() {
     }
 
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    router.push("/login");
+    try {
+      await resetPassword({
+        email: email.trim(),
+        code: codeStr,
+        newPassword,
+      });
+      router.push("/login?reset=success");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      const lower = message.toLowerCase();
+      if (lower.includes("not registered") || lower.includes("not found")) {
+        setError("このメールアドレスは登録されていません。");
+      } else {
+        setError(message || "パスワードの変更に失敗しました。");
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleCodeChange(index: number, value: string) {
