@@ -136,13 +136,16 @@ function ProfileCard({
           {/* つながる */}
           <button
             onClick={onLike}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-white text-xs font-semibold transition-colors"
+            className="flex-[1.25] min-w-36 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-white text-xs font-semibold leading-tight transition-colors"
             style={{ backgroundColor: "#1B4332" }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
             </svg>
-            {getFirstName(user.fullName)}さんとつながる
+            <span className="min-w-0 text-center">
+              <span className="block truncate">{getFirstName(user.fullName)}さんと</span>
+              <span className="block">つながる</span>
+            </span>
           </button>
         </div>
       </div>
@@ -310,7 +313,7 @@ function FilterPanel({
   const pillInactive = "bg-white text-gray-600 border-gray-200 hover:border-gray-400";
 
   return (
-    <div className="w-60 shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-hidden">
+    <div className="w-80 xl:w-96 shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
         <span className="text-sm font-semibold text-gray-900">フィルター</span>
@@ -510,9 +513,10 @@ export default function DiscoverPage() {
     filter.nationality !== "all";
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
+      <div className="flex-1 min-w-0 flex flex-col">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-100 shrink-0">
+      <div className="flex items-center justify-between px-6 py-3 shrink-0">
         <div>
           <h1 className="text-base font-bold text-gray-900">ディスカバー</h1>
           <p className="text-xs text-gray-400">新しい出会いを探す</p>
@@ -539,7 +543,7 @@ export default function DiscoverPage() {
       {/* Body */}
       <div className="flex-1 flex min-h-0">
         {/* Card area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-auto">
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-6 overflow-auto">
           <div className="w-full max-w-2xl flex flex-col gap-3">
             <ProfileCard
               user={current}
@@ -547,22 +551,20 @@ export default function DiscoverPage() {
               onSkip={handleSkip}
               onViewDetail={() => router.push(`/users/${current.id}`)}
             />
-            <p className="text-xs text-gray-400 text-center">
-              {currentIndex + 1} / {users.length}
-            </p>
           </div>
         </div>
-
-        {/* Filter panel (right) */}
-        {showFilter && (
-          <FilterPanel
-            filter={filter}
-            onApply={(f) => setFilter(f)}
-            onReset={() => setFilter({ ...DEFAULT_FILTER })}
-            onClose={() => setShowFilter(false)}
-          />
-        )}
       </div>
+      </div>
+
+      {/* Filter panel (right) */}
+      {showFilter && (
+        <FilterPanel
+          filter={filter}
+          onApply={(f) => setFilter(f)}
+          onReset={() => setFilter({ ...DEFAULT_FILTER })}
+          onClose={() => setShowFilter(false)}
+        />
+      )}
 
       {/* Match toast */}
       {matchAlert && (
