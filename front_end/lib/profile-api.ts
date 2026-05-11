@@ -82,6 +82,7 @@ export interface DiscoverProfileData {
   occupation: string;
   bio: string;
   avatarUrl: string;
+  languages: ProfileLanguage[];
   photos: ProfilePhoto[];
   interests: ProfileTag[];
   likeRate: number;
@@ -99,6 +100,48 @@ export interface ConversationResponse {
     nationality: "JP" | "VN";
     avatarUrl: string;
   };
+}
+
+export interface HomeFilterOptions {
+  genders: Array<"male" | "female" | "other">;
+  nationalities: Array<"JP" | "VN">;
+  japaneseLevels: string[];
+  interests: Array<{ id: string; name: string }>;
+  ageRange: {
+    min: number;
+    max: number;
+    defaultMin: number;
+    defaultMax: number;
+  };
+  distanceRange: {
+    min: number;
+    max: number;
+    defaultMax: number;
+    supported: boolean;
+  };
+}
+
+export interface DiscoverQueryParams {
+  gender?: string;
+  nationality?: "JP" | "VN";
+  ageMin?: number;
+  ageMax?: number;
+  distanceMax?: number;
+  japaneseLevels?: string[];
+  interestTagIds?: string[];
+  excludeUserIds?: string[];
+  limit?: number;
+}
+
+export interface DiscoverInterestResponse {
+  status: "pending" | "matched";
+  matchId: string;
+  conversation?: ConversationResponse;
+}
+
+export interface HomeNavSummary {
+  unreadMessagesCount: number;
+  unreadEventsCount: number;
 }
 
 export interface ProfileOptions {
@@ -209,8 +252,45 @@ export function getUserPublicProfile(userId: string) {
   return requestApi<PublicProfileData>(`/users/${userId}/profile`);
 }
 
-export function getDiscoverProfiles() {
-  return requestApi<DiscoverProfileData[]>("/home/discover");
+function appendCsvParam(params: URLSearchParams, name: string, values?: string[]) {
+  const cleanValues = values?.filter(Boolean) ?? [];
+
+  if (cleanValues.length > 0) {
+    params.set(name, cleanValues.join(","));
+  }
+}
+
+export function getHomeFilters() {
+  return requestApi<HomeFilterOptions>("/home/filters");
+}
+
+export function getHomeNavSummary() {
+  return requestApi<HomeNavSummary>("/home/nav-summary");
+}
+
+export function getDiscoverProfiles(query: DiscoverQueryParams = {}) {
+  const params = new URLSearchParams();
+
+  if (query.gender) params.set("gender", query.gender);
+  if (query.nationality) params.set("nationality", query.nationality);
+  if (query.ageMin !== undefined) params.set("ageMin", String(query.ageMin));
+  if (query.ageMax !== undefined) params.set("ageMax", String(query.ageMax));
+  if (query.distanceMax !== undefined) params.set("distanceMax", String(query.distanceMax));
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  appendCsvParam(params, "japaneseLevels", query.japaneseLevels);
+  appendCsvParam(params, "interestTagIds", query.interestTagIds);
+  appendCsvParam(params, "excludeUserIds", query.excludeUserIds);
+
+  const queryString = params.toString();
+  return requestApi<DiscoverProfileData[]>(
+    queryString ? `/home/discover?${queryString}` : "/home/discover",
+  );
+}
+
+export function showDiscoverInterest(userId: string) {
+  return requestApi<DiscoverInterestResponse>(`/home/discover/${userId}/interest`, {
+    method: "POST",
+  });
 }
 
 export function reportUser(
