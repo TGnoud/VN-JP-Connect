@@ -116,10 +116,6 @@ export class HomeService {
     return users
       .map((user) => {
         const profile = profileByUserId.get(user._id.toString());
-        if (!profile) {
-          return null;
-        }
-
         const userInterestTagIds = interestLinks
           .filter((l) => l.user_id.toString() === user._id.toString())
           .map((l) => l.tag_id.toString());
@@ -132,13 +128,13 @@ export class HomeService {
           id: user._id.toString(),
           fullName: user.full_name,
           nationality: user.nationality,
-          age: profile.age ?? null,
-          gender: profile.gender ?? null,
-          location: profile.location ?? '',
-          occupation: profile.occupation ?? '',
-          bio: profile.bio ?? '',
-          avatarUrl: profile.avatar_url ?? '',
-          photos: (profile.photos ?? []).map((p: any) => ({
+          age: profile?.age ?? null,
+          gender: profile?.gender ?? null,
+          location: profile?.location ?? '',
+          occupation: profile?.occupation ?? '',
+          bio: profile?.bio ?? '',
+          avatarUrl: profile?.avatar_url ?? '',
+          photos: (profile?.photos ?? []).map((p: any) => ({
             id: p._id.toString(),
             url: p.url,
             isMain: p.is_main,
@@ -147,11 +143,11 @@ export class HomeService {
           interests,
           likeRate: profile.match_rate ?? 100,
           connectionsCount:
-            profile.connections_count ??
+            profile?.connections_count ??
             connectionsCountByUserId.get(user._id.toString()) ??
             0,
           joinedAt: user.created_at,
-          updatedAt: profile.updated_at,
+          updatedAt: profile?.updated_at ?? user.created_at,
         };
       })
       .filter(Boolean);

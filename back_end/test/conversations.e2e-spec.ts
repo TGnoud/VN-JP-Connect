@@ -55,7 +55,7 @@ describe('Conversations API (e2e)', () => {
 
   it('rejects messaging when users are not matched', () => {
     conversationsService.openWithUser.mockRejectedValueOnce(
-      new ForbiddenException('accepted match is required before messaging this user'),
+      new ForbiddenException('メッセージを送るには、先にこのユーザーとマッチする必要があります。'),
     );
 
     return request(app.getHttpServer())
