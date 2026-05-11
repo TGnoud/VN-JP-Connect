@@ -5,10 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { mkdir, unlink, writeFile } from 'fs/promises';
 import { Model, Types } from 'mongoose';
-import { join } from 'path';
-import { randomUUID } from 'crypto';
 import {
   Match,
   MatchDocument,
@@ -30,12 +27,10 @@ import {
   PROFILE_NATIONALITY_OPTIONS,
 } from './profile.constants';
 import { LanguageInput, PersonalProfileInput } from './profile.validation';
-
-interface UploadedFileLike {
-  buffer?: Buffer;
-  mimetype: string;
-  originalname?: string;
-}
+import {
+  ProfileImageStorageService,
+  UploadedFileLike,
+} from './profile-image-storage.service';
 
 @Injectable()
 export class ProfileService {
@@ -46,6 +41,7 @@ export class ProfileService {
     @InjectModel(UserInterest.name)
     private readonly userInterestModel: Model<UserInterestDocument>,
     @InjectModel(Match.name) private readonly matchModel: Model<MatchDocument>,
+    private readonly profileImageStorage: ProfileImageStorageService,
   ) {}
 
   getProfileOptions() {
@@ -230,12 +226,21 @@ export class ProfileService {
     }
 
     const savedPhotos = await Promise.all(
-      files.map(async (file, index) => ({
-        _id: new Types.ObjectId(),
-        url: await this.saveUploadedFile(userId, file),
-        is_main: existingPhotos.length === 0 && index === 0,
-        uploaded_at: new Date(),
-      })),
+      files.map(async (file, index) => {
+        const storedImage = await this.profileImageStorage.saveProfileImage(
+          userId,
+          file,
+          'photo',
+        );
+
+        return {
+          _id: new Types.ObjectId(),
+          url: storedImage.url,
+          public_id: storedImage.publicId ?? '',
+          is_main: existingPhotos.length === 0 && index === 0,
+          uploaded_at: new Date(),
+        };
+      }),
     );
 
     await this.profileModel
@@ -306,14 +311,14 @@ export class ProfileService {
         },
       )
       .exec();
-    await this.deleteLocalFile(photo.url);
+    await this.profileImageStorage.deleteProfileImage(photo.url, photo.public_id);
 
     return this.getMe(userId);
   }
 
   async updateAvatar(userId: string, file: UploadedFileLike) {
-    const url = await this.saveUploadedFile(userId, file);
-    return this.updateAvatarUrl(userId, url);
+    const storedImage = await this.profileImageStorage.saveProfileImage(userId, file, 'avatar');
+    return this.updateAvatarUrl(userId, storedImage.url);
   }
 
   async updateAvatarUrl(userId: string, url: string) {
@@ -333,8 +338,8 @@ export class ProfileService {
   }
 
   async updateCover(userId: string, file: UploadedFileLike) {
-    const url = await this.saveUploadedFile(userId, file);
-    return this.updateCoverUrl(userId, url);
+    const storedImage = await this.profileImageStorage.saveProfileImage(userId, file, 'cover');
+    return this.updateCoverUrl(userId, storedImage.url);
   }
 
   async updateCoverUrl(userId: string, url: string) {
@@ -471,47 +476,4 @@ export class ProfileService {
     };
   }
 
-  private async saveUploadedFile(userId: string, file: UploadedFileLike) {
-    if (!file?.buffer?.length) {
-      throw new BadRequestException('file is required');
-    }
-
-    const extension = this.extensionFromMimeType(file.mimetype);
-    const uploadDir = join(process.cwd(), 'uploads', 'profile', userId);
-    const filename = `${randomUUID()}${extension}`;
-
-    await mkdir(uploadDir, { recursive: true });
-    await writeFile(join(uploadDir, filename), file.buffer);
-
-    return `/uploads/profile/${userId}/${filename}`;
-  }
-
-  private extensionFromMimeType(mimetype: string) {
-    const extensions: Record<string, string> = {
-      'image/jpeg': '.jpg',
-      'image/png': '.png',
-      'image/webp': '.webp',
-    };
-    const extension = extensions[mimetype];
-
-    if (!extension) {
-      throw new BadRequestException('unsupported image type');
-    }
-
-    return extension;
-  }
-
-  private async deleteLocalFile(url: string) {
-    if (!url.startsWith('/uploads/profile/')) {
-      return;
-    }
-
-    const relativePath = url.replace(/^\/uploads\//, '');
-
-    try {
-      await unlink(join(process.cwd(), 'uploads', relativePath));
-    } catch {
-      // The database update is authoritative; missing local files are ignored.
-    }
-  }
 }

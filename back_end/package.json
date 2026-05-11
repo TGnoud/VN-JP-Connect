@@ -23,13 +23,16 @@
     "db:status:local": "migrate-mongo status -f migrate-mongo.local.cjs",
     "db:status:atlas": "migrate-mongo status -f migrate-mongo.atlas.cjs",
     "seed": "ts-node src/seed.ts",
-    "seed:atlas": "ts-node src/seed.ts --atlas"
+    "seed:atlas": "ts-node src/seed.ts --atlas",
+    "repair:profile-images": "ts-node src/repair-profile-images.ts",
+    "repair:profile-images:atlas": "ts-node src/repair-profile-images.ts --atlas"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/mongoose": "^11.0.4",
     "@nestjs/platform-express": "^11.0.1",
+    "cloudinary": "^2.10.0",
     "dotenv": "^17.4.2",
     "mongodb": "^7.2.0",
     "mongoose": "^9.6.2",

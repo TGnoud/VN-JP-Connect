@@ -74,6 +74,9 @@ export class ProfilePhoto {
   @Prop({ required: true, trim: true })
   url: string;
 
+  @Prop({ trim: true, default: '' })
+  public_id?: string;
+
   @Prop({ required: true, default: false })
   is_main: boolean;
 
