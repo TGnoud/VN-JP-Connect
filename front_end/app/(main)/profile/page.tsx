@@ -279,6 +279,29 @@ type PersonalForm = {
   line: string;
 };
 
+const LANGUAGE_API_NAMES: Record<string, string> = {
+  Japanese: "日本語",
+  Vietnamese: "ベトナム語",
+  English: "英語",
+  Chinese: "中国語",
+  Korean: "韓国語",
+  French: "フランス語",
+  Spanish: "スペイン語",
+};
+
+const LANGUAGE_UI_NAMES = Object.fromEntries(
+  Object.entries(LANGUAGE_API_NAMES).map(([apiName, uiName]) => [uiName, apiName]),
+);
+
+const LEVEL_API_NAMES: Record<string, string> = {
+  Native: "母語",
+  Beginner: "Basic",
+};
+
+const LEVEL_UI_NAMES = Object.fromEntries(
+  Object.entries(LEVEL_API_NAMES).map(([apiName, uiName]) => [uiName, apiName]),
+);
+
 function formatJoinedAt(value: string) {
   return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "long" }).format(
     new Date(value),
@@ -290,23 +313,20 @@ function shortEmail(value: string) {
 }
 
 function languageFromApi(language: string, level: string): LangEntry {
+  const uiName = LANGUAGE_API_NAMES[language] ?? language;
   const option =
-    language === "Vietnamese"
-      ? LANG_OPTIONS[1]
-      : language === "Japanese"
-        ? LANG_OPTIONS[0]
-        : language === "English"
-          ? LANG_OPTIONS[2]
-          : { name: language, useFlag: false, flagSrc: "", dotColor: "#6b7280" };
+    LANG_OPTIONS.find((item) => item.name === uiName) ??
+    { name: uiName, useFlag: false, flagSrc: "", dotColor: "#6b7280" };
 
-  return { ...option, level: level === "Native" ? LEVEL_OPTIONS[0] : level };
+  return { ...option, level: LEVEL_API_NAMES[level] ?? level };
 }
 
 function languageToApi(language: string) {
-  if (language === LANG_OPTIONS[1].name) return "Vietnamese";
-  if (language === LANG_OPTIONS[0].name) return "Japanese";
-  if (language === LANG_OPTIONS[2].name) return "English";
-  return language;
+  return LANGUAGE_UI_NAMES[language] ?? language;
+}
+
+function levelToApi(level: string) {
+  return LEVEL_UI_NAMES[level] ?? level;
 }
 
 function profileFromApi(profile: ProfileData): UiProfile {
@@ -793,16 +813,22 @@ export default function ProfilePage() {
   }
 
   async function saveLanguages(nextLanguages: LangEntry[]) {
-    setLanguages(nextLanguages);
     applyApiProfile(await replaceLanguages(nextLanguages.map((item) => ({
       language: languageToApi(item.name),
-      level: item.level === LEVEL_OPTIONS[0] ? "Native" : item.level,
+      level: levelToApi(item.level),
     }))));
   }
 
   async function saveInterests(nextInterests: string[]) {
-    setInterests(nextInterests);
     const tags = await searchInterestTags();
+    const missingInterests = nextInterests.filter(
+      (name) => !tags.some((tag: ProfileTag) => tag.name === name),
+    );
+
+    if (missingInterests.length > 0) {
+      throw new Error(`Missing interest tags in backend: ${missingInterests.join(", ")}`);
+    }
+
     const tagIds = nextInterests
       .map((name) => tags.find((tag: ProfileTag) => tag.name === name)?.id)
       .filter((id): id is string => Boolean(id));
@@ -982,7 +1008,7 @@ export default function ProfilePage() {
             {interests.map((i) => (
               <span key={i} className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: "#1B4332" }}>
                 {i}
-                <button onClick={() => { void removeInterest(i).catch(console.error); }} className="ml-0.5 opacity-80 hover:opacity-100 leading-none">×</button>
+                <button onClick={() => { void removeInterest(i).catch((error) => { console.error(error); alert(errorMessage(error)); }); }} className="ml-0.5 opacity-80 hover:opacity-100 leading-none">×</button>
               </span>
             ))}
             <button onClick={() => setModal("selectInterests")} className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">+ 追加</button>
@@ -990,7 +1016,7 @@ export default function ProfilePage() {
           <p className="text-xs text-gray-500 mb-2">おすすめ</p>
           <div className="flex flex-wrap gap-1.5">
             {ALL_INTERESTS.slice(8, 13).filter((s) => !interests.includes(s)).map((s) => (
-              <button key={s} onClick={() => { void addRecommendedInterest(s).catch(console.error); }} className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+              <button key={s} onClick={() => { void addRecommendedInterest(s).catch((error) => { console.error(error); alert(errorMessage(error)); }); }} className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
                 + {s}
               </button>
             ))}
