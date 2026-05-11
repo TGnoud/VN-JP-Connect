@@ -86,6 +86,26 @@ const AVATAR_OPTIONS = [
   "https://api.dicebear.com/7.x/personas/svg?seed=anh",
 ];
 
+const EMPTY_PROFILE = {
+  ...PROFILE,
+  fullName: "",
+  email: "",
+  age: 0,
+  gender: "",
+  nationality: "",
+  city: "",
+  occupation: "",
+  school: "",
+  joinedAt: "",
+  likeRate: 100,
+  connectionsCount: 0,
+  bio: "",
+  avatarUrl: "https://api.dicebear.com/7.x/personas/svg?seed=user",
+  coverUrl: COVER_PHOTOS[0],
+  photos: [],
+  interests: [],
+};
+
 /* ── Icons ── */
 function PencilIcon({ size = 3.5 }: { size?: number }) {
   return (
@@ -753,16 +773,16 @@ type ModalType = "editInfo" | "addPhoto" | "selectInterests" | "changeAvatar" | 
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<UiProfile>(PROFILE);
+  const [profile, setProfile] = useState<UiProfile>(EMPTY_PROFILE);
   const [socialLinks, setSocialLinks] = useState({
-    instagram: "@minh_nguyen_vn",
-    facebook: "Minh Nguyen",
-    line: "@minh_line",
+    instagram: "",
+    facebook: "",
+    line: "",
   });
-  const [interests, setInterests] = useState(PROFILE.interests);
-  const [bio, setBio] = useState(PROFILE.bio);
-  const [languages, setLanguages] = useState<LangEntry[]>([...LANGUAGES]);
-  const [photos, setPhotos] = useState<string[]>(PROFILE.photos);
+  const [interests, setInterests] = useState<string[]>([]);
+  const [bio, setBio] = useState("");
+  const [languages, setLanguages] = useState<LangEntry[]>(() => LANGUAGES.slice(0, 0));
+  const [photos, setPhotos] = useState<string[]>([]);
   const [modal, setModal] = useState<ModalType | null>(null);
   const [failedMedia, setFailedMedia] = useState({ avatarUrl: "", coverUrl: "" });
 
