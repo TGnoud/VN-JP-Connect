@@ -141,7 +141,7 @@ export class HomeService {
             uploadedAt: p.uploaded_at,
           })),
           interests,
-          likeRate: profile.match_rate ?? 100,
+          likeRate: profile?.match_rate ?? 100,
           connectionsCount:
             profile?.connections_count ??
             connectionsCountByUserId.get(user._id.toString()) ??
