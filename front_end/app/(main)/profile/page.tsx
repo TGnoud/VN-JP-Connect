@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import {
   addPhotoUrls,
   getMyProfile,
@@ -85,26 +84,6 @@ const AVATAR_OPTIONS = [
   "https://api.dicebear.com/7.x/personas/svg?seed=yuki",
   "https://api.dicebear.com/7.x/personas/svg?seed=anh",
 ];
-
-const EMPTY_PROFILE = {
-  ...PROFILE,
-  fullName: "",
-  email: "",
-  age: 0,
-  gender: "",
-  nationality: "",
-  city: "",
-  occupation: "",
-  school: "",
-  joinedAt: "",
-  likeRate: 100,
-  connectionsCount: 0,
-  bio: "",
-  avatarUrl: "https://api.dicebear.com/7.x/personas/svg?seed=user",
-  coverUrl: COVER_PHOTOS[0],
-  photos: [],
-  interests: [],
-};
 
 /* ── Icons ── */
 function PencilIcon({ size = 3.5 }: { size?: number }) {
@@ -772,17 +751,16 @@ function ChangeCoverModal({ current, onClose, onSave }: { current: string; onClo
 type ModalType = "editInfo" | "addPhoto" | "selectInterests" | "changeAvatar" | "changeCover" | "editBio" | "editLanguages";
 
 export default function ProfilePage() {
-  const router = useRouter();
-  const [profile, setProfile] = useState<UiProfile>(EMPTY_PROFILE);
+  const [profile, setProfile] = useState<UiProfile>(PROFILE);
   const [socialLinks, setSocialLinks] = useState({
     instagram: "",
     facebook: "",
     line: "",
   });
-  const [interests, setInterests] = useState<string[]>([]);
-  const [bio, setBio] = useState("");
-  const [languages, setLanguages] = useState<LangEntry[]>(() => LANGUAGES.slice(0, 0));
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [interests, setInterests] = useState<string[]>(PROFILE.interests);
+  const [bio, setBio] = useState(PROFILE.bio);
+  const [languages, setLanguages] = useState<LangEntry[]>(LANGUAGES);
+  const [photos, setPhotos] = useState<string[]>(PROFILE.photos);
   const [modal, setModal] = useState<ModalType | null>(null);
   const [failedMedia, setFailedMedia] = useState({ avatarUrl: "", coverUrl: "" });
 
@@ -805,10 +783,11 @@ export default function ProfilePage() {
         setPhotos(uiProfile.photos);
         setSocialLinks(socialLinksFromApi(apiProfile));
       } catch (error) {
-        console.error(error);
         if (error instanceof Error && error.message.includes("Login is required")) {
-          router.push("/login");
+          return;
         }
+
+        console.warn(errorMessage(error));
       }
     }
 
@@ -817,7 +796,7 @@ export default function ProfilePage() {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, []);
 
   function applyApiProfile(apiProfile: ProfileData) {
     const uiProfile = profileFromApi(apiProfile);
@@ -933,13 +912,11 @@ export default function ProfilePage() {
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50">
-      {/* Page title */}
-      <div className="bg-white border-b border-gray-100 px-6 py-3 shrink-0">
-        <h1 className="text-base font-bold text-gray-900">マイプロフィール</h1>
-        <p className="text-xs text-gray-400">個人情報の管理</p>
-      </div>
-
-      <div className="max-w-2xl mx-auto px-4 py-5 flex flex-col gap-4">
+      <div className="max-w-2xl mx-auto px-4 pt-6 pb-5 flex flex-col gap-4">
+        <div>
+          <h1 className="text-2xl font-bold leading-tight text-gray-900">マイプロフィール</h1>
+          <p className="mt-1 text-xs font-medium text-gray-400">個人情報の管理</p>
+        </div>
 
         {/* ── Hero card ── */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

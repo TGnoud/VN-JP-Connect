@@ -47,6 +47,7 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [gender, setGender] = useState("");
@@ -65,6 +66,7 @@ export default function RegisterPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
 
   function toggleArr(arr: string[], set: (v: string[]) => void, val: string) {
     set(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
@@ -88,6 +90,15 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
+    if (!/^\d{6}$/.test(otp)) {
+      setErrors((current) => ({
+        ...current,
+        otp: otp.trim()
+          ? "6桁の認証コードを入力してください。"
+          : "認証コードを入力してください。",
+      }));
+      return;
+    }
     setLoading(true);
     setErrors({});
 
@@ -111,6 +122,25 @@ export default function RegisterPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSendOtp() {
+    const nextErrors: Record<string, string> = {};
+
+    if (!email.trim()) {
+      nextErrors.email = "ãƒ¡ãƒ¼ãƒ«ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      nextErrors.email = "æœ‰åŠ¹ãªãƒ¡ãƒ¼ãƒ«ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors((current) => ({ ...current, ...nextErrors }));
+      return;
+    }
+
+    setSendingOtp(true);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    setSendingOtp(false);
   }
 
   return (
@@ -193,6 +223,33 @@ export default function RegisterPage() {
                     />
                     <FieldError msg={errors.phone} />
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 mb-1 block">
+                    認証コード (OTP)<Req />
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="6桁のコードを入力"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      maxLength={6}
+                      className={clsx(INPUT_CLS, "flex-1", errors.otp && "border-red-400 bg-red-50")}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={sendingOtp}
+                      className="w-36 shrink-0 rounded-md text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ backgroundColor: "#1B4332" }}
+                    >
+                      {sendingOtp ? "送信中..." : "OTPを送信"}
+                    </button>
+                  </div>
+                  <FieldError msg={errors.otp} />
                 </div>
 
                 {/* 7 - パスワード */}
@@ -490,7 +547,6 @@ export default function RegisterPage() {
                 rows={4}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-800 focus:border-transparent placeholder:text-gray-400"
               />
-              <p className="text-xs text-gray-400 text-right mt-1">{bio.length}/500</p>
             </section>
 
             {/* 17 - Submit */}

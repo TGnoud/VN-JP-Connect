@@ -202,6 +202,10 @@ function DualRangeSlider({
   onChangeMax: (v: number) => void;
 }) {
   const pct = (v: number) => ((v - min) / (max - min)) * 100;
+  const minInputMax = Math.max(min, valueMax - 1);
+  const maxInputMin = Math.min(max, valueMin + 1);
+  const minInputWidth = pct(minInputMax);
+  const maxInputLeft = pct(maxInputMin);
   return (
     <div className="relative w-full" style={{ height: CONTAINER_H }}>
       <div className="absolute inset-x-0 rounded-full bg-gray-200"
@@ -210,14 +214,14 @@ function DualRangeSlider({
         style={{ left: `${pct(valueMin)}%`, right: `${100 - pct(valueMax)}%`, height: TRACK_H, top: TRACK_TOP, backgroundColor: "#1B4332" }} />
       <div style={thumbStyle(pct(valueMin))} />
       <div style={thumbStyle(pct(valueMax))} />
-      <input type="range" min={min} max={max} value={valueMin}
+      <input type="range" min={min} max={minInputMax} value={Math.min(valueMin, minInputMax)}
         onChange={(e) => onChangeMin(Math.min(Number(e.target.value), valueMax - 1))}
         className="absolute inset-0 w-full cursor-pointer opacity-0"
-        style={{ height: "100%", zIndex: valueMin > (min + max) / 2 ? 4 : 3 }} />
-      <input type="range" min={min} max={max} value={valueMax}
+        style={{ height: "100%", width: `${minInputWidth}%`, zIndex: 4 }} />
+      <input type="range" min={maxInputMin} max={max} value={Math.max(valueMax, maxInputMin)}
         onChange={(e) => onChangeMax(Math.max(Number(e.target.value), valueMin + 1))}
         className="absolute inset-0 w-full cursor-pointer opacity-0"
-        style={{ height: "100%", zIndex: valueMin > (min + max) / 2 ? 3 : 4 }} />
+        style={{ height: "100%", left: `${maxInputLeft}%`, width: `${100 - maxInputLeft}%`, zIndex: 4 }} />
     </div>
   );
 }

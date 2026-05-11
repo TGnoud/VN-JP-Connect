@@ -316,7 +316,7 @@ export default function UserDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto pt-6">
 
         {/* ── Cover photo ── */}
         <div className="relative h-44 bg-gradient-to-br from-emerald-100 to-gray-200 overflow-hidden">
