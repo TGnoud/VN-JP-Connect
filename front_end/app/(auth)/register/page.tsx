@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
+import { register, setStoredUserId } from "@/lib/auth-api";
 import { INTERESTS, PURPOSES, JAPANESE_LEVELS, VIETNAMESE_LEVELS, CITIES } from "@/lib/mock-data";
 
 const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
@@ -88,10 +89,28 @@ export default function RegisterPage() {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    // TODO: call API POST /auth/register
-    await new Promise((r) => setTimeout(r, 800));
-    setLoading(false);
-    router.push("/login");
+    setErrors({});
+
+    try {
+      const response = await register({
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phoneNumber: phone.trim() || `no-phone-${Date.now()}`,
+        password,
+        nationality: nationality === "日本" ? "JP" : "VN",
+      });
+      setStoredUserId(response.userId);
+      router.push("/profile");
+    } catch (error) {
+      setErrors({
+        submit:
+          error instanceof Error
+            ? error.message
+            : "登録に失敗しました。",
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -483,6 +502,9 @@ export default function RegisterPage() {
             >
               {loading ? "登録中..." : "登録を完了する"}
             </button>
+            {errors.submit && (
+              <p className="text-xs text-red-500 text-center -mt-4">{errors.submit}</p>
+            )}
 
             {/* 18 - Login link */}
             <p className="text-center text-sm text-gray-400 -mt-4 pb-4">

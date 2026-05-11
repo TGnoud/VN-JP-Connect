@@ -1,7 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import {
+  addPhotoUrls,
+  getMyProfile,
+  replaceInterests,
+  replaceLanguages,
+  resolveMediaUrl,
+  searchInterestTags,
+  updateAvatarUrl,
+  updateBio,
+  updateCoverUrl,
+  updatePersonalProfile,
+  uploadAvatar,
+  uploadCover,
+  uploadPhotos,
+  type ProfileData,
+  type ProfileTag,
+} from "@/lib/profile-api";
 
 /* ── Constants ── */
 const PROFILE = {
@@ -187,24 +205,39 @@ function Modal({ title, onClose, children, wide = false }: { title: string; onCl
   );
 }
 
-function ModalFooter({ onCancel, onSave, saveLabel, saveDisabled = false, saveIcon }: { onCancel: () => void; onSave: () => void; saveLabel: string; saveDisabled?: boolean; saveIcon?: React.ReactNode }) {
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "保存に失敗しました。";
+}
+
+function ModalFooter({ onCancel, onSave, saveLabel, saveDisabled = false }: { onCancel: () => void; onSave: () => void | Promise<void>; saveLabel: string; saveDisabled?: boolean }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (saving || saveDisabled) return;
+
+    setSaving(true);
+    try {
+      await onSave();
+    } catch (error) {
+      console.error(error);
+      alert(errorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="px-5 py-3 border-t border-gray-100 flex justify-end gap-2 shrink-0">
       <button onClick={onCancel} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">キャンセル</button>
-      <button
-        onClick={onSave}
-        disabled={saveDisabled}
-        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors"
-        style={{ backgroundColor: saveDisabled ? "#9ca3af" : "#1B4332" }}
-      >
-        {saveIcon ?? <CheckIcon />} {saveLabel}
+      <button onClick={handleSave} disabled={saveDisabled || saving} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors" style={{ backgroundColor: "#1B4332" }}>
+        <CheckIcon /> {saveLabel}
       </button>
     </div>
   );
 }
 
 /* ── Modal: プロフィール編集 ── */
-function EditBioModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (v: string) => void }) {
+function EditBioModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (v: string) => void | Promise<void> }) {
   const [text, setText] = useState(current);
   return (
     <Modal title="プロフィールを編集" onClose={onClose} wide>
@@ -219,7 +252,7 @@ function EditBioModal({ current, onClose, onSave }: { current: string; onClose: 
         />
         <p className="text-xs text-gray-400 mt-1 text-right">{text.length} 文字</p>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { onSave(text); onClose(); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(text)).then(onClose)} saveLabel="保存する" />
     </Modal>
   );
 }
@@ -237,8 +270,118 @@ const LANG_OPTIONS = [
 const LEVEL_OPTIONS = ["母語", "N1", "N2", "N3", "N4", "N5", "Basic", "A1", "A2", "B1", "B2", "C1", "C2", "IELTS 7.0", "IELTS 6.5"];
 
 type LangEntry = typeof LANGUAGES[0];
+type UiProfile = typeof PROFILE;
+type PersonalForm = {
+  fullName: string;
+  email: string;
+  age: string;
+  gender: string;
+  nationality: string;
+  city: string;
+  occupation: string;
+  school: string;
+  instagram: string;
+  facebook: string;
+  line: string;
+};
 
-function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]; onClose: () => void; onSave: (langs: LangEntry[]) => void }) {
+const LANGUAGE_API_NAMES: Record<string, string> = {
+  Japanese: "日本語",
+  Vietnamese: "ベトナム語",
+  English: "英語",
+  Chinese: "中国語",
+  Korean: "韓国語",
+  French: "フランス語",
+  Spanish: "スペイン語",
+};
+
+const LANGUAGE_UI_NAMES = Object.fromEntries(
+  Object.entries(LANGUAGE_API_NAMES).map(([apiName, uiName]) => [uiName, apiName]),
+);
+
+const LEVEL_API_NAMES: Record<string, string> = {
+  Native: "母語",
+  Beginner: "Basic",
+};
+
+const LEVEL_UI_NAMES = Object.fromEntries(
+  Object.entries(LEVEL_API_NAMES).map(([apiName, uiName]) => [uiName, apiName]),
+);
+
+function formatJoinedAt(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "long" }).format(
+    new Date(value),
+  );
+}
+
+function shortEmail(value: string) {
+  return value.length > 14 ? `${value.slice(0, 13)}...` : value;
+}
+
+function languageFromApi(language: string, level: string): LangEntry {
+  const uiName = LANGUAGE_API_NAMES[language] ?? language;
+  const option =
+    LANG_OPTIONS.find((item) => item.name === uiName) ??
+    { name: uiName, useFlag: false, flagSrc: "", dotColor: "#6b7280" };
+
+  return { ...option, level: LEVEL_API_NAMES[level] ?? level };
+}
+
+function languageToApi(language: string) {
+  return LANGUAGE_UI_NAMES[language] ?? language;
+}
+
+function levelToApi(level: string) {
+  return LEVEL_UI_NAMES[level] ?? level;
+}
+
+function defaultAvatarUrlFromSeed(seedValue: string) {
+  const seed = encodeURIComponent(seedValue || "user");
+  return `https://api.dicebear.com/7.x/personas/svg?seed=${seed}`;
+}
+
+function defaultAvatarUrl(profile: ProfileData) {
+  return defaultAvatarUrlFromSeed(profile.id || profile.email || profile.fullName || "user");
+}
+
+function profileFromApi(profile: ProfileData): UiProfile {
+  return {
+    ...PROFILE,
+    fullName: profile.fullName,
+    email: profile.email,
+    age: profile.age ?? 0,
+    gender:
+      profile.gender === "female"
+        ? "女性"
+        : profile.gender === "other"
+          ? "その他"
+          : profile.gender === "male"
+            ? "男性"
+            : "",
+    nationality: profile.nationality === "JP" ? "日本" : "ベトナム",
+    city: profile.location,
+    occupation: profile.occupation,
+    school: profile.education,
+    joinedAt: profile.joinedAt ? formatJoinedAt(profile.joinedAt) : PROFILE.joinedAt,
+    likeRate: profile.likeRate ?? 100,
+    connectionsCount: profile.connectionsCount ?? 0,
+    bio: profile.bio,
+    avatarUrl: resolveMediaUrl(profile.avatarUrl, 256) || defaultAvatarUrl(profile),
+    coverUrl: resolveMediaUrl(profile.coverUrl, 1400) || COVER_PHOTOS[0],
+    photos: profile.photos.map((photo) => resolveMediaUrl(photo.url, 700)),
+    interests: profile.interests.map((interest) => interest.name),
+  };
+}
+
+function socialLinksFromApi(profile: ProfileData) {
+  return {
+    instagram: profile.socialLinks.instagram,
+    facebook: profile.socialLinks.facebook,
+    line: profile.socialLinks.line,
+  };
+}
+
+function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]; onClose: () => void; onSave: (langs: LangEntry[]) => void | Promise<void> }) {
   const [list, setList] = useState<LangEntry[]>([...current]);
   const [newLang, setNewLang] = useState("");
   const [newLevel, setNewLevel] = useState("");
@@ -331,18 +474,18 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
         </div>
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { onSave(list); onClose(); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(list)).then(onClose)} saveLabel="保存する" />
     </Modal>
   );
 }
 
 /* ── Modal 29: 個人情報を編集 ── */
-function EditInfoModal({ onClose }: { onClose: () => void }) {
+function EditInfoModal({ current, socialLinks, onClose, onSave }: { current: UiProfile; socialLinks: { instagram: string; facebook: string; line: string }; onClose: () => void; onSave: (form: PersonalForm) => void | Promise<void> }) {
   const [form, setForm] = useState({
-    fullName: PROFILE.fullName, email: PROFILE.email, age: String(PROFILE.age),
-    gender: PROFILE.gender, nationality: PROFILE.nationality, city: PROFILE.city,
-    occupation: PROFILE.occupation, school: PROFILE.school,
-    instagram: "@minh_nguyen_vn", facebook: "Minh Nguyen", line: "@minh_line",
+    fullName: current.fullName, email: current.email, age: String(current.age),
+    gender: current.gender, nationality: current.nationality, city: current.city,
+    occupation: current.occupation, school: current.school,
+    instagram: socialLinks.instagram, facebook: socialLinks.facebook, line: socialLinks.line,
   });
 
   const fields: { key: keyof typeof form; label: string; icon: React.ReactNode }[] = [
@@ -378,14 +521,16 @@ function EditInfoModal({ onClose }: { onClose: () => void }) {
           </div>
         ))}
       </div>
-      <ModalFooter onCancel={onClose} onSave={onClose} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(form)).then(onClose)} saveLabel="保存する" />
     </Modal>
   );
 }
 
 /* ── Modal 31: 写真を追加 ── */
-function AddPhotoModal({ currentCount, onClose }: { currentCount: number; onClose: () => void }) {
+function AddPhotoModal({ currentCount, onClose, onSave }: { currentCount: number; onClose: () => void; onSave: (urls: string[], files: File[]) => void | Promise<void> }) {
   const [selected, setSelected] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const remaining = 9 - currentCount;
 
   function toggle(p: string) {
@@ -403,10 +548,19 @@ function AddPhotoModal({ currentCount, onClose }: { currentCount: number; onClos
         </p>
 
         {/* Upload area */}
-        <div className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-8 mb-5 cursor-pointer hover:bg-gray-50 transition-colors">
-          <span className="inline-flex items-center justify-center size-10 rounded-full mb-1" style={{ backgroundColor: "#ecfdf5" }}>
-            <UploadIcon className="size-5 text-green-700" />
-          </span>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const pickedFiles = Array.from(e.target.files ?? []).slice(0, remaining);
+            setFiles(pickedFiles);
+          }}
+        />
+        <div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-8 mb-5 cursor-pointer hover:bg-gray-50 transition-colors">
+          <UploadIcon className="size-8 text-green-200" />
           <p className="text-sm font-semibold text-gray-700 mt-2">クリックしてアップロード</p>
           <p className="text-xs text-gray-400">またはドラッグ&amp;ドロップ</p>
           <p className="text-xs text-gray-300 mt-1">JPG, PNG, WEBP（最大5MB）</p>
@@ -429,17 +583,16 @@ function AddPhotoModal({ currentCount, onClose }: { currentCount: number; onClos
       </div>
       <ModalFooter
         onCancel={onClose}
-        onSave={onClose}
-        saveLabel={`追加する (${selected.length})`}
-        saveDisabled={selected.length === 0}
-        saveIcon={<span className="text-base leading-none">+</span>}
+        onSave={() => Promise.resolve(onSave(selected, files)).then(onClose)}
+        saveLabel={`追加する (${selected.length + files.length})`}
+        saveDisabled={selected.length === 0 && files.length === 0}
       />
     </Modal>
   );
 }
 
 /* ── Modal 32: 趣味を選択 ── */
-function SelectInterestsModal({ current, onClose, onSave }: { current: string[]; onClose: () => void; onSave: (v: string[]) => void }) {
+function SelectInterestsModal({ current, onClose, onSave }: { current: string[]; onClose: () => void; onSave: (v: string[]) => void | Promise<void> }) {
   const [selected, setSelected] = useState<string[]>([...current]);
   const [query, setQuery] = useState("");
 
@@ -488,14 +641,17 @@ function SelectInterestsModal({ current, onClose, onSave }: { current: string[];
           })}
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { onSave(selected); onClose(); }} saveLabel={`保存する (${selected.length})`} />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(selected)).then(onClose)} saveLabel={`保存する (${selected.length})`} />
     </Modal>
   );
 }
 
 /* ── Modal 33: プロフィール写真を変更 ── */
-function ChangeAvatarModal({ onClose }: { onClose: () => void }) {
-  const [selected, setSelected] = useState(AVATAR_OPTIONS[0]);
+function ChangeAvatarModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (url: string, file: File | null) => void | Promise<void> }) {
+  const [selected, setSelected] = useState(current || AVATAR_OPTIONS[0]);
+  const [file, setFile] = useState<File | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const preview = file ? URL.createObjectURL(file) : selected;
 
   return (
     <Modal title="プロフィール写真を変更" onClose={onClose}>
@@ -505,14 +661,14 @@ function ChangeAvatarModal({ onClose }: { onClose: () => void }) {
         {/* Large preview */}
         <div className="flex justify-center mb-4">
           <div className="relative w-28 h-28 rounded-full overflow-hidden border-4 border-green-600">
-            <Image src={selected} alt="selected" fill className="object-cover" unoptimized />
+            <Image src={preview} alt="selected" fill className="object-cover" unoptimized />
           </div>
         </div>
 
         {/* Options row */}
         <div className="flex gap-3 justify-center mb-4">
           {AVATAR_OPTIONS.map((a) => (
-            <button key={a} onClick={() => setSelected(a)} className={`relative w-16 h-16 rounded-full overflow-hidden border-2 transition-all ${selected === a ? "border-green-600" : "border-gray-200"}`}>
+            <button key={a} onClick={() => { setSelected(a); setFile(null); }} className={`relative w-16 h-16 rounded-full overflow-hidden border-2 transition-all ${selected === a && !file ? "border-green-600" : "border-gray-200"}`}>
               <Image src={a} alt="" fill className="object-cover" unoptimized />
               {selected === a && (
                 <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: "rgba(27,67,50,0.3)" }}>
@@ -524,20 +680,32 @@ function ChangeAvatarModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Upload area */}
-        <div className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-5 cursor-pointer hover:bg-gray-50 transition-colors">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png"
+          className="hidden"
+          onChange={(e) => {
+            const nextFile = e.target.files?.[0] ?? null;
+            setFile(nextFile);
+          }}
+        />
+        <div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-5 cursor-pointer hover:bg-gray-50 transition-colors">
           <CameraIcon className="size-6 text-gray-300" />
           <p className="text-sm font-medium text-gray-600 mt-1">ファイルをアップロード</p>
           <p className="text-xs text-gray-400">JPG, PNG（最大2MB）</p>
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={onClose} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(selected, file)).then(onClose)} saveLabel="保存する" />
     </Modal>
   );
 }
 
 /* ── Modal 34: カバー写真を変更 ── */
-function ChangeCoverModal({ onClose }: { onClose: () => void }) {
-  const [selected, setSelected] = useState(COVER_PHOTOS[0]);
+function ChangeCoverModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (url: string, file: File | null) => void | Promise<void> }) {
+  const [selected, setSelected] = useState(current || COVER_PHOTOS[0]);
+  const [file, setFile] = useState<File | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   return (
     <Modal title="カバー写真を変更" onClose={onClose} wide>
@@ -547,7 +715,7 @@ function ChangeCoverModal({ onClose }: { onClose: () => void }) {
         {/* Photo grid */}
         <div className="grid grid-cols-3 gap-2 mb-3">
           {COVER_PHOTOS.map((p) => (
-            <button key={p} onClick={() => setSelected(p)} className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${selected === p ? "border-green-600" : "border-transparent"}`}>
+            <button key={p} onClick={() => { setSelected(p); setFile(null); }} className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${selected === p && !file ? "border-green-600" : "border-transparent"}`}>
               <Image src={p} alt="" fill className="object-cover" unoptimized />
               {selected === p && (
                 <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: "rgba(27,67,50,0.35)" }}>
@@ -559,13 +727,23 @@ function ChangeCoverModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Upload area */}
-        <div className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-5 cursor-pointer hover:bg-gray-50 transition-colors">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png"
+          className="hidden"
+          onChange={(e) => {
+            const nextFile = e.target.files?.[0] ?? null;
+            setFile(nextFile);
+          }}
+        />
+        <div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-5 cursor-pointer hover:bg-gray-50 transition-colors">
           <UploadIcon className="size-6 text-gray-300" />
           <p className="text-xs text-gray-500 mt-1">またはファイルをアップロード</p>
           <p className="text-xs text-gray-400">JPG, PNG（最大5MB）</p>
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={onClose} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(selected, file)).then(onClose)} saveLabel="保存する" />
     </Modal>
   );
 }
@@ -574,30 +752,164 @@ function ChangeCoverModal({ onClose }: { onClose: () => void }) {
 type ModalType = "editInfo" | "addPhoto" | "selectInterests" | "changeAvatar" | "changeCover" | "editBio" | "editLanguages";
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const [profile, setProfile] = useState<UiProfile>(PROFILE);
+  const [socialLinks, setSocialLinks] = useState({
+    instagram: "@minh_nguyen_vn",
+    facebook: "Minh Nguyen",
+    line: "@minh_line",
+  });
   const [interests, setInterests] = useState(PROFILE.interests);
   const [bio, setBio] = useState(PROFILE.bio);
   const [languages, setLanguages] = useState<LangEntry[]>([...LANGUAGES]);
+  const [photos, setPhotos] = useState<string[]>(PROFILE.photos);
   const [modal, setModal] = useState<ModalType | null>(null);
+  const [failedMedia, setFailedMedia] = useState({ avatarUrl: "", coverUrl: "" });
 
   function close() { setModal(null); }
 
-  const S = { className: "size-3.5 text-green-700", viewBox: "0 0 24 24", fill: "none" as const, stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  useEffect(() => {
+    let active = true;
+
+    async function loadProfile() {
+      try {
+        const apiProfile = await getMyProfile();
+
+        if (!active) return;
+
+        const uiProfile = profileFromApi(apiProfile);
+        setProfile(uiProfile);
+        setBio(uiProfile.bio);
+        setInterests(uiProfile.interests);
+        setLanguages(apiProfile.languages.map((item) => languageFromApi(item.language, item.level)));
+        setPhotos(uiProfile.photos);
+        setSocialLinks(socialLinksFromApi(apiProfile));
+      } catch (error) {
+        console.error(error);
+        if (error instanceof Error && error.message.includes("Login is required")) {
+          router.push("/login");
+        }
+      }
+    }
+
+    void loadProfile();
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
+  function applyApiProfile(apiProfile: ProfileData) {
+    const uiProfile = profileFromApi(apiProfile);
+    setProfile(uiProfile);
+    setBio(uiProfile.bio);
+    setInterests(uiProfile.interests);
+    setLanguages(apiProfile.languages.map((item) => languageFromApi(item.language, item.level)));
+    setPhotos(uiProfile.photos);
+    setSocialLinks(socialLinksFromApi(apiProfile));
+  }
+
+  async function savePersonal(form: PersonalForm) {
+    const apiProfile = await updatePersonalProfile({
+      fullName: form.fullName,
+      email: form.email,
+      age: Number(form.age),
+      gender: form.gender === "女性" ? "female" : form.gender === "その他" ? "other" : "male",
+      nationality: form.nationality === "日本" ? "JP" : "VN",
+      location: form.city,
+      occupation: form.occupation,
+      education: form.school,
+      socialLinks: {
+        instagram: form.instagram,
+        facebook: form.facebook,
+        line: form.line,
+      },
+    });
+    applyApiProfile(apiProfile);
+  }
+
+  async function saveBio(nextBio: string) {
+    setBio(nextBio);
+    applyApiProfile(await updateBio(nextBio));
+  }
+
+  async function saveLanguages(nextLanguages: LangEntry[]) {
+    applyApiProfile(await replaceLanguages(nextLanguages.map((item) => ({
+      language: languageToApi(item.name),
+      level: levelToApi(item.level),
+    }))));
+  }
+
+  async function saveInterests(nextInterests: string[]) {
+    const tags = await searchInterestTags();
+    const missingInterests = nextInterests.filter(
+      (name) => !tags.some((tag: ProfileTag) => tag.name === name),
+    );
+
+    if (missingInterests.length > 0) {
+      throw new Error(`Missing interest tags in backend: ${missingInterests.join(", ")}`);
+    }
+
+    const tagIds = nextInterests
+      .map((name) => tags.find((tag: ProfileTag) => tag.name === name)?.id)
+      .filter((id): id is string => Boolean(id));
+    applyApiProfile(await replaceInterests(tagIds));
+  }
+
+  async function removeInterest(interest: string) {
+    await saveInterests(interests.filter((item) => item !== interest));
+  }
+
+  async function addRecommendedInterest(interest: string) {
+    if (interests.includes(interest)) return;
+    await saveInterests([...interests, interest]);
+  }
+
+  async function saveAvatar(url: string, file: File | null) {
+    applyApiProfile(file ? await uploadAvatar(file) : await updateAvatarUrl(resolveMediaUrl(url, 256)));
+  }
+
+  async function saveCover(url: string, file: File | null) {
+    applyApiProfile(file ? await uploadCover(file) : await updateCoverUrl(resolveMediaUrl(url, 1400)));
+  }
+
+  async function savePhotos(urls: string[], files: File[]) {
+    let apiProfile: ProfileData | null = null;
+
+    if (urls.length > 0) {
+      apiProfile = await addPhotoUrls(urls.map((url) => resolveMediaUrl(url, 700)));
+    }
+
+    if (files.length > 0) {
+      apiProfile = await uploadPhotos(files);
+    }
+
+    if (apiProfile) {
+      applyApiProfile(apiProfile);
+    }
+  }
+
   const INFO_FIELDS = [
-    { label: "名前",   value: PROFILE.fullName,     icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg> },
-    { label: "メール", value: "minh.nguyen@em...",   icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg> },
-    { label: "年齢",   value: `${PROFILE.age}歳`,   icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg> },
-    { label: "性別",   value: PROFILE.gender,        icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg> },
-    { label: "国籍",   value: PROFILE.nationality,   icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" /></svg> },
-    { label: "所在地", value: PROFILE.city,           icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" /></svg> },
-    { label: "職業",   value: PROFILE.occupation,    icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z" /></svg> },
-    { label: "学歴",   value: PROFILE.school,         icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.905 59.905 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" /></svg> },
+    { label: "名前",  value: profile.fullName, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" /></svg> },
+    { label: "メール", value: shortEmail(profile.email), icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" /><path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" /></svg> },
+    { label: "年齢",  value: `${profile.age}歳`, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg> },
+    { label: "性別",  value: profile.gender, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" /></svg> },
+    { label: "国籍",  value: profile.nationality, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 7l2.55 2.4A1 1 0 0116 11H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" /></svg> },
+    { label: "所在地", value: profile.city, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" /></svg> },
+    { label: "職業",  value: profile.occupation, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" /><path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" /></svg> },
+    { label: "学歴",  value: profile.school, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" /></svg> },
   ];
 
   const SNS_FIELDS = [
-    { label: "Instagram", value: "@minh_nguyen_vn", icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg> },
-    { label: "Facebook",  value: "Minh Nguyen", icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg> },
-    { label: "LINE",      value: "@minh_line", icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg> },
+    { label: "Instagram", value: socialLinks.instagram, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg> },
+    { label: "Facebook",  value: socialLinks.facebook, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg> },
+    { label: "LINE",      value: socialLinks.line, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 24 24" fill="currentColor"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg> },
   ];
+
+  const avatarSrc = failedMedia.avatarUrl === profile.avatarUrl
+    ? defaultAvatarUrlFromSeed(profile.email || profile.fullName)
+    : profile.avatarUrl;
+  const coverSrc = failedMedia.coverUrl === profile.coverUrl ? COVER_PHOTOS[0] : profile.coverUrl;
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50">
@@ -612,16 +924,31 @@ export default function ProfilePage() {
         {/* ── Hero card ── */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="relative h-40 bg-gradient-to-br from-emerald-100 to-gray-200">
-            <Image src={PROFILE.coverUrl} alt="cover" fill className="object-cover" unoptimized />
-            <button onClick={() => setModal("changeCover")} className="absolute bottom-3 right-3 bg-white/80 rounded-full p-1.5 shadow hover:bg-white transition-colors text-gray-500">
-              <CameraIcon className="size-4" />
+            <Image
+              src={coverSrc}
+              alt="cover"
+              fill
+              className="object-cover"
+              unoptimized
+              onError={() => setFailedMedia((current) => ({ ...current, coverUrl: profile.coverUrl }))}
+            />
+            <button onClick={() => setModal("changeCover")} className="absolute bottom-3 right-3 bg-white/80 rounded-full p-2 shadow hover:bg-white transition-colors text-gray-600">
+              <CameraIcon />
             </button>
           </div>
 
           <div className="px-5 pb-5">
             <div className="relative -mt-10 mb-3 inline-block">
               <div className="w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-100">
-                <Image src={PROFILE.avatarUrl} alt={PROFILE.fullName} width={80} height={80} className="object-cover w-full h-full" unoptimized />
+                <Image
+                  src={avatarSrc}
+                  alt={profile.fullName}
+                  width={80}
+                  height={80}
+                  className="object-cover w-full h-full"
+                  unoptimized
+                  onError={() => setFailedMedia((current) => ({ ...current, avatarUrl: profile.avatarUrl }))}
+                />
               </div>
               <button onClick={() => setModal("changeAvatar")} className="absolute bottom-0.5 right-0.5 rounded-full p-1.5 shadow transition-colors text-white" style={{ backgroundColor: "#1B4332" }}>
                 <CameraIcon className="size-3.5" />
@@ -630,29 +957,29 @@ export default function ProfilePage() {
 
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">{PROFILE.fullName}</h2>
+                <h2 className="text-xl font-bold text-gray-900">{profile.fullName}</h2>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-1">
                   <span className="flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" /></svg>
-                    {PROFILE.city}
+                    {profile.city}
                   </span>
                   <span className="flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" /><path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" /></svg>
-                    {PROFILE.occupation}
+                    {profile.occupation}
                   </span>
                   <span className="flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg>
-                    {PROFILE.joinedAt}に参加
+                    {profile.joinedAt}に参加
                   </span>
                 </div>
                 <div className="flex gap-2 mt-2.5">
                   <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" /></svg>
-                    {PROFILE.likeRate}% マッチ率
+                    {profile.likeRate}% マッチ率
                   </span>
                   <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg>
-                    {PROFILE.connectionsCount} コネクション
+                    {profile.connectionsCount} コネクション
                   </span>
                 </div>
               </div>
@@ -722,7 +1049,7 @@ export default function ProfilePage() {
             {interests.map((i) => (
               <span key={i} className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: "#1B4332" }}>
                 {i}
-                <button onClick={() => setInterests((arr) => arr.filter((x) => x !== i))} className="ml-0.5 opacity-80 hover:opacity-100 leading-none">×</button>
+                <button onClick={() => { void removeInterest(i).catch((error) => { console.error(error); alert(errorMessage(error)); }); }} className="ml-0.5 opacity-80 hover:opacity-100 leading-none">×</button>
               </span>
             ))}
             <button onClick={() => setModal("selectInterests")} className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">+ 追加</button>
@@ -730,7 +1057,7 @@ export default function ProfilePage() {
           <p className="text-xs text-gray-500 mb-2">おすすめ</p>
           <div className="flex flex-wrap gap-1.5">
             {ALL_INTERESTS.slice(8, 13).filter((s) => !interests.includes(s)).map((s) => (
-              <button key={s} onClick={() => setInterests((arr) => arr.includes(s) ? arr : [...arr, s])} className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors">
+              <button key={s} onClick={() => { void addRecommendedInterest(s).catch((error) => { console.error(error); alert(errorMessage(error)); }); }} className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
                 + {s}
               </button>
             ))}
@@ -739,9 +1066,9 @@ export default function ProfilePage() {
 
         {/* ── 写真 ── */}
         <SectionCard>
-          <SectionHeader title={`写真(${PROFILE.photos.length}/9)`} action={<AddBtn onClick={() => setModal("addPhoto")} />} />
+          <SectionHeader title={`写真(${photos.length}/9)`} action={<AddBtn onClick={() => setModal("addPhoto")} />} />
           <div className="grid grid-cols-4 gap-2">
-            {PROFILE.photos.map((p, i) => (
+            {photos.map((p, i) => (
               <div key={p} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
                 <Image src={p} alt={`photo-${i}`} fill className="object-cover" unoptimized />
                 {i === 0 && (
@@ -759,13 +1086,13 @@ export default function ProfilePage() {
       </div>
 
       {/* ── Modals ── */}
-      {modal === "editInfo"         && <EditInfoModal onClose={close} />}
-      {modal === "editBio"          && <EditBioModal current={bio} onClose={close} onSave={setBio} />}
-      {modal === "editLanguages"     && <EditLanguagesModal current={languages} onClose={close} onSave={setLanguages} />}
-      {modal === "addPhoto"         && <AddPhotoModal currentCount={PROFILE.photos.length} onClose={close} />}
-      {modal === "selectInterests"  && <SelectInterestsModal current={interests} onClose={close} onSave={setInterests} />}
-      {modal === "changeAvatar"     && <ChangeAvatarModal onClose={close} />}
-      {modal === "changeCover"      && <ChangeCoverModal onClose={close} />}
+      {modal === "editInfo"         && <EditInfoModal current={profile} socialLinks={socialLinks} onClose={close} onSave={savePersonal} />}
+      {modal === "editBio"          && <EditBioModal current={bio} onClose={close} onSave={saveBio} />}
+      {modal === "editLanguages"     && <EditLanguagesModal current={languages} onClose={close} onSave={saveLanguages} />}
+      {modal === "addPhoto"         && <AddPhotoModal currentCount={photos.length} onClose={close} onSave={savePhotos} />}
+      {modal === "selectInterests"  && <SelectInterestsModal current={interests} onClose={close} onSave={saveInterests} />}
+      {modal === "changeAvatar"     && <ChangeAvatarModal current={profile.avatarUrl} onClose={close} onSave={saveAvatar} />}
+      {modal === "changeCover"      && <ChangeCoverModal current={profile.coverUrl} onClose={close} onSave={saveCover} />}
     </div>
   );
 }
