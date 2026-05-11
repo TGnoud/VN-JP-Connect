@@ -13,7 +13,6 @@ describe('profile validation', () => {
       validatePersonalBody({
         fullName: 'Nguyen Van Minh',
         email: 'minh@example.com',
-        age: '26',
         gender: 'male',
         nationality: 'VN',
         socialLinks: { instagram: '@minh' },
@@ -21,7 +20,6 @@ describe('profile validation', () => {
     ).toMatchObject({
       fullName: 'Nguyen Van Minh',
       email: 'minh@example.com',
-      age: 26,
       gender: 'male',
       nationality: 'VN',
     });

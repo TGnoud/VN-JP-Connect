@@ -2,6 +2,8 @@
 
 import { getStoredUserId } from "@/lib/auth-api";
 
+export const MAX_PROFILE_BIO_LENGTH = 300;
+
 export interface ProfileTag {
   id: string;
   name: string;
@@ -260,6 +262,10 @@ export function updatePersonalProfile(payload: unknown) {
 }
 
 export function updateBio(bio: string) {
+  if (bio.length > MAX_PROFILE_BIO_LENGTH) {
+    throw new Error(`bio must be at most ${MAX_PROFILE_BIO_LENGTH} characters`);
+  }
+
   return requestApi<ProfileData>("/profiles/me/bio", {
     method: "PATCH",
     body: JSON.stringify({ bio }),

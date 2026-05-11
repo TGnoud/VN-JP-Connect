@@ -24,6 +24,10 @@
     "db:status:atlas": "migrate-mongo status -f migrate-mongo.atlas.cjs",
     "seed": "ts-node src/seed.ts",
     "seed:atlas": "ts-node src/seed.ts --atlas",
+    "repair:legacy-ages": "ts-node src/repair-legacy-ages.ts",
+    "repair:legacy-ages:atlas": "ts-node src/repair-legacy-ages.ts --atlas",
+    "repair:profile-bios": "ts-node src/repair-profile-bios.ts",
+    "repair:profile-bios:atlas": "ts-node src/repair-profile-bios.ts --atlas",
     "repair:profile-images": "ts-node src/repair-profile-images.ts",
     "repair:profile-images:atlas": "ts-node src/repair-profile-images.ts --atlas"
   },

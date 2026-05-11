@@ -18,7 +18,9 @@ import {
   UserInterest,
   UserInterestDocument,
 } from '../database/schemas';
+import { calculateAge, DEFAULT_LEGACY_AGE } from '../common/age';
 import {
+  MAX_BIO_LENGTH,
   MAX_PROFILE_PHOTOS,
   PROFILE_GENDER_OPTIONS,
   PROFILE_LANGUAGE_LEVEL_OPTIONS,
@@ -117,10 +119,6 @@ export class ProfileService {
       userSet.nationality = input.nationality;
     }
 
-    if (input.age !== undefined) {
-      profileSet.age = input.age;
-    }
-
     if (input.gender) {
       profileSet.gender = input.gender;
     }
@@ -155,6 +153,10 @@ export class ProfileService {
   }
 
   async updateBio(userId: string, bio: string) {
+    if (bio.length > MAX_BIO_LENGTH) {
+      throw new BadRequestException(`bio must be at most ${MAX_BIO_LENGTH} characters`);
+    }
+
     const userObjectId = new Types.ObjectId(userId);
     await this.profileModel
       .findOneAndUpdate(
@@ -163,7 +165,7 @@ export class ProfileService {
           $set: { bio, updated_at: new Date() },
           $setOnInsert: { user_id: userObjectId },
         },
-        { new: true, upsert: true },
+        { new: true, upsert: true, runValidators: true },
       )
       .exec();
 
@@ -445,12 +447,12 @@ export class ProfileService {
       email: user.email,
       phoneNumber: user.phone_number,
       nationality: user.nationality,
-      age: profile.age ?? null,
+      age: calculateAge(user.birth_date) ?? profile.age ?? DEFAULT_LEGACY_AGE,
       gender: profile.gender ?? null,
       location: profile.location ?? '',
       occupation: profile.occupation ?? '',
       education: profile.education ?? '',
-      bio: profile.bio ?? '',
+      bio: String(profile.bio ?? '').slice(0, MAX_BIO_LENGTH),
       avatarUrl: profile.avatar_url ?? '',
       coverUrl: profile.cover_url ?? '',
       socialLinks: {

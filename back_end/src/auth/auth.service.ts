@@ -24,6 +24,7 @@ export class AuthService {
       password_hash: hashPassword(input.password),
       full_name: input.fullName,
       nationality: input.nationality,
+      birth_date: input.birthDate,
       is_verified: false,
       created_at: new Date(),
     });

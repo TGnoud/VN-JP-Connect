@@ -104,12 +104,14 @@ export default function RegisterPage() {
     setErrors({});
 
     try {
+      const birthDate = `${birthYear}-${birthMonth.padStart(2, "0")}-${birthDay.padStart(2, "0")}`;
       const response = await register({
         fullName: fullName.trim(),
         email: email.trim(),
         phoneNumber: phone.trim() || `no-phone-${Date.now()}`,
         password,
         nationality: nationality === "日本" ? "JP" : "VN",
+        birthDate,
       });
       setStoredUserId(response.userId);
       router.push("/profile");

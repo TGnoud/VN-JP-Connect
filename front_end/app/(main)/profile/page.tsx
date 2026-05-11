@@ -16,6 +16,7 @@ import {
   uploadAvatar,
   uploadCover,
   uploadPhotos,
+  MAX_PROFILE_BIO_LENGTH,
   type ProfileData,
   type ProfileTag,
 } from "@/lib/profile-api";
@@ -237,21 +238,22 @@ function ModalFooter({ onCancel, onSave, saveLabel, saveDisabled = false }: { on
 
 /* ── Modal: プロフィール編集 ── */
 function EditBioModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (v: string) => void | Promise<void> }) {
-  const [text, setText] = useState(current);
+  const [text, setText] = useState(current.slice(0, MAX_PROFILE_BIO_LENGTH));
   return (
     <Modal title="プロフィールを編集" onClose={onClose} wide>
       <div className="px-5 py-4">
         <label className="text-xs font-medium text-gray-600 mb-1.5 block">自己紹介</label>
         <textarea
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => setText(e.target.value.slice(0, MAX_PROFILE_BIO_LENGTH))}
+          maxLength={MAX_PROFILE_BIO_LENGTH}
           rows={6}
           className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:border-transparent resize-none"
           placeholder="自己紹介を入力してください..."
         />
-        <p className="text-xs text-gray-400 mt-1 text-right">{text.length} 文字</p>
+        <p className="text-xs text-gray-400 mt-1 text-right">{text.length}/{MAX_PROFILE_BIO_LENGTH} 文字</p>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(text)).then(onClose)} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(text)).then(onClose)} saveLabel="保存する" saveDisabled={text.length > MAX_PROFILE_BIO_LENGTH} />
     </Modal>
   );
 }
@@ -269,7 +271,7 @@ const LANG_OPTIONS = [
 const LEVEL_OPTIONS = ["母語", "N1", "N2", "N3", "N4", "N5", "Basic", "A1", "A2", "B1", "B2", "C1", "C2", "IELTS 7.0", "IELTS 6.5"];
 
 type LangEntry = typeof LANGUAGES[0];
-type UiProfile = typeof PROFILE;
+type UiProfile = Omit<typeof PROFILE, "age"> & { age: number | null };
 type PersonalForm = {
   fullName: string;
   email: string;
@@ -348,7 +350,7 @@ function profileFromApi(profile: ProfileData): UiProfile {
     ...PROFILE,
     fullName: profile.fullName,
     email: profile.email,
-    age: profile.age ?? 0,
+    age: profile.age ?? null,
     gender:
       profile.gender === "female"
         ? "女性"
@@ -364,7 +366,7 @@ function profileFromApi(profile: ProfileData): UiProfile {
     joinedAt: profile.joinedAt ? formatJoinedAt(profile.joinedAt) : PROFILE.joinedAt,
     likeRate: profile.likeRate ?? 100,
     connectionsCount: profile.connectionsCount ?? 0,
-    bio: profile.bio,
+    bio: profile.bio.slice(0, MAX_PROFILE_BIO_LENGTH),
     avatarUrl: resolveMediaUrl(profile.avatarUrl, 256) || defaultAvatarUrl(profile),
     coverUrl: resolveMediaUrl(profile.coverUrl, 1400) || COVER_PHOTOS[0],
     photos: profile.photos.map((photo) => resolveMediaUrl(photo.url, 700)),
@@ -481,7 +483,7 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
 /* ── Modal 29: 個人情報を編集 ── */
 function EditInfoModal({ current, socialLinks, onClose, onSave }: { current: UiProfile; socialLinks: { instagram: string; facebook: string; line: string }; onClose: () => void; onSave: (form: PersonalForm) => void | Promise<void> }) {
   const [form, setForm] = useState({
-    fullName: current.fullName, email: current.email, age: String(current.age),
+    fullName: current.fullName, email: current.email, age: current.age == null ? "" : String(current.age),
     gender: current.gender, nationality: current.nationality, city: current.city,
     occupation: current.occupation, school: current.school,
     instagram: socialLinks.instagram, facebook: socialLinks.facebook, line: socialLinks.line,
@@ -513,7 +515,12 @@ function EditInfoModal({ current, socialLinks, onClose, onSave }: { current: UiP
               <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">{f.icon}</span>
               <input
                 value={form[f.key]}
-                onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                readOnly={f.key === "age"}
+                aria-readonly={f.key === "age"}
+                onChange={(e) => {
+                  if (f.key === "age") return;
+                  setForm((prev) => ({ ...prev, [f.key]: e.target.value }));
+                }}
                 className={inputCls}
               />
             </div>
@@ -812,7 +819,6 @@ export default function ProfilePage() {
     const apiProfile = await updatePersonalProfile({
       fullName: form.fullName,
       email: form.email,
-      age: Number(form.age),
       gender: form.gender === "女性" ? "female" : form.gender === "その他" ? "other" : "male",
       nationality: form.nationality === "日本" ? "JP" : "VN",
       location: form.city,
@@ -828,7 +834,10 @@ export default function ProfilePage() {
   }
 
   async function saveBio(nextBio: string) {
-    setBio(nextBio);
+    if (nextBio.length > MAX_PROFILE_BIO_LENGTH) {
+      throw new Error(`bio must be at most ${MAX_PROFILE_BIO_LENGTH} characters`);
+    }
+
     applyApiProfile(await updateBio(nextBio));
   }
 
@@ -891,7 +900,7 @@ export default function ProfilePage() {
   const INFO_FIELDS = [
     { label: "名前",  value: profile.fullName, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" /></svg> },
     { label: "メール", value: shortEmail(profile.email), icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" /><path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" /></svg> },
-    { label: "年齢",  value: `${profile.age}歳`, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg> },
+    { label: "年齢",  value: profile.age == null ? "-" : `${profile.age}歳`, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg> },
     { label: "性別",  value: profile.gender, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" /></svg> },
     { label: "国籍",  value: profile.nationality, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 7l2.55 2.4A1 1 0 0116 11H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" /></svg> },
     { label: "所在地", value: profile.city, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" /></svg> },

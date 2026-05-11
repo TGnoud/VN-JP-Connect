@@ -49,6 +49,9 @@ export class User {
   @Prop({ required: true, type: String, enum: NATIONALITIES })
   nationality: Nationality;
 
+  @Prop()
+  birth_date?: Date;
+
   @Prop({ required: true, default: false })
   is_verified: boolean;
 

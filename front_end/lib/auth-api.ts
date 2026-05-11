@@ -60,6 +60,7 @@ export function register(payload: {
   password: string;
   fullName: string;
   nationality: "JP" | "VN";
+  birthDate: string;
 }) {
   return requestAuth("/auth/register", payload);
 }

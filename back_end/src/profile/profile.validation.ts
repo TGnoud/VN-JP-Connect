@@ -11,7 +11,6 @@ import {
 export interface PersonalProfileInput {
   fullName?: string;
   email?: string;
-  age?: number;
   gender?: string;
   nationality?: string;
   location?: string;
@@ -81,16 +80,6 @@ export function validatePersonalBody(body: unknown): PersonalProfileInput {
       line: optionalString(socialLinks.line, 'socialLinks.line'),
     },
   };
-
-  if (payload.age !== undefined) {
-    const age = Number(payload.age);
-
-    if (!Number.isInteger(age) || age < 0 || age > 120) {
-      throw new BadRequestException('age must be an integer between 0 and 120');
-    }
-
-    input.age = age;
-  }
 
   if (input.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) {
     throw new BadRequestException('email must be valid');

@@ -31,12 +31,37 @@ function requireNationality(value: string): Nationality {
   return value as Nationality;
 }
 
+function requireBirthDate(value: unknown) {
+  const rawValue = requireString(value, 'birthDate');
+  const birthDate = new Date(`${rawValue}T00:00:00.000Z`);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(rawValue) || Number.isNaN(birthDate.getTime())) {
+    throw new BadRequestException('birthDate must be a valid YYYY-MM-DD date');
+  }
+
+  const [year, month, day] = rawValue.split('-').map(Number);
+  if (
+    birthDate.getUTCFullYear() !== year ||
+    birthDate.getUTCMonth() !== month - 1 ||
+    birthDate.getUTCDate() !== day
+  ) {
+    throw new BadRequestException('birthDate must be a valid YYYY-MM-DD date');
+  }
+
+  if (birthDate > new Date()) {
+    throw new BadRequestException('birthDate cannot be in the future');
+  }
+
+  return birthDate;
+}
+
 export type RegisterInput = {
   email: string;
   phoneNumber: string;
   password: string;
   fullName: string;
   nationality: Nationality;
+  birthDate: Date;
 };
 
 export function validateRegisterBody(body: unknown): RegisterInput {
@@ -52,8 +77,9 @@ export function validateRegisterBody(body: unknown): RegisterInput {
   }
   const fullName = requireString(body.fullName, 'fullName');
   const nationality = requireNationality(requireString(body.nationality, 'nationality'));
+  const birthDate = requireBirthDate(body.birthDate);
 
-  return { email, phoneNumber, password, fullName, nationality };
+  return { email, phoneNumber, password, fullName, nationality, birthDate };
 }
 
 export type LoginInput = {

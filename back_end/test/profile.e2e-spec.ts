@@ -82,7 +82,6 @@ describe('Profile API (e2e)', () => {
       .send({
         fullName: 'Nguyen Van Minh',
         email: 'minh@example.com',
-        age: 26,
         gender: 'male',
         nationality: 'VN',
       })
@@ -90,7 +89,7 @@ describe('Profile API (e2e)', () => {
 
     expect(profileService.updatePersonal).toHaveBeenCalledWith(
       userId,
-      expect.objectContaining({ email: 'minh@example.com', age: 26 }),
+      expect.objectContaining({ email: 'minh@example.com' }),
     );
   });
 

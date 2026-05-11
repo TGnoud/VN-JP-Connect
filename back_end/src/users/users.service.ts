@@ -21,10 +21,12 @@ import {
   UserReportReason,
   USER_REPORT_REASONS,
 } from '../database/schemas';
+import { calculateAge, DEFAULT_LEGACY_AGE } from '../common/age';
 import {
   ProfileImageStorageService,
   UploadedFileLike,
 } from '../profile/profile-image-storage.service';
+import { MAX_BIO_LENGTH } from '../profile/profile.constants';
 
 export const REPORT_EVIDENCE_MAX_FILES = 5;
 export const REPORT_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
@@ -69,12 +71,12 @@ export class UsersService {
       id: targetUser._id.toString(),
       fullName: targetUser.full_name,
       nationality: targetUser.nationality,
-      age: profile?.age ?? null,
+      age: calculateAge(targetUser.birth_date) ?? profile?.age ?? DEFAULT_LEGACY_AGE,
       gender: profile?.gender ?? null,
       location: profile?.location ?? '',
       occupation: profile?.occupation ?? '',
       education: profile?.education ?? '',
-      bio: profile?.bio ?? '',
+      bio: String(profile?.bio ?? '').slice(0, MAX_BIO_LENGTH),
       avatarUrl: profile?.avatar_url ?? '',
       coverUrl: profile?.cover_url ?? '',
       languages: (profile?.languages ?? []).map((item) => ({
