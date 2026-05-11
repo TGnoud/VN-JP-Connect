@@ -67,6 +67,7 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
 
   function toggleArr(arr: string[], set: (v: string[]) => void, val: string) {
     set(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
@@ -125,22 +126,31 @@ export default function RegisterPage() {
   }
 
   async function handleSendOtp() {
-    const nextErrors: Record<string, string> = {};
-
     if (!email.trim()) {
-      nextErrors.email = "ãƒ¡ãƒ¼ãƒ«ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      nextErrors.email = "æœ‰åŠ¹ãªãƒ¡ãƒ¼ãƒ«ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚";
-    }
-
-    if (Object.keys(nextErrors).length > 0) {
-      setErrors((current) => ({ ...current, ...nextErrors }));
+      setErrors((current) => ({
+        ...current,
+        email: "メールアドレスを入力してください。",
+      }));
       return;
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrors((current) => ({
+        ...current,
+        email: "有効なメールアドレスを入力してください。",
+      }));
+      return;
+    }
+
+    setErrors((current) => {
+      const next = { ...current };
+      delete next.email;
+      return next;
+    });
     setSendingOtp(true);
     await new Promise((resolve) => setTimeout(resolve, 600));
     setSendingOtp(false);
+    setOtpSent(true);
   }
 
   return (
@@ -242,14 +252,18 @@ export default function RegisterPage() {
                     <button
                       type="button"
                       onClick={handleSendOtp}
-                      disabled={sendingOtp}
-                      className="w-36 shrink-0 rounded-md text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-36 shrink-0 rounded-md text-sm font-semibold text-white transition-colors hover:bg-green-900"
                       style={{ backgroundColor: "#1B4332" }}
                     >
                       {sendingOtp ? "送信中..." : "OTPを送信"}
                     </button>
                   </div>
                   <FieldError msg={errors.otp} />
+                  {otpSent && !errors.email && (
+                    <p className="mt-3 text-xs font-medium" style={{ color: "#00543D" }}>
+                      ✓ OTPコードがメールアドレスに送信されました
+                    </p>
+                  )}
                 </div>
 
                 {/* 7 - パスワード */}
