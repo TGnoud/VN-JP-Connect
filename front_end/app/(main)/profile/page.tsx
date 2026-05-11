@@ -199,11 +199,31 @@ function Modal({ title, onClose, children, wide = false }: { title: string; onCl
   );
 }
 
-function ModalFooter({ onCancel, onSave, saveLabel, saveDisabled = false }: { onCancel: () => void; onSave: () => void; saveLabel: string; saveDisabled?: boolean }) {
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "保存に失敗しました。";
+}
+
+function ModalFooter({ onCancel, onSave, saveLabel, saveDisabled = false }: { onCancel: () => void; onSave: () => void | Promise<void>; saveLabel: string; saveDisabled?: boolean }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (saving || saveDisabled) return;
+
+    setSaving(true);
+    try {
+      await onSave();
+    } catch (error) {
+      console.error(error);
+      alert(errorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="px-5 py-3 border-t border-gray-100 flex justify-end gap-2 shrink-0">
       <button onClick={onCancel} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">キャンセル</button>
-      <button onClick={onSave} disabled={saveDisabled} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors" style={{ backgroundColor: "#1B4332" }}>
+      <button onClick={handleSave} disabled={saveDisabled || saving} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors" style={{ backgroundColor: "#1B4332" }}>
         <CheckIcon /> {saveLabel}
       </button>
     </div>
@@ -226,7 +246,7 @@ function EditBioModal({ current, onClose, onSave }: { current: string; onClose: 
         />
         <p className="text-xs text-gray-400 mt-1 text-right">{text.length} 文字</p>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(text)).then(onClose).catch(console.error); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(text)).then(onClose)} saveLabel="保存する" />
     </Modal>
   );
 }
@@ -418,7 +438,7 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
           </button>
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(list)).then(onClose).catch(console.error); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(list)).then(onClose)} saveLabel="保存する" />
     </Modal>
   );
 }
@@ -465,7 +485,7 @@ function EditInfoModal({ current, socialLinks, onClose, onSave }: { current: UiP
           </div>
         ))}
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(form)).then(onClose).catch(console.error); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(form)).then(onClose)} saveLabel="保存する" />
     </Modal>
   );
 }
@@ -498,7 +518,10 @@ function AddPhotoModal({ currentCount, onClose, onSave }: { currentCount: number
           accept="image/jpeg,image/png,image/webp"
           multiple
           className="hidden"
-          onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, remaining))}
+          onChange={(e) => {
+            const pickedFiles = Array.from(e.target.files ?? []).slice(0, remaining);
+            setFiles(pickedFiles);
+          }}
         />
         <div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-8 mb-5 cursor-pointer hover:bg-gray-50 transition-colors">
           <UploadIcon className="size-8 text-green-200" />
@@ -524,7 +547,7 @@ function AddPhotoModal({ currentCount, onClose, onSave }: { currentCount: number
       </div>
       <ModalFooter
         onCancel={onClose}
-        onSave={() => { void Promise.resolve(onSave(selected, files)).then(onClose).catch(console.error); }}
+        onSave={() => Promise.resolve(onSave(selected, files)).then(onClose)}
         saveLabel={`追加する (${selected.length + files.length})`}
         saveDisabled={selected.length === 0 && files.length === 0}
       />
@@ -582,7 +605,7 @@ function SelectInterestsModal({ current, onClose, onSave }: { current: string[];
           })}
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(selected)).then(onClose).catch(console.error); }} saveLabel={`保存する (${selected.length})`} />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(selected)).then(onClose)} saveLabel={`保存する (${selected.length})`} />
     </Modal>
   );
 }
@@ -626,7 +649,10 @@ function ChangeAvatarModal({ current, onClose, onSave }: { current: string; onCl
           type="file"
           accept="image/jpeg,image/png"
           className="hidden"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => {
+            const nextFile = e.target.files?.[0] ?? null;
+            setFile(nextFile);
+          }}
         />
         <div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-5 cursor-pointer hover:bg-gray-50 transition-colors">
           <CameraIcon className="size-6 text-gray-300" />
@@ -634,7 +660,7 @@ function ChangeAvatarModal({ current, onClose, onSave }: { current: string; onCl
           <p className="text-xs text-gray-400">JPG, PNG（最大2MB）</p>
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(selected, file)).then(onClose).catch(console.error); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(selected, file)).then(onClose)} saveLabel="保存する" />
     </Modal>
   );
 }
@@ -670,7 +696,10 @@ function ChangeCoverModal({ current, onClose, onSave }: { current: string; onClo
           type="file"
           accept="image/jpeg,image/png"
           className="hidden"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => {
+            const nextFile = e.target.files?.[0] ?? null;
+            setFile(nextFile);
+          }}
         />
         <div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-5 cursor-pointer hover:bg-gray-50 transition-colors">
           <UploadIcon className="size-6 text-gray-300" />
@@ -678,7 +707,7 @@ function ChangeCoverModal({ current, onClose, onSave }: { current: string; onClo
           <p className="text-xs text-gray-400">JPG, PNG（最大5MB）</p>
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(selected, file)).then(onClose).catch(console.error); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(selected, file)).then(onClose)} saveLabel="保存する" />
     </Modal>
   );
 }
