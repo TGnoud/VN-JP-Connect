@@ -211,7 +211,7 @@ function ModalFooter({ onCancel, onSave, saveLabel, saveDisabled = false }: { on
 }
 
 /* ── Modal: プロフィール編集 ── */
-function EditBioModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (v: string) => void }) {
+function EditBioModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (v: string) => void | Promise<void> }) {
   const [text, setText] = useState(current);
   return (
     <Modal title="プロフィールを編集" onClose={onClose} wide>
@@ -226,7 +226,7 @@ function EditBioModal({ current, onClose, onSave }: { current: string; onClose: 
         />
         <p className="text-xs text-gray-400 mt-1 text-right">{text.length} 文字</p>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { onSave(text); onClose(); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(text)).then(onClose).catch(console.error); }} saveLabel="保存する" />
     </Modal>
   );
 }
@@ -328,7 +328,7 @@ function socialLinksFromApi(profile: ProfileData) {
   };
 }
 
-function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]; onClose: () => void; onSave: (langs: LangEntry[]) => void }) {
+function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]; onClose: () => void; onSave: (langs: LangEntry[]) => void | Promise<void> }) {
   const [list, setList] = useState<LangEntry[]>([...current]);
   const [newLang, setNewLang] = useState("");
   const [newLevel, setNewLevel] = useState("");
@@ -418,13 +418,13 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
           </button>
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { onSave(list); onClose(); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(list)).then(onClose).catch(console.error); }} saveLabel="保存する" />
     </Modal>
   );
 }
 
 /* ── Modal 29: 個人情報を編集 ── */
-function EditInfoModal({ current, socialLinks, onClose, onSave }: { current: UiProfile; socialLinks: { instagram: string; facebook: string; line: string }; onClose: () => void; onSave: (form: PersonalForm) => void }) {
+function EditInfoModal({ current, socialLinks, onClose, onSave }: { current: UiProfile; socialLinks: { instagram: string; facebook: string; line: string }; onClose: () => void; onSave: (form: PersonalForm) => void | Promise<void> }) {
   const [form, setForm] = useState({
     fullName: current.fullName, email: current.email, age: String(current.age),
     gender: current.gender, nationality: current.nationality, city: current.city,
@@ -465,13 +465,13 @@ function EditInfoModal({ current, socialLinks, onClose, onSave }: { current: UiP
           </div>
         ))}
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { onSave(form); onClose(); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(form)).then(onClose).catch(console.error); }} saveLabel="保存する" />
     </Modal>
   );
 }
 
 /* ── Modal 31: 写真を追加 ── */
-function AddPhotoModal({ currentCount, onClose, onSave }: { currentCount: number; onClose: () => void; onSave: (urls: string[], files: File[]) => void }) {
+function AddPhotoModal({ currentCount, onClose, onSave }: { currentCount: number; onClose: () => void; onSave: (urls: string[], files: File[]) => void | Promise<void> }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -524,7 +524,7 @@ function AddPhotoModal({ currentCount, onClose, onSave }: { currentCount: number
       </div>
       <ModalFooter
         onCancel={onClose}
-        onSave={() => { onSave(selected, files); onClose(); }}
+        onSave={() => { void Promise.resolve(onSave(selected, files)).then(onClose).catch(console.error); }}
         saveLabel={`追加する (${selected.length + files.length})`}
         saveDisabled={selected.length === 0 && files.length === 0}
       />
@@ -533,7 +533,7 @@ function AddPhotoModal({ currentCount, onClose, onSave }: { currentCount: number
 }
 
 /* ── Modal 32: 趣味を選択 ── */
-function SelectInterestsModal({ current, onClose, onSave }: { current: string[]; onClose: () => void; onSave: (v: string[]) => void }) {
+function SelectInterestsModal({ current, onClose, onSave }: { current: string[]; onClose: () => void; onSave: (v: string[]) => void | Promise<void> }) {
   const [selected, setSelected] = useState<string[]>([...current]);
   const [query, setQuery] = useState("");
 
@@ -582,13 +582,13 @@ function SelectInterestsModal({ current, onClose, onSave }: { current: string[];
           })}
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { onSave(selected); onClose(); }} saveLabel={`保存する (${selected.length})`} />
+      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(selected)).then(onClose).catch(console.error); }} saveLabel={`保存する (${selected.length})`} />
     </Modal>
   );
 }
 
 /* ── Modal 33: プロフィール写真を変更 ── */
-function ChangeAvatarModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (url: string, file: File | null) => void }) {
+function ChangeAvatarModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (url: string, file: File | null) => void | Promise<void> }) {
   const [selected, setSelected] = useState(current || AVATAR_OPTIONS[0]);
   const [file, setFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -634,13 +634,13 @@ function ChangeAvatarModal({ current, onClose, onSave }: { current: string; onCl
           <p className="text-xs text-gray-400">JPG, PNG（最大2MB）</p>
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { onSave(selected, file); onClose(); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(selected, file)).then(onClose).catch(console.error); }} saveLabel="保存する" />
     </Modal>
   );
 }
 
 /* ── Modal 34: カバー写真を変更 ── */
-function ChangeCoverModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (url: string, file: File | null) => void }) {
+function ChangeCoverModal({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (url: string, file: File | null) => void | Promise<void> }) {
   const [selected, setSelected] = useState(current || COVER_PHOTOS[0]);
   const [file, setFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -678,7 +678,7 @@ function ChangeCoverModal({ current, onClose, onSave }: { current: string; onClo
           <p className="text-xs text-gray-400">JPG, PNG（最大5MB）</p>
         </div>
       </div>
-      <ModalFooter onCancel={onClose} onSave={() => { onSave(selected, file); onClose(); }} saveLabel="保存する" />
+      <ModalFooter onCancel={onClose} onSave={() => { void Promise.resolve(onSave(selected, file)).then(onClose).catch(console.error); }} saveLabel="保存する" />
     </Modal>
   );
 }
@@ -990,13 +990,13 @@ export default function ProfilePage() {
       </div>
 
       {/* ── Modals ── */}
-      {modal === "editInfo"         && <EditInfoModal current={profile} socialLinks={socialLinks} onClose={close} onSave={(form) => { void savePersonal(form).catch(console.error); }} />}
-      {modal === "editBio"          && <EditBioModal current={bio} onClose={close} onSave={(nextBio) => { void saveBio(nextBio).catch(console.error); }} />}
-      {modal === "editLanguages"     && <EditLanguagesModal current={languages} onClose={close} onSave={(nextLanguages) => { void saveLanguages(nextLanguages).catch(console.error); }} />}
-      {modal === "addPhoto"         && <AddPhotoModal currentCount={photos.length} onClose={close} onSave={(urls, files) => { void savePhotos(urls, files).catch(console.error); }} />}
-      {modal === "selectInterests"  && <SelectInterestsModal current={interests} onClose={close} onSave={(nextInterests) => { void saveInterests(nextInterests).catch(console.error); }} />}
-      {modal === "changeAvatar"     && <ChangeAvatarModal current={profile.avatarUrl} onClose={close} onSave={(url, file) => { void saveAvatar(url, file).catch(console.error); }} />}
-      {modal === "changeCover"      && <ChangeCoverModal current={profile.coverUrl} onClose={close} onSave={(url, file) => { void saveCover(url, file).catch(console.error); }} />}
+      {modal === "editInfo"         && <EditInfoModal current={profile} socialLinks={socialLinks} onClose={close} onSave={savePersonal} />}
+      {modal === "editBio"          && <EditBioModal current={bio} onClose={close} onSave={saveBio} />}
+      {modal === "editLanguages"     && <EditLanguagesModal current={languages} onClose={close} onSave={saveLanguages} />}
+      {modal === "addPhoto"         && <AddPhotoModal currentCount={photos.length} onClose={close} onSave={savePhotos} />}
+      {modal === "selectInterests"  && <SelectInterestsModal current={interests} onClose={close} onSave={saveInterests} />}
+      {modal === "changeAvatar"     && <ChangeAvatarModal current={profile.avatarUrl} onClose={close} onSave={saveAvatar} />}
+      {modal === "changeCover"      && <ChangeCoverModal current={profile.coverUrl} onClose={close} onSave={saveCover} />}
     </div>
   );
 }
