@@ -1,10 +1,18 @@
 import 'dotenv/config';
 import { Collection, Db, Document, Filter, MongoClient, ObjectId } from 'mongodb';
 
-const configuredMongoUri = process.env.MONGO_LOCAL_URI;
+const seedTarget = process.argv.includes('--atlas') ? 'atlas' : 'local';
+const configuredMongoUri =
+  seedTarget === 'atlas'
+    ? process.env.MONGO_ATLAS_URI ?? process.env.MONGO_URI
+    : process.env.MONGO_LOCAL_URI;
 
 if (!configuredMongoUri) {
-  throw new Error('Missing MONGO_LOCAL_URI in environment variables');
+  throw new Error(
+    `Missing ${
+      seedTarget === 'atlas' ? 'MONGO_ATLAS_URI or MONGO_URI' : 'MONGO_LOCAL_URI'
+    } in environment variables`,
+  );
 }
 
 const mongoUri = configuredMongoUri;
@@ -15,11 +23,13 @@ function databaseNameFromUri(uri: string) {
   return databaseName || undefined;
 }
 
-function assertLocalSeedTarget(uri: string) {
+function assertSeedTarget(uri: string) {
   const parsedUri = new URL(uri);
   const host = parsedUri.hostname;
   const databaseName =
-    process.env.MONGO_LOCAL_DATABASE_NAME ?? databaseNameFromUri(uri);
+    seedTarget === 'atlas'
+      ? (process.env.MONGO_ATLAS_DATABASE_NAME ?? databaseNameFromUri(uri))
+      : (process.env.MONGO_LOCAL_DATABASE_NAME ?? databaseNameFromUri(uri));
   const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(host);
   const isLocalDatabase = databaseName?.endsWith('_local') ?? false;
 
@@ -29,10 +39,14 @@ function assertLocalSeedTarget(uri: string) {
     );
   }
 
-  if (!isLocalHost && !isLocalDatabase) {
+  if (seedTarget === 'local' && !isLocalHost && !isLocalDatabase) {
     throw new Error(
       'Refusing to seed a shared database. Use localhost or a database name ending with _local.',
     );
+  }
+
+  if (seedTarget === 'atlas' && (isLocalHost || isLocalDatabase)) {
+    throw new Error('Refusing to run Atlas seed against a local database.');
   }
 
   return databaseName;
@@ -81,15 +95,15 @@ async function seedUsers(db: Db, now: Date) {
 
   const vnStudentId = await upsertAndGetId(
     users,
-    { email: 'student.vn@vn-jp-connect.local' },
+    { phone_number: '+84900000002' },
     {
-      email: 'student.vn@vn-jp-connect.local',
+      email: 'minh.nguyen@example.com',
       phone_number: '+84900000002',
       password_hash: 'local-seed-password-hash',
-      full_name: 'Nguyen Van A',
+      full_name: 'Nguyen Van Minh',
       nationality: 'VN',
       is_verified: true,
-      created_at: now,
+      created_at: new Date('2024-06-01T00:00:00.000Z'),
     },
   );
 
@@ -159,7 +173,149 @@ async function seedTags(db: Db) {
     type: 'purpose',
   });
 
-  return { languageExchangeId, jobHuntingId, cultureId, studyAbroadId };
+  const profileInterestNames = [
+    '言語交換',
+    'アニメ',
+    'テクノロジー',
+    'ベトナム料理',
+    '旅行',
+    '写真',
+    'コーヒー',
+    '読書',
+    'マンガ',
+    'J-POP',
+    'K-POP',
+    'ゲーム',
+    'サッカー',
+    '映画',
+    '音楽',
+    'ダンス',
+  ];
+  const profileInterestIds: ObjectId[] = [];
+
+  for (const name of profileInterestNames) {
+    const tagId = await upsertAndGetId(
+      tags,
+      { name, type: 'interest' },
+      { name, type: 'interest' },
+    );
+    profileInterestIds.push(tagId);
+  }
+
+  return {
+    languageExchangeId,
+    jobHuntingId,
+    cultureId,
+    studyAbroadId,
+    profileInterestIds,
+  };
+}
+
+async function seedProfiles(
+  db: Db,
+  users: {
+    vnStudentId: ObjectId;
+    jpStudentId: ObjectId;
+    organizerId: ObjectId;
+  },
+  now: Date,
+) {
+  const profiles = db.collection('profiles');
+
+  await upsertAndGetId(
+    profiles,
+    { user_id: users.vnStudentId },
+    {
+      user_id: users.vnStudentId,
+      age: 26,
+      gender: 'male',
+      location: 'ハノイ市, ベトナム',
+      occupation: 'ソフトウェア開発者',
+      education: 'ハノイ工科大学',
+      bio: 'ハノイ出身のソフトウェア開発者です。日本語を勉強して2年になります。日本の文化、特にアニメ、料理、テクノロジーに深い興味があります。言語交換パートナーを探しています。一緒に楽しく学びましょう！',
+      avatar_url: 'https://api.dicebear.com/7.x/personas/svg?seed=minh',
+      cover_url: 'https://images.unsplash.com/photo-1492571350019-22de08371fd3?w=1400&q=90',
+      social_links: {
+        instagram: '@minh_nguyen_vn',
+        facebook: 'Minh Nguyen',
+        line: '@minh_line',
+      },
+      languages: [
+        { language: 'Vietnamese', level: 'Native' },
+        { language: 'Japanese', level: 'N3' },
+        { language: 'English', level: 'IELTS 7.0' },
+      ],
+      photos: [
+        {
+          _id: new ObjectId(),
+          url: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=700&q=90',
+          is_main: true,
+          uploaded_at: now,
+        },
+        {
+          _id: new ObjectId(),
+          url: 'https://images.unsplash.com/photo-1478436127897-769e1b3f0f36?w=700&q=90',
+          is_main: false,
+          uploaded_at: now,
+        },
+        {
+          _id: new ObjectId(),
+          url: 'https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=700&q=90',
+          is_main: false,
+          uploaded_at: now,
+        },
+      ],
+      match_rate: 94,
+      connections_count: 128,
+      updated_at: now,
+    },
+  );
+
+  await upsertAndGetId(
+    profiles,
+    { user_id: users.jpStudentId },
+    {
+      user_id: users.jpStudentId,
+      age: 24,
+      gender: 'female',
+      location: 'Tokyo, Japan',
+      occupation: 'Teacher',
+      education: 'Tokyo University',
+      bio: 'I am studying Vietnamese and want to meet friends interested in culture exchange.',
+      avatar_url: 'https://api.dicebear.com/7.x/personas/svg?seed=hanako',
+      cover_url: '',
+      social_links: { instagram: '', facebook: '', line: '' },
+      languages: [
+        { language: 'Japanese', level: 'Native' },
+        { language: 'Vietnamese', level: 'Beginner' },
+      ],
+      photos: [],
+      updated_at: now,
+    },
+  );
+
+  await upsertAndGetId(
+    profiles,
+    { user_id: users.organizerId },
+    {
+      user_id: users.organizerId,
+      age: 30,
+      gender: 'other',
+      location: 'Ho Chi Minh City, Viet Nam',
+      occupation: 'Event Organizer',
+      education: '',
+      bio: 'I organize VN-JP exchange events and help members find useful connections.',
+      avatar_url: '',
+      cover_url: '',
+      social_links: { instagram: '', facebook: '', line: '' },
+      languages: [
+        { language: 'Vietnamese', level: 'Native' },
+        { language: 'Japanese', level: 'N2' },
+      ],
+      photos: [],
+      updated_at: now,
+    },
+  );
 }
 
 async function seedUserInterests(
@@ -167,6 +323,13 @@ async function seedUserInterests(
   pairs: Array<{ user_id: ObjectId; tag_id: ObjectId }>,
 ) {
   const userInterests = db.collection('user_interests');
+  const userIds = [
+    ...new Set(pairs.map((pair) => pair.user_id.toHexString())),
+  ].map((id) => new ObjectId(id));
+
+  if (userIds.length > 0) {
+    await userInterests.deleteMany({ user_id: { $in: userIds } });
+  }
 
   for (const pair of pairs) {
     await upsertAndGetId(userInterests, pair, pair);
@@ -282,7 +445,7 @@ async function seedEventParticipants(
 }
 
 async function seed() {
-  const databaseName = assertLocalSeedTarget(mongoUri);
+  const databaseName = assertSeedTarget(mongoUri);
   const client = new MongoClient(mongoUri);
 
   try {
@@ -292,10 +455,13 @@ async function seed() {
     const now = new Date();
     const users = await seedUsers(db, now);
     const tags = await seedTags(db);
+    await seedProfiles(db, users, now);
 
     await seedUserInterests(db, [
-      { user_id: users.vnStudentId, tag_id: tags.languageExchangeId },
-      { user_id: users.vnStudentId, tag_id: tags.jobHuntingId },
+      ...tags.profileInterestIds.slice(0, 8).map((tag_id) => ({
+        user_id: users.vnStudentId,
+        tag_id,
+      })),
       { user_id: users.jpStudentId, tag_id: tags.languageExchangeId },
       { user_id: users.jpStudentId, tag_id: tags.cultureId },
       { user_id: users.organizerId, tag_id: tags.studyAbroadId },
@@ -326,7 +492,8 @@ async function seed() {
       now,
     );
 
-    console.log('Local seed data created successfully.');
+    console.log(`${seedTarget} seed data created successfully.`);
+    console.log(`NEXT_PUBLIC_DEV_USER_ID=${users.vnStudentId.toHexString()}`);
   } finally {
     await client.close();
   }
