@@ -6,8 +6,10 @@ export type DatabaseEnv = Partial<
     | 'DB_TARGET'
     | 'MONGO_LOCAL_URI'
     | 'MONGO_LOCAL_DATABASE_NAME'
+    | 'MONGO_ATLAS_URI'
     | 'MONGO_URI'
     | 'MONGO_ATLAS_DATABASE_NAME'
+    | 'NODE_ENV'
   >
 >;
 
@@ -17,8 +19,12 @@ export interface MongoRuntimeConfig {
   dbName: string;
 }
 
-function resolveTarget(target: string | undefined): DatabaseTarget {
-  if (!target || target === 'local') {
+function resolveTarget(target: string | undefined, nodeEnv: string | undefined): DatabaseTarget {
+  if (!target) {
+    return nodeEnv === 'production' ? 'atlas' : 'local';
+  }
+
+  if (target === 'local') {
     return 'local';
   }
 
@@ -40,12 +46,16 @@ function requireEnv(value: string | undefined, key: string, target: DatabaseTarg
 }
 
 export function resolveMongoConfig(env: DatabaseEnv = process.env): MongoRuntimeConfig {
-  const target = resolveTarget(env.DB_TARGET);
+  const target = resolveTarget(env.DB_TARGET, env.NODE_ENV);
 
   if (target === 'atlas') {
     return {
       target,
-      uri: requireEnv(env.MONGO_URI, 'MONGO_URI', target),
+      uri: requireEnv(
+        env.MONGO_ATLAS_URI ?? env.MONGO_URI,
+        'MONGO_ATLAS_URI or MONGO_URI',
+        target,
+      ),
       dbName: requireEnv(
         env.MONGO_ATLAS_DATABASE_NAME,
         'MONGO_ATLAS_DATABASE_NAME',

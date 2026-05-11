@@ -3,14 +3,29 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { AppModule } from './app.module';
 
+function allowedOrigins() {
+  const configuredOrigins = process.env.CORS_ORIGINS?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return configuredOrigins?.length
+    ? configuredOrigins
+    : ['https://vn-jp-connect.vercel.app', 'http://localhost:3000'];
+}
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableCors({
-    // Cấp quyền cho Vercel và Localhost 
-    origin: [
-      'https://vn-jp-connect.vercel.app', 
-      'http://localhost:3000'
-    ], 
+    origin: (origin, callback) => {
+      const origins = allowedOrigins();
+
+      if (!origin || origins.includes(origin) || origin.endsWith('.vercel.app')) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS blocked origin: ${origin}`), false);
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
