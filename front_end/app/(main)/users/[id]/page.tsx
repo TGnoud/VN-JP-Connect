@@ -1,53 +1,64 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { MOCK_USERS } from "@/lib/mock-data";
-
-function calcAge(birthDate: string) {
-  const diff = Date.now() - new Date(birthDate).getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
-}
+import {
+  getUserPublicProfile,
+  openConversationWithUser,
+  reportUser,
+  resolveMediaUrl,
+  type PublicProfileData,
+} from "@/lib/profile-api";
 
 const REPORT_REASONS = [
-  "スパム行為",
-  "不適切なコンテンツ",
-  "ハラスメント",
-  "偽のプロフィール",
-  "その他",
+  { value: "spam", label: "スパム行為" },
+  { value: "inappropriate_content", label: "不適切なコンテンツ" },
+  { value: "harassment", label: "ハラスメント" },
+  { value: "fake_profile", label: "偽のプロフィール" },
+  { value: "other", label: "その他" },
 ];
 
 type Lang = { useFlag: boolean; flagSrc: string; dotColor: string; name: string; level: string; sub?: string };
 
-function getLanguages(user: (typeof MOCK_USERS)[0]): Lang[] {
-  if (user.nationality === "Japanese") {
-    return [
-      { useFlag: false, flagSrc: "", dotColor: "#ef4444", name: "日本語", level: "母語" },
-      { useFlag: true,  flagSrc: "https://flagcdn.com/20x15/vn.png", dotColor: "", name: "ベトナム語", level: user.vietnameseLevel },
-      { useFlag: true,  flagSrc: "https://flagcdn.com/20x15/gb.png", dotColor: "", name: "英語", level: "流暢", sub: "TOEIC 920" },
-    ];
-  }
-  return [
-    { useFlag: true,  flagSrc: "https://flagcdn.com/20x15/vn.png", dotColor: "", name: "ベトナム語", level: "母語" },
-    { useFlag: false, flagSrc: "", dotColor: "#ef4444", name: "日本語", level: user.japaneseLevel },
-    { useFlag: true,  flagSrc: "https://flagcdn.com/20x15/gb.png", dotColor: "", name: "英語", level: "流暢", sub: "TOEIC 920" },
-  ];
+const DEFAULT_COVER_URL = "https://images.unsplash.com/photo-1492571350019-22de08371fd3?w=900&q=80";
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  Vietnamese: "ベトナム語",
+  Japanese: "日本語",
+  English: "英語",
+  Chinese: "中国語",
+  Korean: "韓国語",
+  French: "フランス語",
+  Spanish: "スペイン語",
+};
+
+const LEVEL_LABELS: Record<string, string> = {
+  Native: "母語",
+  Beginner: "Basic",
+};
+
+function defaultAvatarUrl(user: PublicProfileData | null) {
+  const seed = encodeURIComponent(user?.id || user?.fullName || "user");
+  return `https://api.dicebear.com/7.x/personas/svg?seed=${seed}`;
 }
 
-const DEMO_PHOTOS = [
-  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&q=80",
-  "https://images.unsplash.com/photo-1527203561188-dae1bc1a417f?w=300&q=80",
-  "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&q=80",
-  "https://images.unsplash.com/photo-1614289371518-722f2615943d?w=300&q=80",
-  "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&q=80",
-];
+function getLanguages(user: PublicProfileData): Lang[] {
+  return user.languages.map((item) => {
+    const name = LANGUAGE_LABELS[item.language] ?? item.language;
+    const level = LEVEL_LABELS[item.level] ?? item.level;
 
-const MOCK_COVER: Record<string, string> = {
-  "1": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=900&q=80",
-  "2": "https://images.unsplash.com/photo-1478436127897-769e1b3f0f36?w=900&q=80",
-  "3": "https://images.unsplash.com/photo-1492571350019-22de08371fd3?w=900&q=80",
-};
+    if (item.language === "Vietnamese") {
+      return { useFlag: true, flagSrc: "https://flagcdn.com/20x15/vn.png", dotColor: "", name, level };
+    }
+
+    if (item.language === "English") {
+      return { useFlag: true, flagSrc: "https://flagcdn.com/20x15/gb.png", dotColor: "", name, level };
+    }
+
+    return { useFlag: false, flagSrc: "", dotColor: "#ef4444", name, level };
+  });
+}
 
 /* ── Icons ── */
 function BackArrowIcon() {
@@ -163,16 +174,34 @@ function XIcon() {
 }
 
 /* ── ReportModal ── */
-function ReportModal({ onClose }: { onClose: () => void }) {
+function ReportModal({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (payload: { reason: string; detail: string; files: File[] }) => Promise<void>;
+}) {
   const [reason, setReason] = useState("");
   const [detail, setDetail] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!reason) return;
-    setSubmitted(true);
-    setTimeout(onClose, 1500);
+    setSubmitting(true);
+    setSubmitError("");
+
+    try {
+      await onSubmit({ reason, detail, files });
+      setSubmitted(true);
+      setTimeout(onClose, 1500);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "報告の送信に失敗しました。");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -212,15 +241,15 @@ function ReportModal({ onClose }: { onClose: () => void }) {
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             {REPORT_REASONS.map((r, i) => (
               <label
-                key={r}
+                key={r.value}
                 className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${i > 0 ? "border-t border-gray-100" : ""}`}
               >
                 <input
-                  type="radio" name="report-reason" value={r} checked={reason === r}
-                  onChange={() => setReason(r)}
+                  type="radio" name="report-reason" value={r.value} checked={reason === r.value}
+                  onChange={() => setReason(r.value)}
                   className="w-4 h-4 shrink-0" style={{ accentColor: "#1B4332" }}
                 />
-                <span className="text-sm text-gray-700">{r}</span>
+                <span className="text-sm text-gray-700">{r.label}</span>
               </label>
             ))}
           </div>
@@ -253,6 +282,9 @@ function ReportModal({ onClose }: { onClose: () => void }) {
               />
             </label>
           </div>
+          {submitError && (
+            <p className="text-xs text-red-500">{submitError}</p>
+          )}
         </div>
 
         {/* Footer */}
@@ -264,11 +296,11 @@ function ReportModal({ onClose }: { onClose: () => void }) {
             キャンセル
           </button>
           <button
-            onClick={handleSubmit} disabled={!reason}
+            onClick={() => { void handleSubmit(); }} disabled={!reason || submitting}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
-            style={{ backgroundColor: reason ? "#1B4332" : "#9ca3af" }}
+            style={{ backgroundColor: reason && !submitting ? "#1B4332" : "#9ca3af" }}
           >
-            報告する
+            {submitting ? "送信中..." : "報告する"}
           </button>
         </div>
       </div>
@@ -281,23 +313,137 @@ export default function UserDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [showReport, setShowReport] = useState(false);
+  const [user, setUser] = useState<PublicProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState("");
+  const [messageError, setMessageError] = useState("");
+  const [openingChat, setOpeningChat] = useState(false);
+  const [failedMedia, setFailedMedia] = useState({ avatarUrl: "", coverUrl: "" });
+  const [failedPhotoUrls, setFailedPhotoUrls] = useState<string[]>([]);
 
-  const user = MOCK_USERS.find((u) => u.id === params.id) ?? MOCK_USERS[0];
-  const age = calcAge(user.birthDate);
+  useEffect(() => {
+    let active = true;
+
+    async function loadUserProfile() {
+      setLoading(true);
+      setPageError("");
+
+      try {
+        const profile = await getUserPublicProfile(params.id);
+
+        if (!active) return;
+
+        if (profile.isMe) {
+          router.replace("/profile");
+          return;
+        }
+
+        setUser(profile);
+      } catch (error) {
+        if (!active) return;
+        setPageError(error instanceof Error ? error.message : "プロフィールを読み込めませんでした。");
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadUserProfile();
+
+    return () => {
+      active = false;
+    };
+  }, [params.id, router]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 overflow-auto bg-gray-50">
+        <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+          <button
+            onClick={() => router.back()}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors shrink-0"
+          >
+            <BackArrowIcon />
+          </button>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-gray-900 leading-tight truncate">プロフィール</p>
+            <p className="text-xs text-gray-400">読み込み中...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex-1 overflow-auto bg-gray-50">
+        <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+          <button
+            onClick={() => router.back()}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors shrink-0"
+          >
+            <BackArrowIcon />
+          </button>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-gray-900 leading-tight truncate">プロフィール</p>
+            <p className="text-xs text-red-500">{pageError || "ユーザーが見つかりません。"}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const languages = getLanguages(user);
-
-  const genderLabel = user.gender === "male" ? "男性" : "女性";
-  const nationalityLabel = user.nationality === "Japanese" ? "日本" : "ベトナム";
+  const genderLabel =
+    user.gender === "female" ? "女性" : user.gender === "other" ? "その他" : "男性";
+  const nationalityLabel = user.nationality === "JP" ? "日本" : "ベトナム";
   const joinedLabel = new Date(user.joinedAt).toLocaleDateString("ja-JP", { year: "numeric", month: "long" }) + "参加";
-  const coverUrl = user.coverUrl ?? MOCK_COVER[user.id] ?? MOCK_COVER["1"];
-  const photos = (user.photos && user.photos.length > 0) ? user.photos : DEMO_PHOTOS;
+  const rawCoverUrl = resolveMediaUrl(user.coverUrl, 900) || DEFAULT_COVER_URL;
+  const coverUrl = failedMedia.coverUrl === rawCoverUrl ? DEFAULT_COVER_URL : rawCoverUrl;
+  const rawAvatarUrl = resolveMediaUrl(user.avatarUrl, 256) || defaultAvatarUrl(user);
+  const avatarUrl = failedMedia.avatarUrl === rawAvatarUrl ? defaultAvatarUrl(user) : rawAvatarUrl;
+  const photos = user.photos
+    .map((photo) => resolveMediaUrl(photo.url, 700))
+    .filter((url) => url && !failedPhotoUrls.includes(url));
 
   const infoItems = [
-    { label: "年齢",  value: `${age}歳` },
+    { label: "年齢",  value: user.age == null ? "-" : `${user.age}歳` },
     { label: "性別",  value: genderLabel },
     { label: "国籍",  value: nationalityLabel },
-    { label: "学歴",  value: "早稲田大学" },
+    { label: "学歴",  value: user.education || "-" },
   ];
+
+  async function handleMessageClick() {
+    if (!user) return;
+
+    setOpeningChat(true);
+    setMessageError("");
+
+    try {
+      const conversation = await openConversationWithUser(user.id);
+      sessionStorage.setItem("vn_jp_active_conversation", JSON.stringify(conversation));
+      router.push(`/chat?conversationId=${conversation.id}`);
+    } catch (error) {
+      setMessageError(
+        error instanceof Error
+          ? error.message
+          : "マッチ後にメッセージできます。",
+      );
+    } finally {
+      setOpeningChat(false);
+    }
+  }
+
+  async function submitReport(payload: { reason: string; detail: string; files: File[] }) {
+    if (!user) return;
+
+    await reportUser(user.id, {
+      reason: payload.reason,
+      detail: payload.detail,
+      evidence: payload.files,
+    });
+  }
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50">
@@ -320,7 +466,14 @@ export default function UserDetailPage() {
 
         {/* ── Cover photo ── */}
         <div className="relative h-44 bg-gradient-to-br from-emerald-100 to-gray-200 overflow-hidden">
-          <Image src={coverUrl} alt="cover" fill className="object-cover" unoptimized />
+          <Image
+            src={coverUrl}
+            alt="cover"
+            fill
+            className="object-cover"
+            unoptimized
+            onError={() => setFailedMedia((current) => ({ ...current, coverUrl: rawCoverUrl }))}
+          />
         </div>
 
         {/* ── Profile hero ── */}
@@ -328,25 +481,33 @@ export default function UserDetailPage() {
           {/* Avatar + name + buttons — avatar has -mt-10 independently */}
           <div className="flex gap-4 mb-3">
             <div className="relative w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-100 shrink-0 -mt-10">
-              <Image src={user.avatarUrl} alt={user.fullName} fill className="object-cover" unoptimized />
+              <Image
+                src={avatarUrl}
+                alt={user.fullName}
+                fill
+                className="object-cover"
+                unoptimized
+                onError={() => setFailedMedia((current) => ({ ...current, avatarUrl: rawAvatarUrl }))}
+              />
             </div>
             {/* Name + buttons: start cleanly in white section */}
             <div className="flex flex-1 items-start justify-between gap-2 mt-2">
               <div className="min-w-0">
                 <h1 className="text-xl font-bold text-gray-900 leading-tight">{user.fullName}</h1>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-0.5">
-                  <span className="flex items-center gap-1"><PinIcon />{user.city}</span>
+                  <span className="flex items-center gap-1"><PinIcon />{user.location}</span>
                   <span className="flex items-center gap-1"><BriefcaseIcon />{user.occupation}</span>
                   <span className="flex items-center gap-1"><CalendarIcon />{joinedLabel}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => router.push("/chat")}
+                  onClick={() => { void handleMessageClick(); }}
+                  disabled={openingChat}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors"
                   style={{ backgroundColor: "#1B4332" }}
                 >
-                  <ChatBubbleIcon /> メッセージ
+                  <ChatBubbleIcon /> {openingChat ? "接続中..." : "メッセージ"}
                 </button>
                 <button
                   onClick={() => setShowReport(true)}
@@ -371,6 +532,9 @@ export default function UserDetailPage() {
               <span className="text-xs text-gray-400">つながり</span>
             </div>
           </div>
+          {messageError && (
+            <p className="text-xs text-red-500 mt-2">{messageError}</p>
+          )}
         </div>
 
         {/* ── Content cards ── */}
@@ -444,8 +608,8 @@ export default function UserDetailPage() {
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {user.interests.map((interest) => (
-                  <span key={interest} className="text-xs px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
-                    {interest}
+                  <span key={interest.id} className="text-xs px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
+                    {interest.name}
                   </span>
                 ))}
               </div>
@@ -464,7 +628,14 @@ export default function UserDetailPage() {
             <div className="grid grid-cols-5 gap-2">
               {photos.map((p, i) => (
                 <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
-                  <Image src={p} alt={`photo-${i}`} fill className="object-cover" unoptimized />
+                  <Image
+                    src={p}
+                    alt={`photo-${i}`}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                    onError={() => setFailedPhotoUrls((current) => current.includes(p) ? current : [...current, p])}
+                  />
                 </div>
               ))}
             </div>
@@ -473,7 +644,7 @@ export default function UserDetailPage() {
         </div>
       </div>
 
-      {showReport && <ReportModal onClose={() => setShowReport(false)} />}
+      {showReport && <ReportModal onClose={() => setShowReport(false)} onSubmit={submitReport} />}
     </div>
   );
 }

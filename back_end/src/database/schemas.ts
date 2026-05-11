@@ -5,11 +5,21 @@ export const NATIONALITIES = ['JP', 'VN'] as const;
 export const TAG_TYPES = ['interest', 'purpose'] as const;
 export const MATCH_STATUSES = ['pending', 'accepted', 'rejected'] as const;
 export const PROFILE_GENDERS = ['male', 'female', 'other'] as const;
+export const USER_REPORT_REASONS = [
+  'spam',
+  'inappropriate_content',
+  'harassment',
+  'fake_profile',
+  'other',
+] as const;
+export const USER_REPORT_STATUSES = ['pending', 'reviewed', 'dismissed'] as const;
 
 export type Nationality = (typeof NATIONALITIES)[number];
 export type TagType = (typeof TAG_TYPES)[number];
 export type MatchStatus = (typeof MATCH_STATUSES)[number];
 export type ProfileGender = (typeof PROFILE_GENDERS)[number];
+export type UserReportReason = (typeof USER_REPORT_REASONS)[number];
+export type UserReportStatus = (typeof USER_REPORT_STATUSES)[number];
 
 export type UserDocument = HydratedDocument<User>;
 export type TagDocument = HydratedDocument<Tag>;
@@ -20,6 +30,7 @@ export type MessageDocument = HydratedDocument<Message>;
 export type EventDocument = HydratedDocument<Event>;
 export type EventParticipantDocument = HydratedDocument<EventParticipant>;
 export type ProfileDocument = HydratedDocument<Profile>;
+export type UserReportDocument = HydratedDocument<UserReport>;
 
 @Schema({ collection: 'users', versionKey: false })
 export class User {
@@ -224,6 +235,54 @@ MessageSchema.index(
   { name: 'messages_conversation_sent_at_idx' },
 );
 MessageSchema.index({ sender_id: 1 }, { name: 'messages_sender_id_idx' });
+
+export class UserReportEvidence {
+  @Prop({ required: true, trim: true })
+  url: string;
+
+  @Prop({ trim: true, default: '' })
+  public_id?: string;
+
+  @Prop({ required: true, trim: true })
+  mime_type: string;
+
+  @Prop({ trim: true, default: '' })
+  original_name?: string;
+
+  @Prop({ min: 0, default: 0 })
+  size?: number;
+}
+
+@Schema({ collection: 'user_reports', versionKey: false })
+export class UserReport {
+  @Prop({ required: true, type: Types.ObjectId, ref: User.name })
+  reporter_id: Types.ObjectId;
+
+  @Prop({ required: true, type: Types.ObjectId, ref: User.name })
+  reported_user_id: Types.ObjectId;
+
+  @Prop({ required: true, type: String, enum: USER_REPORT_REASONS })
+  reason: UserReportReason;
+
+  @Prop({ trim: true, default: '' })
+  detail: string;
+
+  @Prop({ type: [UserReportEvidence], default: [] })
+  evidence_files: UserReportEvidence[];
+
+  @Prop({ required: true, type: String, enum: USER_REPORT_STATUSES, default: 'pending' })
+  status: UserReportStatus;
+
+  @Prop({ required: true, default: Date.now })
+  created_at: Date;
+}
+
+export const UserReportSchema = SchemaFactory.createForClass(UserReport);
+UserReportSchema.index(
+  { reporter_id: 1, reported_user_id: 1, created_at: -1 },
+  { name: 'user_reports_reporter_reported_created_idx' },
+);
+UserReportSchema.index({ reported_user_id: 1, status: 1 }, { name: 'user_reports_reported_status_idx' });
 
 @Schema({ collection: 'events', versionKey: false })
 export class Event {

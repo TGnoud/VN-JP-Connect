@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { clsx } from "clsx";
-import { MOCK_CHAT_ROOMS, MOCK_CURRENT_USER } from "@/lib/mock-data";
+import { MOCK_CHAT_ROOMS } from "@/lib/mock-data";
+import { resolveMediaUrl, type ConversationResponse } from "@/lib/profile-api";
 import type { ChatRoom, ChatMessage } from "@/types";
 
 const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
@@ -22,6 +23,38 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
 function formatTime(ts: string) {
   const d = new Date(ts);
   return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+}
+
+function roomFromConversation(conversation: ConversationResponse): ChatRoom {
+  return {
+    id: conversation.id,
+    participants: [
+      {
+        id: conversation.partner.id,
+        fullName: conversation.partner.fullName,
+        email: "",
+        phone: "",
+        nationality: conversation.partner.nationality === "JP" ? "Japanese" : "Vietnamese",
+        gender: "male",
+        birthDate: "2000-01-01",
+        occupation: "",
+        city: "",
+        japaneseLevel: "Basic",
+        vietnameseLevel: "Basic",
+        purposes: [],
+        interests: [],
+        bio: "",
+        avatarUrl:
+          resolveMediaUrl(conversation.partner.avatarUrl, 256) ||
+          `https://api.dicebear.com/7.x/personas/svg?seed=${encodeURIComponent(conversation.partner.id)}`,
+        likeRate: 100,
+        connectionsCount: 0,
+        joinedAt: conversation.createdAt,
+      },
+    ],
+    unreadCount: 0,
+    isGroup: false,
+  };
 }
 
 interface RoomItemProps {
@@ -71,8 +104,38 @@ export default function ChatPage() {
   const [activeRoomId, setActiveRoomId] = useState<string | null>(MOCK_CHAT_ROOMS[0]?.id ?? null);
   const [inputText, setInputText] = useState("");
   const [messagesByRoom, setMessagesByRoom] = useState(MOCK_MESSAGES);
+  const [openedRoom, setOpenedRoom] = useState<ChatRoom | null>(null);
 
-  const activeRoom = MOCK_CHAT_ROOMS.find((r) => r.id === activeRoomId) ?? null;
+  useEffect(() => {
+    const conversationId =
+      typeof window === "undefined"
+        ? null
+        : new URLSearchParams(window.location.search).get("conversationId");
+
+    if (!conversationId) return;
+
+    try {
+      const storedConversation = sessionStorage.getItem("vn_jp_active_conversation");
+      const conversation = storedConversation
+        ? (JSON.parse(storedConversation) as ConversationResponse)
+        : null;
+
+      queueMicrotask(() => {
+        if (conversation?.id === conversationId) {
+          setOpenedRoom(roomFromConversation(conversation));
+        }
+
+        setActiveRoomId(conversationId);
+      });
+    } catch {
+      queueMicrotask(() => setActiveRoomId(conversationId));
+    }
+  }, []);
+
+  const rooms = openedRoom
+    ? [openedRoom, ...MOCK_CHAT_ROOMS.filter((room) => room.id !== openedRoom.id)]
+    : MOCK_CHAT_ROOMS;
+  const activeRoom = rooms.find((r) => r.id === activeRoomId) ?? null;
   const partner = activeRoom?.participants[0] ?? null;
   const messages = activeRoomId ? (messagesByRoom[activeRoomId] ?? []) : [];
 
@@ -107,7 +170,7 @@ export default function ChatPage() {
           <h1 className="text-lg font-bold text-gray-900">メッセージ</h1>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {MOCK_CHAT_ROOMS.map((room) => (
+          {rooms.map((room) => (
             <RoomItem
               key={room.id}
               room={room}
