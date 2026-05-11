@@ -1,10 +1,18 @@
 import 'dotenv/config';
 import { Collection, Db, Document, Filter, MongoClient, ObjectId } from 'mongodb';
 
-const configuredMongoUri = process.env.MONGO_LOCAL_URI;
+const seedTarget = process.argv.includes('--atlas') ? 'atlas' : 'local';
+const configuredMongoUri =
+  seedTarget === 'atlas'
+    ? process.env.MONGO_ATLAS_URI ?? process.env.MONGO_URI
+    : process.env.MONGO_LOCAL_URI;
 
 if (!configuredMongoUri) {
-  throw new Error('Missing MONGO_LOCAL_URI in environment variables');
+  throw new Error(
+    `Missing ${
+      seedTarget === 'atlas' ? 'MONGO_ATLAS_URI or MONGO_URI' : 'MONGO_LOCAL_URI'
+    } in environment variables`,
+  );
 }
 
 const mongoUri = configuredMongoUri;
@@ -15,11 +23,13 @@ function databaseNameFromUri(uri: string) {
   return databaseName || undefined;
 }
 
-function assertLocalSeedTarget(uri: string) {
+function assertSeedTarget(uri: string) {
   const parsedUri = new URL(uri);
   const host = parsedUri.hostname;
   const databaseName =
-    process.env.MONGO_LOCAL_DATABASE_NAME ?? databaseNameFromUri(uri);
+    seedTarget === 'atlas'
+      ? (process.env.MONGO_ATLAS_DATABASE_NAME ?? databaseNameFromUri(uri))
+      : (process.env.MONGO_LOCAL_DATABASE_NAME ?? databaseNameFromUri(uri));
   const isLocalHost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(host);
   const isLocalDatabase = databaseName?.endsWith('_local') ?? false;
 
@@ -29,10 +39,14 @@ function assertLocalSeedTarget(uri: string) {
     );
   }
 
-  if (!isLocalHost && !isLocalDatabase) {
+  if (seedTarget === 'local' && !isLocalHost && !isLocalDatabase) {
     throw new Error(
       'Refusing to seed a shared database. Use localhost or a database name ending with _local.',
     );
+  }
+
+  if (seedTarget === 'atlas' && (isLocalHost || isLocalDatabase)) {
+    throw new Error('Refusing to run Atlas seed against a local database.');
   }
 
   return databaseName;
@@ -431,7 +445,7 @@ async function seedEventParticipants(
 }
 
 async function seed() {
-  const databaseName = assertLocalSeedTarget(mongoUri);
+  const databaseName = assertSeedTarget(mongoUri);
   const client = new MongoClient(mongoUri);
 
   try {
@@ -478,7 +492,8 @@ async function seed() {
       now,
     );
 
-    console.log('Local seed data created successfully.');
+    console.log(`${seedTarget} seed data created successfully.`);
+    console.log(`NEXT_PUBLIC_DEV_USER_ID=${users.vnStudentId.toHexString()}`);
   } finally {
     await client.close();
   }

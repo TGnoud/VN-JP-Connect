@@ -22,7 +22,8 @@
     "db:migrate:atlas": "migrate-mongo up -f migrate-mongo.atlas.cjs",
     "db:status:local": "migrate-mongo status -f migrate-mongo.local.cjs",
     "db:status:atlas": "migrate-mongo status -f migrate-mongo.atlas.cjs",
-    "seed": "ts-node src/seed.ts"
+    "seed": "ts-node src/seed.ts",
+    "seed:atlas": "ts-node src/seed.ts --atlas"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
