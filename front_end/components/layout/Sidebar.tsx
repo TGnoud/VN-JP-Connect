@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { clearStoredUserId } from "@/lib/auth-api";
 
 const NAV_ITEMS = [
   {
@@ -99,7 +100,10 @@ export default function Sidebar() {
       {/* Logout */}
       <div className="px-3 py-4">
         <button
-          onClick={() => router.push("/login")}
+          onClick={() => {
+            clearStoredUserId();
+            router.push("/login");
+          }}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all w-full"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
