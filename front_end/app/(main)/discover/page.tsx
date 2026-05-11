@@ -634,24 +634,30 @@ export default function DiscoverPage() {
 
   const current = users[currentIndex];
 
-  async function dismissCurrentUser(userId: string) {
+  function removeInterestedUser(userId: string) {
     const nextExcludedUserIds = Array.from(new Set([...excludedUserIds, userId]));
     const remainingUsers = users.filter((user) => user.id !== userId);
 
     setExcludedUserIds(nextExcludedUserIds);
-
-    if (remainingUsers.length === 0) {
-      await loadDiscoverProfiles(filter, nextExcludedUserIds, filterOptions);
-      return;
-    }
-
     setUsers(remainingUsers);
-    setCurrentIndex((index) => Math.min(index, remainingUsers.length - 1));
+    setCurrentIndex((index) =>
+      remainingUsers.length === 0 ? 0 : Math.min(index, remainingUsers.length - 1),
+    );
   }
 
   function handleSkip() {
     if (!current) return;
-    void dismissCurrentUser(current.id);
+
+    if (users.length <= 1) {
+      setCurrentIndex(0);
+      return;
+    }
+
+    const remainingUsers = users.filter((user) => user.id !== current.id);
+    const cycledUsers = [...remainingUsers, current];
+
+    setUsers(cycledUsers);
+    setCurrentIndex(currentIndex >= users.length - 1 ? 0 : currentIndex);
   }
 
   async function handleLike() {
@@ -666,7 +672,7 @@ export default function DiscoverPage() {
         sessionStorage.setItem("vn_jp_active_conversation", JSON.stringify(result.conversation));
       }
       setTimeout(() => setMatchAlert(null), 3000);
-      await dismissCurrentUser(current.id);
+      removeInterestedUser(current.id);
     } catch (error) {
       alert(error instanceof Error ? error.message : "保存に失敗しました。");
     } finally {
@@ -674,8 +680,7 @@ export default function DiscoverPage() {
     }
   }
 
-  if (loading || !current) {
-    return (
+  const emptyState = (
       <div className="flex-1 flex items-center justify-center p-8 text-center bg-gray-50">
         <div>
           <p className="text-5xl mb-4">🎉</p>
@@ -687,8 +692,7 @@ export default function DiscoverPage() {
           </p>
         </div>
       </div>
-    );
-  }
+  );
 
   const hasActiveFilter =
     filter.gender !== "all" ||
@@ -743,12 +747,16 @@ export default function DiscoverPage() {
         {/* Card area */}
         <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-6 overflow-auto">
           <div className="w-full max-w-2xl flex flex-col gap-3">
-            <ProfileCard
-              user={current}
-              onLike={handleLike}
-              onSkip={handleSkip}
-              onViewDetail={() => router.push(`/users/${current.id}`)}
-            />
+            {loading || !current ? (
+              emptyState
+            ) : (
+              <ProfileCard
+                user={current}
+                onLike={handleLike}
+                onSkip={handleSkip}
+                onViewDetail={() => router.push(`/users/${current.id}`)}
+              />
+            )}
           </div>
         </div>
       </div>
