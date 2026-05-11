@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { MOCK_USERS } from "@/lib/mock-data";
@@ -106,32 +106,47 @@ function PeopleGroupIcon() {
     </svg>
   );
 }
+function SectionIconWrap({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-center w-7 h-7 rounded-md shrink-0" style={{ backgroundColor: "#d1fae5" }}>
+      {children}
+    </div>
+  );
+}
 function UserInfoIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
-    </svg>
+    <SectionIconWrap>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 20 20" fill="#1B4332">
+        <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
+      </svg>
+    </SectionIconWrap>
   );
 }
 function LanguageGlobeIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-    </svg>
+    <SectionIconWrap>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+      </svg>
+    </SectionIconWrap>
   );
 }
 function HeartIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M9.653 16.915l-.005-.003-.019-.01a20.759 20.759 0 01-1.162-.682 22.045 22.045 0 01-2.582-2.184C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.536a22.049 22.049 0 01-3.744 2.18l-.019.01-.005.003h-.002a.739.739 0 01-.69.001l-.002-.001z" />
-    </svg>
+    <SectionIconWrap>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 20 20" fill="#1B4332">
+        <path d="M9.653 16.915l-.005-.003-.019-.01a20.759 20.759 0 01-1.162-.682 22.045 22.045 0 01-2.582-2.184C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.536a22.049 22.049 0 01-3.744 2.18l-.019.01-.005.003h-.002a.739.739 0 01-.69.001l-.002-.001z" />
+      </svg>
+    </SectionIconWrap>
   );
 }
 function CameraIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-      <path fillRule="evenodd" d="M1 8a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 018.07 3h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0016.07 6H17a2 2 0 012 2v7a2 2 0 01-2 2H3a2 2 0 01-2-2V8zm13.5 3a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM10 14a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-    </svg>
+    <SectionIconWrap>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 20 20" fill="#1B4332">
+        <path fillRule="evenodd" d="M1 8a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 018.07 3h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0016.07 6H17a2 2 0 012 2v7a2 2 0 01-2 2H3a2 2 0 01-2-2V8zm13.5 3a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM10 14a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+      </svg>
+    </SectionIconWrap>
   );
 }
 function XIcon() {
