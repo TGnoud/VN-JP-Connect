@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   addPhotoUrls,
   getMyProfile,
@@ -329,42 +330,45 @@ function levelToApi(level: string) {
   return LEVEL_UI_NAMES[level] ?? level;
 }
 
+function defaultAvatarUrl(profile: ProfileData) {
+  const seed = encodeURIComponent(profile.id || profile.email || profile.fullName || "user");
+  return `https://api.dicebear.com/7.x/personas/svg?seed=${seed}`;
+}
+
 function profileFromApi(profile: ProfileData): UiProfile {
   return {
     ...PROFILE,
     fullName: profile.fullName,
     email: profile.email,
-    age: profile.age ?? PROFILE.age,
+    age: profile.age ?? 0,
     gender:
       profile.gender === "female"
         ? "女性"
         : profile.gender === "other"
           ? "その他"
-          : PROFILE.gender,
-    nationality: profile.nationality === "JP" ? "日本" : PROFILE.nationality,
-    city: profile.location || PROFILE.city,
-    occupation: profile.occupation || PROFILE.occupation,
-    school: profile.education || PROFILE.school,
+          : profile.gender === "male"
+            ? "男性"
+            : "",
+    nationality: profile.nationality === "JP" ? "日本" : "ベトナム",
+    city: profile.location,
+    occupation: profile.occupation,
+    school: profile.education,
     joinedAt: profile.joinedAt ? formatJoinedAt(profile.joinedAt) : PROFILE.joinedAt,
-    likeRate: profile.likeRate ?? PROFILE.likeRate,
-    connectionsCount: profile.connectionsCount ?? PROFILE.connectionsCount,
-    bio: profile.bio || PROFILE.bio,
-    avatarUrl: resolveMediaUrl(profile.avatarUrl, 256) || PROFILE.avatarUrl,
-    coverUrl: resolveMediaUrl(profile.coverUrl, 1400) || PROFILE.coverUrl,
-    photos: profile.photos.length
-      ? profile.photos.map((photo) => resolveMediaUrl(photo.url, 700))
-      : PROFILE.photos,
-    interests: profile.interests.length
-      ? profile.interests.map((interest) => interest.name)
-      : PROFILE.interests,
+    likeRate: profile.likeRate ?? 100,
+    connectionsCount: profile.connectionsCount ?? 0,
+    bio: profile.bio,
+    avatarUrl: resolveMediaUrl(profile.avatarUrl, 256) || defaultAvatarUrl(profile),
+    coverUrl: resolveMediaUrl(profile.coverUrl, 1400) || COVER_PHOTOS[0],
+    photos: profile.photos.map((photo) => resolveMediaUrl(photo.url, 700)),
+    interests: profile.interests.map((interest) => interest.name),
   };
 }
 
 function socialLinksFromApi(profile: ProfileData) {
   return {
-    instagram: profile.socialLinks.instagram || "@minh_nguyen_vn",
-    facebook: profile.socialLinks.facebook || "Minh Nguyen",
-    line: profile.socialLinks.line || "@minh_line",
+    instagram: profile.socialLinks.instagram,
+    facebook: profile.socialLinks.facebook,
+    line: profile.socialLinks.line,
   };
 }
 
@@ -736,6 +740,7 @@ function ChangeCoverModal({ current, onClose, onSave }: { current: string; onClo
 type ModalType = "editInfo" | "addPhoto" | "selectInterests" | "changeAvatar" | "changeCover" | "editBio" | "editLanguages";
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [profile, setProfile] = useState<UiProfile>(PROFILE);
   const [socialLinks, setSocialLinks] = useState({
     instagram: "@minh_nguyen_vn",
@@ -768,6 +773,9 @@ export default function ProfilePage() {
         setSocialLinks(socialLinksFromApi(apiProfile));
       } catch (error) {
         console.error(error);
+        if (error instanceof Error && error.message.includes("Login is required")) {
+          router.push("/login");
+        }
       }
     }
 
@@ -776,7 +784,7 @@ export default function ProfilePage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [router]);
 
   function applyApiProfile(apiProfile: ProfileData) {
     const uiProfile = profileFromApi(apiProfile);

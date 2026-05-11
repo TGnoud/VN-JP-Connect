@@ -3,10 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { login, setStoredUserId } from "@/lib/auth-api";
 
 interface FormErrors {
   identifier?: string;
   password?: string;
+  submit?: string;
 }
 
 export default function LoginPage() {
@@ -29,9 +31,25 @@ export default function LoginPage() {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setLoading(false);
-    router.push("/discover");
+    setErrors({});
+
+    try {
+      const response = await login({
+        email: identifier.trim(),
+        password,
+      });
+      setStoredUserId(response.userId);
+      router.push("/profile");
+    } catch (error) {
+      setErrors({
+        submit:
+          error instanceof Error
+            ? error.message
+            : "ログインに失敗しました。",
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -126,6 +144,9 @@ export default function LoginPage() {
             >
               {loading ? "ログイン中..." : "ログイン"}
             </button>
+            {errors.submit && (
+              <p className="text-xs text-red-500 text-center">{errors.submit}</p>
+            )}
           </form>
 
           {/* 7 - Forgot password */}

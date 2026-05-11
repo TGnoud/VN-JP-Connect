@@ -1,5 +1,7 @@
 "use client";
 
+import { getStoredUserId } from "@/lib/auth-api";
+
 export interface ProfileTag {
   id: string;
   name: string;
@@ -61,12 +63,21 @@ export const API_BASE_URL =
   );
 export const DEV_USER_ID = process.env.NEXT_PUBLIC_DEV_USER_ID ?? "";
 
-function requireDevUserId() {
-  if (!DEV_USER_ID) {
-    throw new Error("Missing NEXT_PUBLIC_DEV_USER_ID for profile API requests.");
+function requireCurrentUserId() {
+  const storedUserId = getStoredUserId();
+
+  if (storedUserId) {
+    return storedUserId;
   }
 
-  return DEV_USER_ID;
+  const isLocalPage =
+    typeof window !== "undefined" && window.location.hostname.includes("localhost");
+
+  if (DEV_USER_ID && isLocalPage) {
+    return DEV_USER_ID;
+  }
+
+  throw new Error("Login is required before using profile API requests.");
 }
 
 async function requestApi<T>(path: string, init: RequestInit = {}) {
@@ -76,7 +87,7 @@ async function requestApi<T>(path: string, init: RequestInit = {}) {
     headers.set("Content-Type", "application/json");
   }
 
-  headers.set("x-user-id", requireDevUserId());
+  headers.set("x-user-id", requireCurrentUserId());
 
   let response: Response;
 
