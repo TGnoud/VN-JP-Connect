@@ -31,9 +31,12 @@ describe('Profile API (e2e)', () => {
       replaceLanguages: jest.fn().mockResolvedValue(profileResponse),
       replaceInterests: jest.fn().mockResolvedValue(profileResponse),
       addPhotos: jest.fn().mockResolvedValue(profileResponse),
+      addPhotoUrls: jest.fn().mockResolvedValue(profileResponse),
       deletePhoto: jest.fn().mockResolvedValue(profileResponse),
       updateAvatar: jest.fn().mockResolvedValue(profileResponse),
+      updateAvatarUrl: jest.fn().mockResolvedValue(profileResponse),
       updateCover: jest.fn().mockResolvedValue(profileResponse),
+      updateCoverUrl: jest.fn().mockResolvedValue(profileResponse),
       getProfileOptions: jest.fn().mockReturnValue({ genders: ['male'] }),
       searchTags: jest.fn().mockResolvedValue([{ id: tagId, name: 'Anime' }]),
     };
@@ -167,6 +170,18 @@ describe('Profile API (e2e)', () => {
       .expect(200);
   });
 
+  it('adds profile photos from preset URLs', async () => {
+    await request(app.getHttpServer())
+      .post('/profiles/me/photos-url')
+      .set('x-user-id', userId)
+      .send({ urls: ['https://images.unsplash.com/photo.jpg'] })
+      .expect(201);
+
+    expect(profileService.addPhotoUrls).toHaveBeenCalledWith(userId, [
+      'https://images.unsplash.com/photo.jpg',
+    ]);
+  });
+
   it('rejects invalid photo upload type', () => {
     return request(app.getHttpServer())
       .post('/profiles/me/photos')
@@ -196,6 +211,23 @@ describe('Profile API (e2e)', () => {
         contentType: 'image/jpeg',
       })
       .expect(200);
+  });
+
+  it('updates avatar and cover from preset URLs', async () => {
+    await request(app.getHttpServer())
+      .patch('/profiles/me/avatar-url')
+      .set('x-user-id', userId)
+      .send({ url: 'https://api.dicebear.com/7.x/personas/svg?seed=minh' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch('/profiles/me/cover-url')
+      .set('x-user-id', userId)
+      .send({ url: 'https://images.unsplash.com/photo.jpg' })
+      .expect(200);
+
+    expect(profileService.updateAvatarUrl).toHaveBeenCalled();
+    expect(profileService.updateCoverUrl).toHaveBeenCalled();
   });
 
   it('returns profile options and searches tags', async () => {

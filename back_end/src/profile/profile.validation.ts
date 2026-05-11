@@ -167,3 +167,41 @@ export function validateInterestBody(body: unknown) {
 
   return uniqueTagIds;
 }
+
+export function validateImageUrlBody(body: unknown) {
+  const payload = assertObjectBody(body);
+  const url = optionalString(payload.url, 'url');
+
+  if (!url) {
+    throw new BadRequestException('url is required');
+  }
+
+  const isPublicUrl = /^https?:\/\/\S+$/i.test(url);
+  const isLocalUploadUrl = url.startsWith('/uploads/profile/');
+
+  if (!isPublicUrl && !isLocalUploadUrl) {
+    throw new BadRequestException('url must be an http(s) URL or local upload path');
+  }
+
+  return { url };
+}
+
+export function validateImageUrlsBody(body: unknown) {
+  const payload = assertObjectBody(body);
+
+  if (!Array.isArray(payload.urls)) {
+    throw new BadRequestException('urls must be an array');
+  }
+
+  const urls = [...new Set(payload.urls)];
+
+  for (const url of urls) {
+    if (typeof url !== 'string') {
+      throw new BadRequestException('urls must contain strings');
+    }
+
+    validateImageUrlBody({ url });
+  }
+
+  return { urls };
+}

@@ -1,5 +1,7 @@
 import {
   validateBioBody,
+  validateImageUrlBody,
+  validateImageUrlsBody,
   validateInterestBody,
   validateLanguagesBody,
   validatePersonalBody,
@@ -55,6 +57,27 @@ describe('profile validation', () => {
   it('accepts only ObjectId interest IDs', () => {
     expect(() => validateInterestBody({ tagIds: ['not-an-id'] })).toThrow(
       'tagIds must contain valid ObjectId strings',
+    );
+  });
+
+  it('validates preset image URLs', () => {
+    expect(validateImageUrlBody({ url: 'https://example.com/avatar.png' })).toEqual({
+      url: 'https://example.com/avatar.png',
+    });
+    expect(validateImageUrlBody({ url: '/uploads/profile/user/avatar.png' })).toEqual({
+      url: '/uploads/profile/user/avatar.png',
+    });
+    expect(() => validateImageUrlBody({ url: 'javascript:alert(1)' })).toThrow(
+      'url must be an http(s) URL or local upload path',
+    );
+  });
+
+  it('validates preset image URL lists', () => {
+    expect(validateImageUrlsBody({ urls: ['https://example.com/a.png'] })).toEqual({
+      urls: ['https://example.com/a.png'],
+    });
+    expect(() => validateImageUrlsBody({ urls: ['file:///tmp/a.png'] })).toThrow(
+      'url must be an http(s) URL or local upload path',
     );
   });
 });

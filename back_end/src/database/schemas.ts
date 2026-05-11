@@ -119,6 +119,12 @@ export class Profile {
   @Prop({ type: [ProfilePhoto], default: [] })
   photos: ProfilePhoto[];
 
+  @Prop({ min: 0, max: 100 })
+  match_rate?: number;
+
+  @Prop({ min: 0 })
+  connections_count?: number;
+
   @Prop({ required: true, default: Date.now })
   updated_at: Date;
 }

@@ -81,15 +81,15 @@ async function seedUsers(db: Db, now: Date) {
 
   const vnStudentId = await upsertAndGetId(
     users,
-    { email: 'student.vn@vn-jp-connect.local' },
+    { phone_number: '+84900000002' },
     {
-      email: 'student.vn@vn-jp-connect.local',
+      email: 'minh.nguyen@example.com',
       phone_number: '+84900000002',
       password_hash: 'local-seed-password-hash',
-      full_name: 'Nguyen Van A',
+      full_name: 'Nguyen Van Minh',
       nationality: 'VN',
       is_verified: true,
-      created_at: now,
+      created_at: new Date('2024-06-01T00:00:00.000Z'),
     },
   );
 
@@ -160,21 +160,22 @@ async function seedTags(db: Db) {
   });
 
   const profileInterestNames = [
-    'Anime',
-    'Technology',
-    'Vietnamese Food',
-    'Travel',
-    'Photography',
-    'Coffee',
-    'Reading',
-    'Manga',
+    '言語交換',
+    'アニメ',
+    'テクノロジー',
+    'ベトナム料理',
+    '旅行',
+    '写真',
+    'コーヒー',
+    '読書',
+    'マンガ',
     'J-POP',
     'K-POP',
-    'Game',
-    'Soccer',
-    'Movie',
-    'Music',
-    'Dance',
+    'ゲーム',
+    'サッカー',
+    '映画',
+    '音楽',
+    'ダンス',
   ];
   const profileInterestIds: ObjectId[] = [];
 
@@ -214,12 +215,12 @@ async function seedProfiles(
       user_id: users.vnStudentId,
       age: 26,
       gender: 'male',
-      location: 'Ha Noi, Viet Nam',
-      occupation: 'Software Developer',
-      education: 'Hanoi University of Science and Technology',
-      bio: 'I am a software developer from Ha Noi studying Japanese and looking for language exchange partners.',
+      location: 'ハノイ市, ベトナム',
+      occupation: 'ソフトウェア開発者',
+      education: 'ハノイ工科大学',
+      bio: 'ハノイ出身のソフトウェア開発者です。日本語を勉強して2年になります。日本の文化、特にアニメ、料理、テクノロジーに深い興味があります。言語交換パートナーを探しています。一緒に楽しく学びましょう！',
       avatar_url: 'https://api.dicebear.com/7.x/personas/svg?seed=minh',
-      cover_url: 'https://images.unsplash.com/photo-1492571350019-22de08371fd3?w=900&q=80',
+      cover_url: 'https://images.unsplash.com/photo-1492571350019-22de08371fd3?w=1400&q=90',
       social_links: {
         instagram: '@minh_nguyen_vn',
         facebook: 'Minh Nguyen',
@@ -233,23 +234,25 @@ async function seedProfiles(
       photos: [
         {
           _id: new ObjectId(),
-          url: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=300&q=80',
+          url: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=700&q=90',
           is_main: true,
           uploaded_at: now,
         },
         {
           _id: new ObjectId(),
-          url: 'https://images.unsplash.com/photo-1478436127897-769e1b3f0f36?w=300&q=80',
+          url: 'https://images.unsplash.com/photo-1478436127897-769e1b3f0f36?w=700&q=90',
           is_main: false,
           uploaded_at: now,
         },
         {
           _id: new ObjectId(),
-          url: 'https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=300&q=80',
+          url: 'https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=700&q=90',
           is_main: false,
           uploaded_at: now,
         },
       ],
+      match_rate: 94,
+      connections_count: 128,
       updated_at: now,
     },
   );
@@ -306,6 +309,13 @@ async function seedUserInterests(
   pairs: Array<{ user_id: ObjectId; tag_id: ObjectId }>,
 ) {
   const userInterests = db.collection('user_interests');
+  const userIds = [
+    ...new Set(pairs.map((pair) => pair.user_id.toHexString())),
+  ].map((id) => new ObjectId(id));
+
+  if (userIds.length > 0) {
+    await userInterests.deleteMany({ user_id: { $in: userIds } });
+  }
 
   for (const pair of pairs) {
     await upsertAndGetId(userInterests, pair, pair);
@@ -434,9 +444,7 @@ async function seed() {
     await seedProfiles(db, users, now);
 
     await seedUserInterests(db, [
-      { user_id: users.vnStudentId, tag_id: tags.languageExchangeId },
-      { user_id: users.vnStudentId, tag_id: tags.jobHuntingId },
-      ...tags.profileInterestIds.slice(0, 7).map((tag_id) => ({
+      ...tags.profileInterestIds.slice(0, 8).map((tag_id) => ({
         user_id: users.vnStudentId,
         tag_id,
       })),

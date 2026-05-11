@@ -251,6 +251,39 @@ export class ProfileService {
     return this.getMe(userId);
   }
 
+  async addPhotoUrls(userId: string, urls: string[]) {
+    if (urls.length === 0) {
+      throw new BadRequestException('at least one photo URL is required');
+    }
+
+    const userObjectId = new Types.ObjectId(userId);
+    const profile = await this.ensureProfile(userObjectId);
+    const existingPhotos = profile.photos ?? [];
+
+    if (existingPhotos.length + urls.length > MAX_PROFILE_PHOTOS) {
+      throw new BadRequestException(`photos cannot exceed ${MAX_PROFILE_PHOTOS}`);
+    }
+
+    const savedPhotos = urls.map((url, index) => ({
+      _id: new Types.ObjectId(),
+      url,
+      is_main: existingPhotos.length === 0 && index === 0,
+      uploaded_at: new Date(),
+    }));
+
+    await this.profileModel
+      .updateOne(
+        { user_id: userObjectId },
+        {
+          $push: { photos: { $each: savedPhotos } },
+          $set: { updated_at: new Date() },
+        },
+      )
+      .exec();
+
+    return this.getMe(userId);
+  }
+
   async deletePhoto(userId: string, photoId: string) {
     if (!Types.ObjectId.isValid(photoId)) {
       throw new BadRequestException('photoId must be a valid ObjectId');
@@ -279,8 +312,12 @@ export class ProfileService {
   }
 
   async updateAvatar(userId: string, file: UploadedFileLike) {
-    const userObjectId = new Types.ObjectId(userId);
     const url = await this.saveUploadedFile(userId, file);
+    return this.updateAvatarUrl(userId, url);
+  }
+
+  async updateAvatarUrl(userId: string, url: string) {
+    const userObjectId = new Types.ObjectId(userId);
     await this.profileModel
       .findOneAndUpdate(
         { user_id: userObjectId },
@@ -296,8 +333,12 @@ export class ProfileService {
   }
 
   async updateCover(userId: string, file: UploadedFileLike) {
-    const userObjectId = new Types.ObjectId(userId);
     const url = await this.saveUploadedFile(userId, file);
+    return this.updateCoverUrl(userId, url);
+  }
+
+  async updateCoverUrl(userId: string, url: string) {
+    const userObjectId = new Types.ObjectId(userId);
     await this.profileModel
       .findOneAndUpdate(
         { user_id: userObjectId },
@@ -423,8 +464,8 @@ export class ProfileService {
         isMain: photo.is_main,
         uploadedAt: photo.uploaded_at,
       })),
-      likeRate: 100,
-      connectionsCount,
+      likeRate: profile.match_rate ?? 100,
+      connectionsCount: profile.connections_count ?? connectionsCount,
       joinedAt: user.created_at,
       updatedAt: profile.updated_at,
     };

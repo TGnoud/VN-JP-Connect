@@ -26,6 +26,8 @@ import { CurrentUserId } from './current-user-id.decorator';
 import { ProfileService } from './profile.service';
 import {
   validateBioBody,
+  validateImageUrlBody,
+  validateImageUrlsBody,
   validateInterestBody,
   validateLanguagesBody,
   validatePersonalBody,
@@ -82,6 +84,11 @@ export class ProfileController {
     return this.profileService.addPhotos(userId, files);
   }
 
+  @Post('me/photos-url')
+  addPhotoUrls(@CurrentUserId() userId: string, @Body() body: unknown) {
+    return this.profileService.addPhotoUrls(userId, validateImageUrlsBody(body).urls);
+  }
+
   @Delete('me/photos/:photoId')
   deletePhoto(@CurrentUserId() userId: string, @Param('photoId') photoId: string) {
     return this.profileService.deletePhoto(userId, photoId);
@@ -98,6 +105,11 @@ export class ProfileController {
     return this.profileService.updateAvatar(userId, file);
   }
 
+  @Patch('me/avatar-url')
+  updateAvatarUrl(@CurrentUserId() userId: string, @Body() body: unknown) {
+    return this.profileService.updateAvatarUrl(userId, validateImageUrlBody(body).url);
+  }
+
   @Patch('me/cover')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -107,6 +119,11 @@ export class ProfileController {
   )
   updateCover(@CurrentUserId() userId: string, @UploadedFile() file: any) {
     return this.profileService.updateCover(userId, file);
+  }
+
+  @Patch('me/cover-url')
+  updateCoverUrl(@CurrentUserId() userId: string, @Body() body: unknown) {
+    return this.profileService.updateCoverUrl(userId, validateImageUrlBody(body).url);
   }
 }
 
