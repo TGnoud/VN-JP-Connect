@@ -4,10 +4,12 @@ import { HydratedDocument, Types } from 'mongoose';
 export const NATIONALITIES = ['JP', 'VN'] as const;
 export const TAG_TYPES = ['interest', 'purpose'] as const;
 export const MATCH_STATUSES = ['pending', 'accepted', 'rejected'] as const;
+export const PROFILE_GENDERS = ['male', 'female', 'other'] as const;
 
 export type Nationality = (typeof NATIONALITIES)[number];
 export type TagType = (typeof TAG_TYPES)[number];
 export type MatchStatus = (typeof MATCH_STATUSES)[number];
+export type ProfileGender = (typeof PROFILE_GENDERS)[number];
 
 export type UserDocument = HydratedDocument<User>;
 export type TagDocument = HydratedDocument<Tag>;
@@ -17,6 +19,7 @@ export type ConversationDocument = HydratedDocument<Conversation>;
 export type MessageDocument = HydratedDocument<Message>;
 export type EventDocument = HydratedDocument<Event>;
 export type EventParticipantDocument = HydratedDocument<EventParticipant>;
+export type ProfileDocument = HydratedDocument<Profile>;
 
 @Schema({ collection: 'users', versionKey: false })
 export class User {
@@ -32,7 +35,7 @@ export class User {
   @Prop({ required: true, trim: true })
   full_name: string;
 
-  @Prop({ required: true, enum: NATIONALITIES })
+  @Prop({ required: true, type: String, enum: NATIONALITIES })
   nationality: Nationality;
 
   @Prop({ required: true, default: false })
@@ -45,12 +48,90 @@ export class User {
 export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.index({ email: 1 }, { unique: true, name: 'users_email_unique' });
 
+export class SocialLinks {
+  @Prop({ trim: true, default: '' })
+  instagram: string;
+
+  @Prop({ trim: true, default: '' })
+  facebook: string;
+
+  @Prop({ trim: true, default: '' })
+  line: string;
+}
+
+export class LanguageSkill {
+  @Prop({ required: true, trim: true })
+  language: string;
+
+  @Prop({ required: true, trim: true })
+  level: string;
+}
+
+export class ProfilePhoto {
+  @Prop({ required: true, type: Types.ObjectId, default: () => new Types.ObjectId() })
+  _id: Types.ObjectId;
+
+  @Prop({ required: true, trim: true })
+  url: string;
+
+  @Prop({ required: true, default: false })
+  is_main: boolean;
+
+  @Prop({ required: true, default: Date.now })
+  uploaded_at: Date;
+}
+
+@Schema({ collection: 'profiles', versionKey: false })
+export class Profile {
+  @Prop({ required: true, type: Types.ObjectId, ref: User.name })
+  user_id: Types.ObjectId;
+
+  @Prop({ min: 0, max: 120 })
+  age?: number;
+
+  @Prop({ type: String, enum: PROFILE_GENDERS })
+  gender?: ProfileGender;
+
+  @Prop({ trim: true, default: '' })
+  location: string;
+
+  @Prop({ trim: true, default: '' })
+  occupation: string;
+
+  @Prop({ trim: true, default: '' })
+  education: string;
+
+  @Prop({ trim: true, maxlength: 300, default: '' })
+  bio: string;
+
+  @Prop({ trim: true, default: '' })
+  avatar_url: string;
+
+  @Prop({ trim: true, default: '' })
+  cover_url: string;
+
+  @Prop({ type: SocialLinks, default: () => ({}) })
+  social_links: SocialLinks;
+
+  @Prop({ type: [LanguageSkill], default: [] })
+  languages: LanguageSkill[];
+
+  @Prop({ type: [ProfilePhoto], default: [] })
+  photos: ProfilePhoto[];
+
+  @Prop({ required: true, default: Date.now })
+  updated_at: Date;
+}
+
+export const ProfileSchema = SchemaFactory.createForClass(Profile);
+ProfileSchema.index({ user_id: 1 }, { unique: true, name: 'profiles_user_id_unique' });
+
 @Schema({ collection: 'tags', versionKey: false })
 export class Tag {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ required: true, enum: TAG_TYPES })
+  @Prop({ required: true, type: String, enum: TAG_TYPES })
   type: TagType;
 }
 
@@ -81,7 +162,7 @@ export class Match {
   @Prop({ required: true, type: Types.ObjectId, ref: User.name })
   receiver_id: Types.ObjectId;
 
-  @Prop({ required: true, enum: MATCH_STATUSES, default: 'pending' })
+  @Prop({ required: true, type: String, enum: MATCH_STATUSES, default: 'pending' })
   status: MatchStatus;
 
   @Prop({ required: true, default: Date.now })

@@ -45,6 +45,60 @@ const validators = {
       },
     },
   },
+  profiles: {
+    $jsonSchema: {
+      bsonType: 'object',
+      required: ['user_id', 'updated_at'],
+      additionalProperties: true,
+      properties: {
+        user_id: { bsonType: 'objectId' },
+        age: { bsonType: 'int', minimum: 0, maximum: 120 },
+        gender: { enum: ['male', 'female', 'other', null] },
+        location: { bsonType: 'string' },
+        occupation: { bsonType: 'string' },
+        education: { bsonType: 'string' },
+        bio: { bsonType: 'string', maxLength: 300 },
+        avatar_url: { bsonType: 'string' },
+        cover_url: { bsonType: 'string' },
+        social_links: {
+          bsonType: 'object',
+          additionalProperties: true,
+          properties: {
+            instagram: { bsonType: 'string' },
+            facebook: { bsonType: 'string' },
+            line: { bsonType: 'string' },
+          },
+        },
+        languages: {
+          bsonType: 'array',
+          items: {
+            bsonType: 'object',
+            required: ['language', 'level'],
+            additionalProperties: true,
+            properties: {
+              language: { bsonType: 'string' },
+              level: { bsonType: 'string' },
+            },
+          },
+        },
+        photos: {
+          bsonType: 'array',
+          items: {
+            bsonType: 'object',
+            required: ['_id', 'url', 'is_main', 'uploaded_at'],
+            additionalProperties: true,
+            properties: {
+              _id: { bsonType: 'objectId' },
+              url: { bsonType: 'string' },
+              is_main: { bsonType: 'bool' },
+              uploaded_at: { bsonType: 'date' },
+            },
+          },
+        },
+        updated_at: { bsonType: 'date' },
+      },
+    },
+  },
   matches: {
     $jsonSchema: {
       bsonType: 'object',
@@ -132,6 +186,12 @@ const managedIndexes = {
       options: { unique: true, name: 'user_interests_user_tag_unique' },
     },
     { key: { tag_id: 1 }, options: { name: 'user_interests_tag_id_idx' } },
+  ],
+  profiles: [
+    {
+      key: { user_id: 1 },
+      options: { unique: true, name: 'profiles_user_id_unique' },
+    },
   ],
   matches: [
     {

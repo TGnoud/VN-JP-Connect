@@ -159,7 +159,146 @@ async function seedTags(db: Db) {
     type: 'purpose',
   });
 
-  return { languageExchangeId, jobHuntingId, cultureId, studyAbroadId };
+  const profileInterestNames = [
+    'Anime',
+    'Technology',
+    'Vietnamese Food',
+    'Travel',
+    'Photography',
+    'Coffee',
+    'Reading',
+    'Manga',
+    'J-POP',
+    'K-POP',
+    'Game',
+    'Soccer',
+    'Movie',
+    'Music',
+    'Dance',
+  ];
+  const profileInterestIds: ObjectId[] = [];
+
+  for (const name of profileInterestNames) {
+    const tagId = await upsertAndGetId(
+      tags,
+      { name, type: 'interest' },
+      { name, type: 'interest' },
+    );
+    profileInterestIds.push(tagId);
+  }
+
+  return {
+    languageExchangeId,
+    jobHuntingId,
+    cultureId,
+    studyAbroadId,
+    profileInterestIds,
+  };
+}
+
+async function seedProfiles(
+  db: Db,
+  users: {
+    vnStudentId: ObjectId;
+    jpStudentId: ObjectId;
+    organizerId: ObjectId;
+  },
+  now: Date,
+) {
+  const profiles = db.collection('profiles');
+
+  await upsertAndGetId(
+    profiles,
+    { user_id: users.vnStudentId },
+    {
+      user_id: users.vnStudentId,
+      age: 26,
+      gender: 'male',
+      location: 'Ha Noi, Viet Nam',
+      occupation: 'Software Developer',
+      education: 'Hanoi University of Science and Technology',
+      bio: 'I am a software developer from Ha Noi studying Japanese and looking for language exchange partners.',
+      avatar_url: 'https://api.dicebear.com/7.x/personas/svg?seed=minh',
+      cover_url: 'https://images.unsplash.com/photo-1492571350019-22de08371fd3?w=900&q=80',
+      social_links: {
+        instagram: '@minh_nguyen_vn',
+        facebook: 'Minh Nguyen',
+        line: '@minh_line',
+      },
+      languages: [
+        { language: 'Vietnamese', level: 'Native' },
+        { language: 'Japanese', level: 'N3' },
+        { language: 'English', level: 'IELTS 7.0' },
+      ],
+      photos: [
+        {
+          _id: new ObjectId(),
+          url: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=300&q=80',
+          is_main: true,
+          uploaded_at: now,
+        },
+        {
+          _id: new ObjectId(),
+          url: 'https://images.unsplash.com/photo-1478436127897-769e1b3f0f36?w=300&q=80',
+          is_main: false,
+          uploaded_at: now,
+        },
+        {
+          _id: new ObjectId(),
+          url: 'https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=300&q=80',
+          is_main: false,
+          uploaded_at: now,
+        },
+      ],
+      updated_at: now,
+    },
+  );
+
+  await upsertAndGetId(
+    profiles,
+    { user_id: users.jpStudentId },
+    {
+      user_id: users.jpStudentId,
+      age: 24,
+      gender: 'female',
+      location: 'Tokyo, Japan',
+      occupation: 'Teacher',
+      education: 'Tokyo University',
+      bio: 'I am studying Vietnamese and want to meet friends interested in culture exchange.',
+      avatar_url: 'https://api.dicebear.com/7.x/personas/svg?seed=hanako',
+      cover_url: '',
+      social_links: { instagram: '', facebook: '', line: '' },
+      languages: [
+        { language: 'Japanese', level: 'Native' },
+        { language: 'Vietnamese', level: 'Beginner' },
+      ],
+      photos: [],
+      updated_at: now,
+    },
+  );
+
+  await upsertAndGetId(
+    profiles,
+    { user_id: users.organizerId },
+    {
+      user_id: users.organizerId,
+      age: 30,
+      gender: 'other',
+      location: 'Ho Chi Minh City, Viet Nam',
+      occupation: 'Event Organizer',
+      education: '',
+      bio: 'I organize VN-JP exchange events and help members find useful connections.',
+      avatar_url: '',
+      cover_url: '',
+      social_links: { instagram: '', facebook: '', line: '' },
+      languages: [
+        { language: 'Vietnamese', level: 'Native' },
+        { language: 'Japanese', level: 'N2' },
+      ],
+      photos: [],
+      updated_at: now,
+    },
+  );
 }
 
 async function seedUserInterests(
@@ -292,10 +431,15 @@ async function seed() {
     const now = new Date();
     const users = await seedUsers(db, now);
     const tags = await seedTags(db);
+    await seedProfiles(db, users, now);
 
     await seedUserInterests(db, [
       { user_id: users.vnStudentId, tag_id: tags.languageExchangeId },
       { user_id: users.vnStudentId, tag_id: tags.jobHuntingId },
+      ...tags.profileInterestIds.slice(0, 7).map((tag_id) => ({
+        user_id: users.vnStudentId,
+        tag_id,
+      })),
       { user_id: users.jpStudentId, tag_id: tags.languageExchangeId },
       { user_id: users.jpStudentId, tag_id: tags.cultureId },
       { user_id: users.organizerId, tag_id: tags.studyAbroadId },
