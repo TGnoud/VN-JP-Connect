@@ -27,7 +27,9 @@ async function bootstrap() {
       callback(new Error(`CORS blocked origin: ${origin}`), false);
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: ['Content-Type', 'x-user-id', 'Authorization'],
     credentials: true,
+    optionsSuccessStatus: 204,
   });
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',

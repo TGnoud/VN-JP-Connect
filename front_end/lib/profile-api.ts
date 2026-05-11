@@ -78,11 +78,29 @@ async function requestApi<T>(path: string, init: RequestInit = {}) {
 
   headers.set("x-user-id", requireDevUserId());
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      cache: "no-store",
+    });
+  } catch (error) {
+    const isLocalApi = API_BASE_URL.includes("localhost");
+    const deployedPage =
+      typeof window !== "undefined" && !window.location.hostname.includes("localhost");
+    const hint =
+      isLocalApi && deployedPage
+        ? " NEXT_PUBLIC_API_BASE_URL is still pointing to localhost on the deployed frontend."
+        : " Check that the Render backend URL is reachable and CORS_ORIGINS includes this frontend origin.";
+
+    throw new Error(
+      `Cannot reach backend API at ${API_BASE_URL}.${hint} Original error: ${
+        error instanceof Error ? error.message : "network error"
+      }`,
+    );
+  }
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
