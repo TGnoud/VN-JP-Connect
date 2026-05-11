@@ -48,6 +48,57 @@ export interface ProfileData {
   updatedAt: string;
 }
 
+export interface PublicProfileData {
+  id: string;
+  fullName: string;
+  nationality: "JP" | "VN";
+  age: number | null;
+  gender: "male" | "female" | "other" | null;
+  location: string;
+  occupation: string;
+  education: string;
+  bio: string;
+  avatarUrl: string;
+  coverUrl: string;
+  languages: ProfileLanguage[];
+  interests: ProfileTag[];
+  photos: ProfilePhoto[];
+  likeRate: number;
+  connectionsCount: number;
+  joinedAt: string;
+  updatedAt: string;
+  isMe: boolean;
+}
+
+export interface DiscoverProfileData {
+  id: string;
+  fullName: string;
+  nationality: "JP" | "VN";
+  age: number | null;
+  gender: "male" | "female" | "other" | null;
+  location: string;
+  occupation: string;
+  bio: string;
+  avatarUrl: string;
+  photos: ProfilePhoto[];
+  interests: ProfileTag[];
+  likeRate: number;
+  connectionsCount: number;
+  joinedAt: string;
+}
+
+export interface ConversationResponse {
+  id: string;
+  matchId: string;
+  createdAt: string;
+  partner: {
+    id: string;
+    fullName: string;
+    nationality: "JP" | "VN";
+    avatarUrl: string;
+  };
+}
+
 export interface ProfileOptions {
   genders: string[];
   nationalities: string[];
@@ -150,6 +201,41 @@ export function resolveMediaUrl(url?: string, preferredWidth = 1200) {
 
 export function getMyProfile() {
   return requestApi<ProfileData>("/profiles/me");
+}
+
+export function getUserPublicProfile(userId: string) {
+  return requestApi<PublicProfileData>(`/users/${userId}/profile`);
+}
+
+export function getDiscoverProfiles() {
+  return requestApi<DiscoverProfileData[]>("/home/discover");
+}
+
+export function reportUser(
+  userId: string,
+  payload: { reason: string; detail: string; evidence: File[] },
+) {
+  const formData = new FormData();
+  formData.append("reason", payload.reason);
+  formData.append("detail", payload.detail);
+
+  for (const file of payload.evidence) {
+    formData.append("evidence", file);
+  }
+
+  return requestApi<{ id: string; status: string; createdAt: string }>(
+    `/users/${userId}/report`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
+}
+
+export function openConversationWithUser(userId: string) {
+  return requestApi<ConversationResponse>(`/conversations/with/${userId}`, {
+    method: "POST",
+  });
 }
 
 export function getProfileOptions() {
