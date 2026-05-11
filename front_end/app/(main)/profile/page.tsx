@@ -78,8 +78,9 @@ function PencilIcon({ size = 3.5 }: { size?: number }) {
 }
 function CameraIcon({ className = "size-3.5" }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
-      <path fillRule="evenodd" d="M1 8a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 018.07 3h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0016.07 6H17a2 2 0 012 2v7a2 2 0 01-2 2H3a2 2 0 01-2-2V8zm13.5 3a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM10 14a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+      <path d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
     </svg>
   );
 }
@@ -120,16 +121,20 @@ function CheckIcon() {
 }
 function UserIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
-    </svg>
+    <span className="inline-flex items-center justify-center w-7 h-7 rounded-md shrink-0" style={{ backgroundColor: "#ecfdf5" }}>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+      </svg>
+    </span>
   );
 }
 function LanguageIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-    </svg>
+    <span className="inline-flex items-center justify-center w-7 h-7 rounded-md shrink-0" style={{ backgroundColor: "#ecfdf5" }}>
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="#1B4332" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+      </svg>
+    </span>
   );
 }
 function StarIcon() {
@@ -154,7 +159,7 @@ function SectionHeader({ icon, title, action }: { icon?: React.ReactNode; title:
 }
 function EditBtn({ onClick }: { onClick?: () => void }) {
   return (
-    <button onClick={onClick} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">
+    <button onClick={onClick} className="flex items-center gap-1 text-xs font-medium text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1 hover:bg-gray-50 transition-colors">
       <PencilIcon /> 編集
     </button>
   );
@@ -182,12 +187,17 @@ function Modal({ title, onClose, children, wide = false }: { title: string; onCl
   );
 }
 
-function ModalFooter({ onCancel, onSave, saveLabel, saveDisabled = false }: { onCancel: () => void; onSave: () => void; saveLabel: string; saveDisabled?: boolean }) {
+function ModalFooter({ onCancel, onSave, saveLabel, saveDisabled = false, saveIcon }: { onCancel: () => void; onSave: () => void; saveLabel: string; saveDisabled?: boolean; saveIcon?: React.ReactNode }) {
   return (
     <div className="px-5 py-3 border-t border-gray-100 flex justify-end gap-2 shrink-0">
       <button onClick={onCancel} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">キャンセル</button>
-      <button onClick={onSave} disabled={saveDisabled} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors" style={{ backgroundColor: "#1B4332" }}>
-        <CheckIcon /> {saveLabel}
+      <button
+        onClick={onSave}
+        disabled={saveDisabled}
+        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors"
+        style={{ backgroundColor: saveDisabled ? "#9ca3af" : "#1B4332" }}
+      >
+        {saveIcon ?? <CheckIcon />} {saveLabel}
       </button>
     </div>
   );
@@ -261,10 +271,11 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
               ) : (
                 <span style={{ color: l.dotColor }} className="text-sm leading-none shrink-0">●</span>
               )}
-              <span className="text-sm font-semibold text-gray-800 flex-1">{l.name}</span>
+              <span className="text-sm font-semibold text-gray-800">{l.name}</span>
               <span className="text-xs font-bold px-1.5 py-0.5 rounded border" style={{ color: "#1B4332", borderColor: "#bbf7d0", backgroundColor: "#f0fdf4" }}>
                 {l.level}
               </span>
+              <span className="flex-1" />
               <button onClick={() => removeLang(l.name)} className="ml-1 p-1 rounded hover:bg-red-50 text-red-500 transition-colors">
                 <TrashIcon />
               </button>
@@ -273,6 +284,7 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
         </div>
 
         {/* Add new language form */}
+        <div className="bg-gray-50 rounded-xl p-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1.5 block">言語</label>
@@ -311,11 +323,12 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
           <button
             onClick={addLang}
             disabled={!newLang || !newLevel}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-white disabled:opacity-40 transition-colors"
-            style={{ backgroundColor: "#1B4332" }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-white transition-colors"
+            style={{ backgroundColor: (!newLang || !newLevel) ? "#9ca3af" : "#1B4332" }}
           >
             + 追加
           </button>
+        </div>
         </div>
       </div>
       <ModalFooter onCancel={onClose} onSave={() => { onSave(list); onClose(); }} saveLabel="保存する" />
@@ -391,7 +404,9 @@ function AddPhotoModal({ currentCount, onClose }: { currentCount: number; onClos
 
         {/* Upload area */}
         <div className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-8 mb-5 cursor-pointer hover:bg-gray-50 transition-colors">
-          <UploadIcon className="size-8 text-green-200" />
+          <span className="inline-flex items-center justify-center size-10 rounded-full mb-1" style={{ backgroundColor: "#ecfdf5" }}>
+            <UploadIcon className="size-5 text-green-700" />
+          </span>
           <p className="text-sm font-semibold text-gray-700 mt-2">クリックしてアップロード</p>
           <p className="text-xs text-gray-400">またはドラッグ&amp;ドロップ</p>
           <p className="text-xs text-gray-300 mt-1">JPG, PNG, WEBP（最大5MB）</p>
@@ -417,6 +432,7 @@ function AddPhotoModal({ currentCount, onClose }: { currentCount: number; onClos
         onSave={onClose}
         saveLabel={`追加する (${selected.length})`}
         saveDisabled={selected.length === 0}
+        saveIcon={<span className="text-base leading-none">+</span>}
       />
     </Modal>
   );
@@ -565,21 +581,22 @@ export default function ProfilePage() {
 
   function close() { setModal(null); }
 
+  const S = { className: "size-3.5 text-green-700", viewBox: "0 0 24 24", fill: "none" as const, stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   const INFO_FIELDS = [
-    { label: "名前",  value: PROFILE.fullName, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" /></svg> },
-    { label: "メール", value: "minh.nguyen@em...", icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" /><path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" /></svg> },
-    { label: "年齢",  value: `${PROFILE.age}歳`, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg> },
-    { label: "性別",  value: PROFILE.gender, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" /></svg> },
-    { label: "国籍",  value: PROFILE.nationality, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 7l2.55 2.4A1 1 0 0116 11H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" /></svg> },
-    { label: "所在地", value: PROFILE.city, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" /></svg> },
-    { label: "職業",  value: PROFILE.occupation, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" /><path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" /></svg> },
-    { label: "学歴",  value: PROFILE.school, icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" /></svg> },
+    { label: "名前",   value: PROFILE.fullName,     icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg> },
+    { label: "メール", value: "minh.nguyen@em...",   icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg> },
+    { label: "年齢",   value: `${PROFILE.age}歳`,   icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg> },
+    { label: "性別",   value: PROFILE.gender,        icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg> },
+    { label: "国籍",   value: PROFILE.nationality,   icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" /></svg> },
+    { label: "所在地", value: PROFILE.city,           icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" /></svg> },
+    { label: "職業",   value: PROFILE.occupation,    icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0M12 12.75h.008v.008H12v-.008Z" /></svg> },
+    { label: "学歴",   value: PROFILE.school,         icon: <svg xmlns="http://www.w3.org/2000/svg" {...S}><path d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.627 48.627 0 0 1 12 20.904a48.627 48.627 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.57 50.57 0 0 0-2.658-.813A59.905 59.905 0 0 1 12 3.493a59.902 59.902 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" /></svg> },
   ];
 
   const SNS_FIELDS = [
-    { label: "Instagram", value: "@minh_nguyen_vn", icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg> },
-    { label: "Facebook",  value: "Minh Nguyen", icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg> },
-    { label: "LINE",      value: "@minh_line", icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400" viewBox="0 0 24 24" fill="currentColor"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg> },
+    { label: "Instagram", value: "@minh_nguyen_vn", icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg> },
+    { label: "Facebook",  value: "Minh Nguyen", icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg> },
+    { label: "LINE",      value: "@minh_line", icon: <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-green-700" viewBox="0 0 24 24" fill="currentColor"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg> },
   ];
 
   return (
@@ -596,8 +613,8 @@ export default function ProfilePage() {
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="relative h-40 bg-gradient-to-br from-emerald-100 to-gray-200">
             <Image src={PROFILE.coverUrl} alt="cover" fill className="object-cover" unoptimized />
-            <button onClick={() => setModal("changeCover")} className="absolute bottom-3 right-3 bg-white/80 rounded-full p-2 shadow hover:bg-white transition-colors text-gray-600">
-              <CameraIcon />
+            <button onClick={() => setModal("changeCover")} className="absolute bottom-3 right-3 bg-white/80 rounded-full p-1.5 shadow hover:bg-white transition-colors text-gray-500">
+              <CameraIcon className="size-4" />
             </button>
           </div>
 
@@ -606,8 +623,8 @@ export default function ProfilePage() {
               <div className="w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-100">
                 <Image src={PROFILE.avatarUrl} alt={PROFILE.fullName} width={80} height={80} className="object-cover w-full h-full" unoptimized />
               </div>
-              <button onClick={() => setModal("changeAvatar")} className="absolute bottom-0.5 right-0.5 bg-white rounded-full p-1 shadow border border-gray-200 hover:bg-gray-50 transition-colors text-gray-600">
-                <CameraIcon />
+              <button onClick={() => setModal("changeAvatar")} className="absolute bottom-0.5 right-0.5 rounded-full p-1.5 shadow transition-colors text-white" style={{ backgroundColor: "#1B4332" }}>
+                <CameraIcon className="size-3.5" />
               </button>
             </div>
 
@@ -681,7 +698,7 @@ export default function ProfilePage() {
           <SectionHeader icon={<LanguageIcon />} title="言語スキル" action={<AddBtn onClick={() => setModal("editLanguages")} />} />
           <div className="flex flex-wrap gap-2">
             {languages.map((l) => (
-              <div key={l.name} className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2">
+              <div key={l.name} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 {l.useFlag ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={l.flagSrc} alt={l.name} className="w-5 h-auto rounded-sm shrink-0" />
@@ -699,7 +716,7 @@ export default function ProfilePage() {
 
         {/* ── 趣味 ── */}
         <SectionCard>
-          <SectionHeader icon={<StarIcon />} title="趣味" action={<EditBtn onClick={() => setModal("selectInterests")} />} />
+          <SectionHeader title="趣味" action={<EditBtn onClick={() => setModal("selectInterests")} />} />
           <p className="text-xs text-gray-500 mb-2">選択されている趣味({interests.length}):</p>
           <div className="flex flex-wrap gap-1.5 mb-3">
             {interests.map((i) => (
@@ -713,7 +730,7 @@ export default function ProfilePage() {
           <p className="text-xs text-gray-500 mb-2">おすすめ</p>
           <div className="flex flex-wrap gap-1.5">
             {ALL_INTERESTS.slice(8, 13).filter((s) => !interests.includes(s)).map((s) => (
-              <button key={s} onClick={() => setInterests((arr) => arr.includes(s) ? arr : [...arr, s])} className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+              <button key={s} onClick={() => setInterests((arr) => arr.includes(s) ? arr : [...arr, s])} className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors">
                 + {s}
               </button>
             ))}

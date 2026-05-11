@@ -97,7 +97,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-3 bg-gray-100 sticky top-0 z-10">
+      <header className="flex items-center justify-between px-6 py-3 bg-white sticky top-0 z-10 border-b border-gray-200">
         {/* 1 - Back */}
         <Link href="/" className="flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900">
           <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -109,7 +109,7 @@ export default function RegisterPage() {
         <span className="text-sm font-semibold text-gray-900">Connect VN-JP</span>
         {/* 3 - Login link */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">既にアカウントをお持ちですか？</span>
+          <span className="text-xs text-gray-400">既にアカウントをお持ちですか？</span>
           <Link href="/login" className="text-sm font-bold text-gray-900 hover:underline">
             ログイン
           </Link>
@@ -212,6 +212,8 @@ export default function RegisterPage() {
                 </div>
               </div>
             </section>
+
+            <hr className="border-t border-gray-200 -my-4" />
 
             {/* ② 個人詳細 */}
             <section>
@@ -319,6 +321,8 @@ export default function RegisterPage() {
               </div>
             </section>
 
+            <hr className="border-t border-gray-200 -my-4" />
+
             {/* ③ 場所 */}
             <section>
               <SectionHeader num={3} title="場所" />
@@ -350,6 +354,8 @@ export default function RegisterPage() {
                 </div>
               </div>
             </section>
+
+            <hr className="border-t border-gray-200 -my-4" />
 
             {/* ④ 言語スキル */}
             <section>
@@ -383,6 +389,8 @@ export default function RegisterPage() {
               </div>
             </section>
 
+            <hr className="border-t border-gray-200 -my-4" />
+
             {/* ⑤ 目的 */}
             <section>
               <SectionHeader num={5} title="目的" />
@@ -414,6 +422,8 @@ export default function RegisterPage() {
                 })}
               </div>
             </section>
+
+            <hr className="border-t border-gray-200 -my-4" />
 
             {/* ⑥ 興味 */}
             <section>
@@ -447,6 +457,8 @@ export default function RegisterPage() {
               </div>
             </section>
 
+            <hr className="border-t border-gray-200 -my-4" />
+
             {/* ⑦ 自己紹介 */}
             <section>
               <SectionHeader num={7} title="自己紹介" />
@@ -473,7 +485,7 @@ export default function RegisterPage() {
             </button>
 
             {/* 18 - Login link */}
-            <p className="text-center text-sm text-gray-600 -mt-4 pb-4">
+            <p className="text-center text-sm text-gray-400 -mt-4 pb-4">
               既にアカウントをお持ちですか？{" "}
               <Link href="/login" className="font-bold text-gray-900 hover:underline">
                 ログイン
