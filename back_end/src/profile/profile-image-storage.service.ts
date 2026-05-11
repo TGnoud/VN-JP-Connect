@@ -8,6 +8,7 @@ export interface UploadedFileLike {
   buffer?: Buffer;
   mimetype: string;
   originalname?: string;
+  size?: number;
 }
 
 export interface StoredProfileImage {
@@ -59,6 +60,35 @@ export class ProfileImageStorageService {
     return { url: `/uploads/profile/${userId}/${filename}` };
   }
 
+  async saveReportEvidence(
+    reporterId: string,
+    reportedUserId: string,
+    file: UploadedFileLike,
+  ): Promise<StoredProfileImage> {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('file is required');
+    }
+
+    const extension = this.extensionFromEvidenceMimeType(file.mimetype);
+
+    if (this.cloudinaryEnabled) {
+      return this.uploadToCloudinary(
+        `reports/${reporterId}/${reportedUserId}`,
+        file,
+        'evidence',
+        'auto',
+      );
+    }
+
+    const uploadDir = join(process.cwd(), 'uploads', 'reports', reporterId, reportedUserId);
+    const filename = `${randomUUID()}${extension}`;
+
+    await mkdir(uploadDir, { recursive: true });
+    await writeFile(join(uploadDir, filename), file.buffer);
+
+    return { url: `/uploads/reports/${reporterId}/${reportedUserId}/${filename}` };
+  }
+
   async deleteProfileImage(url: string, publicId?: string) {
     if (this.cloudinaryEnabled) {
       const cloudinaryPublicId = publicId ?? this.publicIdFromCloudinaryUrl(url);
@@ -87,16 +117,19 @@ export class ProfileImageStorageService {
   }
 
   private uploadToCloudinary(
-    userId: string,
+    folder: string,
     file: UploadedFileLike,
-    kind: 'avatar' | 'cover' | 'photo',
+    kind: 'avatar' | 'cover' | 'photo' | 'evidence',
+    resourceType: 'image' | 'auto' = 'image',
   ) {
     return new Promise<StoredProfileImage>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
-          folder: `vn-jp-connect/profile/${userId}`,
+          folder: folder.startsWith('reports/')
+            ? `vn-jp-connect/${folder}`
+            : `vn-jp-connect/profile/${folder}`,
           public_id: `${kind}-${randomUUID()}`,
-          resource_type: 'image',
+          resource_type: resourceType,
         },
         (error, result?: UploadApiResponse) => {
           if (error) {
@@ -130,6 +163,21 @@ export class ProfileImageStorageService {
 
     if (!extension) {
       throw new BadRequestException('unsupported image type');
+    }
+
+    return extension;
+  }
+
+  private extensionFromEvidenceMimeType(mimetype: string) {
+    const extensions: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'application/pdf': '.pdf',
+    };
+    const extension = extensions[mimetype];
+
+    if (!extension) {
+      throw new BadRequestException('unsupported evidence file type');
     }
 
     return extension;

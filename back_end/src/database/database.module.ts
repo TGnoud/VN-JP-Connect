@@ -20,6 +20,8 @@ import {
   User,
   UserInterest,
   UserInterestSchema,
+  UserReport,
+  UserReportSchema,
   UserSchema,
 } from './schemas';
 
@@ -40,6 +42,7 @@ console.log(
       { name: Conversation.name, schema: ConversationSchema },
       { name: Message.name, schema: MessageSchema },
       { name: Profile.name, schema: ProfileSchema },
+      { name: UserReport.name, schema: UserReportSchema },
       { name: Event.name, schema: EventSchema },
       { name: EventParticipant.name, schema: EventParticipantSchema },
     ]),

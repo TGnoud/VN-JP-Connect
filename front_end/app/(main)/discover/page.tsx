@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
-import { MOCK_USERS } from "@/lib/mock-data";
+import { getDiscoverProfiles, resolveMediaUrl, type DiscoverProfileData } from "@/lib/profile-api";
 import type { User, FilterState } from "@/types";
 
 const JP_FILTER_LEVELS = ["N1", "N2", "N3", "N4", "N5", "なし", "母語レベル"] as const;
@@ -28,6 +28,37 @@ function calcAge(birthDate: string) {
 
 function getFirstName(fullName: string) {
   return fullName.split(" ")[0];
+}
+
+function birthDateFromAge(age: number | null) {
+  const year = new Date().getFullYear() - (age ?? 18);
+  return `${year}-01-01`;
+}
+
+function userFromDiscoverProfile(profile: DiscoverProfileData): User {
+  return {
+    id: profile.id,
+    fullName: profile.fullName,
+    email: "",
+    phone: "",
+    nationality: profile.nationality === "JP" ? "Japanese" : "Vietnamese",
+    gender: profile.gender === "female" ? "female" : "male",
+    birthDate: birthDateFromAge(profile.age),
+    occupation: profile.occupation,
+    city: profile.location,
+    japaneseLevel: profile.nationality === "JP" ? "Native" : "N5",
+    vietnameseLevel: profile.nationality === "VN" ? "Native" : "Basic",
+    purposes: [],
+    interests: profile.interests.map((interest) => interest.name),
+    bio: profile.bio,
+    avatarUrl:
+      resolveMediaUrl(profile.avatarUrl, 700) ||
+      `https://api.dicebear.com/7.x/personas/svg?seed=${encodeURIComponent(profile.id)}`,
+    photos: profile.photos.map((photo) => resolveMediaUrl(photo.url, 700)),
+    likeRate: profile.likeRate,
+    connectionsCount: profile.connectionsCount,
+    joinedAt: profile.joinedAt,
+  };
 }
 
 /* ─── Profile Card ─── */
@@ -473,11 +504,42 @@ function FilterPanel({
 /* ─── Page ─── */
 export default function DiscoverPage() {
   const router = useRouter();
-  const [users] = useState<User[]>([...MOCK_USERS]);
+  const [users, setUsers] = useState<User[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filter, setFilter] = useState<FilterState>({ ...DEFAULT_FILTER });
   const [showFilter, setShowFilter] = useState(false);
   const [matchAlert, setMatchAlert] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [discoverError, setDiscoverError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadDiscoverProfiles() {
+      setLoading(true);
+      setDiscoverError("");
+
+      try {
+        const profiles = await getDiscoverProfiles();
+        if (!active) return;
+        setUsers(profiles.map(userFromDiscoverProfile));
+        setCurrentIndex(0);
+      } catch (error) {
+        if (!active) return;
+        setDiscoverError(error instanceof Error ? error.message : "ユーザーを読み込めませんでした。");
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadDiscoverProfiles();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const current = users[currentIndex];
 
@@ -494,13 +556,17 @@ export default function DiscoverPage() {
     handleSkip();
   }
 
-  if (!current) {
+  if (loading || !current) {
     return (
       <div className="flex-1 flex items-center justify-center p-8 text-center bg-gray-50">
         <div>
           <p className="text-5xl mb-4">🎉</p>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">表示できるプロフィールがありません</h2>
-          <p className="text-gray-500 text-sm">絞り込み条件を変更してみてください。</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            {loading ? "読み込み中..." : "表示できるプロフィールがありません"}
+          </h2>
+          <p className="text-gray-500 text-sm">
+            {discoverError || "絞り込み条件を変更してみてください。"}
+          </p>
         </div>
       </div>
     );
