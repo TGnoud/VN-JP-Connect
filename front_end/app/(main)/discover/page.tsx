@@ -4,7 +4,15 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
-import { getDiscoverProfiles, resolveMediaUrl, type DiscoverProfileData } from "@/lib/profile-api";
+import {
+  getDiscoverProfiles,
+  getHomeFilters,
+  resolveMediaUrl,
+  showDiscoverInterest,
+  type DiscoverProfileData,
+  type HomeFilterOptions,
+  type ProfileTag,
+} from "@/lib/profile-api";
 import type { User, FilterState } from "@/types";
 
 const JP_FILTER_LEVELS = ["N1", "N2", "N3", "N4", "N5", "なし", "母語レベル"] as const;
@@ -35,7 +43,30 @@ function birthDateFromAge(age: number | null) {
   return `${year}-01-01`;
 }
 
+function displayJapaneseLevel(level: string) {
+  if (level === "Basic") return "なし";
+  if (level === "Native") return "母語レベル";
+  return level;
+}
+
+function normalizeJapaneseLevel(level?: string): User["japaneseLevel"] {
+  const normalized = level === "Beginner" ? "Basic" : level;
+  return ["N5", "N4", "N3", "N2", "N1", "Basic", "Native"].includes(normalized ?? "")
+    ? (normalized as User["japaneseLevel"])
+    : "Basic";
+}
+
+function normalizeVietnameseLevel(level?: string): User["vietnameseLevel"] {
+  const normalized = level === "Beginner" ? "Basic" : level;
+  return ["Basic", "Native", "A1", "A2", "B1", "B2", "C1"].includes(normalized ?? "")
+    ? (normalized as User["vietnameseLevel"])
+    : "Basic";
+}
+
 function userFromDiscoverProfile(profile: DiscoverProfileData): User {
+  const japaneseLanguage = profile.languages.find((item) => item.language === "Japanese");
+  const vietnameseLanguage = profile.languages.find((item) => item.language === "Vietnamese");
+
   return {
     id: profile.id,
     fullName: profile.fullName,
@@ -46,8 +77,8 @@ function userFromDiscoverProfile(profile: DiscoverProfileData): User {
     birthDate: birthDateFromAge(profile.age),
     occupation: profile.occupation,
     city: profile.location,
-    japaneseLevel: profile.nationality === "JP" ? "Native" : "N5",
-    vietnameseLevel: profile.nationality === "VN" ? "Native" : "Basic",
+    japaneseLevel: normalizeJapaneseLevel(japaneseLanguage?.level),
+    vietnameseLevel: normalizeVietnameseLevel(vietnameseLanguage?.level),
     purposes: [],
     interests: profile.interests.map((interest) => interest.name),
     bio: profile.bio,
@@ -278,11 +309,13 @@ function SingleRangeSlider({ min, max, value, onChange }: {
 
 function FilterPanel({
   filter,
+  filterOptions,
   onApply,
   onReset,
   onClose,
 }: {
   filter: FilterState;
+  filterOptions: HomeFilterOptions | null;
   onApply: (f: FilterState) => void;
   onReset: () => void;
   onClose: () => void;
@@ -335,6 +368,7 @@ function FilterPanel({
   function handleApply() {
     const nat = natArr.length === 1 ? (natArr[0] as FilterState["nationality"]) : "all";
     onApply({ ...local, nationality: nat });
+    onClose();
   }
 
   function handleReset() {
@@ -346,13 +380,19 @@ function FilterPanel({
   const pillBase = "py-1 px-2.5 rounded-md text-xs font-medium border transition-all";
   const pillActive = "text-white border-transparent";
   const pillInactive = "bg-white text-gray-600 border-gray-200 hover:border-gray-400";
+  const japaneseLevelOptions = filterOptions?.japaneseLevels?.length
+    ? filterOptions.japaneseLevels
+    : [...JP_FILTER_LEVELS];
+  const interestOptions = filterOptions?.interests?.length
+    ? filterOptions.interests.map((interest) => interest.name)
+    : FILTER_INTERESTS;
 
   return (
     <div className="w-80 xl:w-96 shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
         <span className="text-sm font-semibold text-gray-900">フィルター</span>
-        <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400 transition-colors">
+        <button onClick={handleApply} className="p-1 rounded hover:bg-gray-100 text-gray-400 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
           </svg>
@@ -422,14 +462,14 @@ function FilterPanel({
           <SectionHeader label="日本語レベル" open={open.jpLevel} onToggle={() => toggleSection("jpLevel")} />
           {open.jpLevel && (
             <div className="flex gap-1.5 flex-wrap pt-2 pb-3">
-              {JP_FILTER_LEVELS.map((lv) => (
+              {japaneseLevelOptions.map((lv) => (
                 <button
                   key={lv}
                   onClick={() => toggleJpLevel(lv)}
                   className={clsx(pillBase, isJpActive(lv) ? pillActive : pillInactive)}
                   style={isJpActive(lv) ? { backgroundColor: "#1B4332" } : undefined}
                 >
-                  {lv}
+                  {displayJapaneseLevel(lv)}
                 </button>
               ))}
             </div>
@@ -441,7 +481,7 @@ function FilterPanel({
           <SectionHeader label="国籍" open={open.nationality} onToggle={() => toggleSection("nationality")} />
           {open.nationality && (
             <div className="flex gap-1.5 flex-wrap pt-2 pb-3">
-              {[{ v: "Vietnamese", l: "ベトナム" }, { v: "Japanese", l: "日本" }, { v: "other", l: "その他" }].map((o) => (
+              {[{ v: "Vietnamese", l: "ベトナム" }, { v: "Japanese", l: "日本" }].map((o) => (
                 <button
                   key={o.v}
                   onClick={() => toggleNat(o.v)}
@@ -465,7 +505,7 @@ function FilterPanel({
           <SectionHeader label="興味" open={open.interests} onToggle={() => toggleSection("interests")} />
           {open.interests && (
             <div className="flex gap-1.5 flex-wrap pt-2 pb-3">
-              {FILTER_INTERESTS.map((interest) => (
+              {interestOptions.map((interest) => (
                 <button
                   key={interest}
                   onClick={() => toggleInterest(interest)}
@@ -511,10 +551,55 @@ export default function DiscoverPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filter, setFilter] = useState<FilterState>({ ...DEFAULT_FILTER });
+  const [filterOptions, setFilterOptions] = useState<HomeFilterOptions | null>(null);
+  const [excludedUserIds, setExcludedUserIds] = useState<string[]>([]);
   const [showFilter, setShowFilter] = useState(false);
-  const [matchAlert, setMatchAlert] = useState<string | null>(null);
+  const [matchAlert, setMatchAlert] = useState<{ type: "pending" | "matched"; name: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [liking, setLiking] = useState(false);
   const [discoverError, setDiscoverError] = useState("");
+
+  function nationalityToApi(value: FilterState["nationality"]) {
+    if (value === "Japanese") return "JP";
+    if (value === "Vietnamese") return "VN";
+    return undefined;
+  }
+
+  function selectedInterestTagIds(nextFilter: FilterState, options: ProfileTag[] | Array<{ id: string; name: string }>) {
+    return nextFilter.interests
+      .map((name) => options.find((option) => option.name === name)?.id)
+      .filter((id): id is string => Boolean(id));
+  }
+
+  async function loadDiscoverProfiles(
+    nextFilter = filter,
+    nextExcludedUserIds = excludedUserIds,
+    nextFilterOptions = filterOptions,
+  ) {
+    setLoading(true);
+    setDiscoverError("");
+
+    try {
+      const profiles = await getDiscoverProfiles({
+        gender: nextFilter.gender === "all" ? undefined : nextFilter.gender,
+        nationality: nationalityToApi(nextFilter.nationality),
+        ageMin: nextFilter.ageMin,
+        ageMax: nextFilter.ageMax,
+        distanceMax: nextFilter.distanceMax,
+        japaneseLevels: nextFilter.japaneseLevel,
+        interestTagIds: selectedInterestTagIds(nextFilter, nextFilterOptions?.interests ?? []),
+        excludeUserIds: nextExcludedUserIds,
+      });
+      setUsers(profiles.map(userFromDiscoverProfile));
+      setCurrentIndex(0);
+    } catch (error) {
+      setDiscoverError(error instanceof Error ? error.message : "ユーザーを読み込めませんでした。");
+      setUsers([]);
+      setCurrentIndex(0);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -524,8 +609,10 @@ export default function DiscoverPage() {
       setDiscoverError("");
 
       try {
+        const options = await getHomeFilters();
         const profiles = await getDiscoverProfiles();
         if (!active) return;
+        setFilterOptions(options);
         setUsers(profiles.map(userFromDiscoverProfile));
         setCurrentIndex(0);
       } catch (error) {
@@ -547,17 +634,44 @@ export default function DiscoverPage() {
 
   const current = users[currentIndex];
 
-  function handleSkip() {
-    setCurrentIndex((i) => (i < users.length - 1 ? i + 1 : 0));
+  async function dismissCurrentUser(userId: string) {
+    const nextExcludedUserIds = Array.from(new Set([...excludedUserIds, userId]));
+    const remainingUsers = users.filter((user) => user.id !== userId);
+
+    setExcludedUserIds(nextExcludedUserIds);
+
+    if (remainingUsers.length === 0) {
+      await loadDiscoverProfiles(filter, nextExcludedUserIds, filterOptions);
+      return;
+    }
+
+    setUsers(remainingUsers);
+    setCurrentIndex((index) => Math.min(index, remainingUsers.length - 1));
   }
 
-  function handleLike() {
+  function handleSkip() {
     if (!current) return;
-    if (Math.random() > 0.5) {
-      setMatchAlert(current.fullName);
+    void dismissCurrentUser(current.id);
+  }
+
+  async function handleLike() {
+    if (!current) return;
+    if (liking) return;
+
+    setLiking(true);
+    try {
+      const result = await showDiscoverInterest(current.id);
+      setMatchAlert({ type: result.status, name: current.fullName });
+      if (result.status === "matched" && result.conversation) {
+        sessionStorage.setItem("vn_jp_active_conversation", JSON.stringify(result.conversation));
+      }
       setTimeout(() => setMatchAlert(null), 3000);
+      await dismissCurrentUser(current.id);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "保存に失敗しました。");
+    } finally {
+      setLiking(false);
     }
-    handleSkip();
   }
 
   if (loading || !current) {
@@ -578,9 +692,23 @@ export default function DiscoverPage() {
 
   const hasActiveFilter =
     filter.gender !== "all" ||
+    filter.ageMin !== DEFAULT_FILTER.ageMin ||
+    filter.ageMax !== DEFAULT_FILTER.ageMax ||
+    filter.distanceMax !== DEFAULT_FILTER.distanceMax ||
     filter.japaneseLevel.length > 0 ||
     filter.interests.length > 0 ||
     filter.nationality !== "all";
+
+  async function handleApplyFilter(nextFilter: FilterState) {
+    setFilter(nextFilter);
+    setShowFilter(false);
+    await loadDiscoverProfiles(nextFilter, excludedUserIds, filterOptions);
+  }
+
+  async function handleResetFilter() {
+    setFilter({ ...DEFAULT_FILTER });
+    await loadDiscoverProfiles({ ...DEFAULT_FILTER }, excludedUserIds, filterOptions);
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -630,8 +758,9 @@ export default function DiscoverPage() {
       {showFilter && (
         <FilterPanel
           filter={filter}
-          onApply={(f) => setFilter(f)}
-          onReset={() => setFilter({ ...DEFAULT_FILTER })}
+          filterOptions={filterOptions}
+          onApply={(f) => { void handleApplyFilter(f); }}
+          onReset={() => { void handleResetFilter(); }}
           onClose={() => setShowFilter(false)}
         />
       )}
@@ -642,7 +771,9 @@ export default function DiscoverPage() {
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2 text-sm font-medium"
           style={{ backgroundColor: "#1B4332" }}
         >
-          💞 {getFirstName(matchAlert)}さんとマッチしました！メッセージを送りましょう。
+          {matchAlert.type === "matched"
+            ? `💞 ${getFirstName(matchAlert.name)}さんとマッチしました！メッセージを送りましょう。`
+            : `✓ ${getFirstName(matchAlert.name)}さんに関心を送りました。`}
         </div>
       )}
     </div>

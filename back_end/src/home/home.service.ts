@@ -1,7 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
+  Conversation,
+  ConversationDocument,
   Match,
   MatchDocument,
   Profile,
@@ -20,8 +22,18 @@ type DiscoverQuery = {
   gender?: string;
   nationality?: string;
   interestTagIds?: string[];
+  japaneseLevels?: string[];
+  excludeUserIds?: string[];
+  ageMin?: number;
+  ageMax?: number;
+  distanceMax?: number;
   limit?: number;
 };
+
+const HOME_AGE_MIN = 18;
+const HOME_AGE_MAX = 65;
+const HOME_DISTANCE_MAX = 200;
+const HOME_JAPANESE_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1', 'Basic', 'Native'];
 
 @Injectable()
 export class HomeService {
@@ -32,6 +44,8 @@ export class HomeService {
     private readonly userInterestModel: Model<UserInterestDocument>,
     @InjectModel(Tag.name) private readonly tagModel: Model<TagDocument>,
     @InjectModel(Match.name) private readonly matchModel: Model<MatchDocument>,
+    @InjectModel(Conversation.name)
+    private readonly conversationModel: Model<ConversationDocument>,
   ) {}
 
   async getFilterOptions() {
@@ -44,7 +58,20 @@ export class HomeService {
     return {
       genders: ['male', 'female', 'other'],
       nationalities: ['VN', 'JP'],
+      japaneseLevels: HOME_JAPANESE_LEVELS,
       interests: interests.map((t) => ({ id: t._id.toString(), name: t.name })),
+      ageRange: {
+        min: HOME_AGE_MIN,
+        max: HOME_AGE_MAX,
+        defaultMin: HOME_AGE_MIN,
+        defaultMax: 35,
+      },
+      distanceRange: {
+        min: 0,
+        max: HOME_DISTANCE_MAX,
+        defaultMax: 50,
+        supported: false,
+      },
     };
   }
 
@@ -54,9 +81,16 @@ export class HomeService {
       throw new BadRequestException('limit must be between 1 and 50');
     }
 
-    const currentUserObjectId = new Types.ObjectId(currentUserId);
+    const currentUserObjectId = this.objectIdFromParam(currentUserId, 'currentUserId');
+    this.validateDiscoverQuery(query);
+    const excludeObjectIds = (query.excludeUserIds ?? []).map((id) =>
+      this.objectIdFromParam(id, 'excludeUserIds'),
+    );
 
-    const userFilter: Record<string, unknown> = { _id: { $ne: currentUserObjectId } };
+    const excludedUserIds = [currentUserObjectId, ...excludeObjectIds];
+    const userFilter: Record<string, unknown> = {
+      _id: { $nin: excludedUserIds },
+    };
     if (query.nationality) {
       userFilter.nationality = query.nationality;
     }
@@ -86,7 +120,7 @@ export class HomeService {
         .distinct('user_id', { tag_id: { $in: tagObjectIds } })
         .exec();
       allowedUserIds = userIds.map((id) => new Types.ObjectId(String(id)));
-      userFilter._id = { $ne: currentUserObjectId, $in: allowedUserIds };
+      userFilter._id = { $nin: excludedUserIds, $in: allowedUserIds };
     }
 
     const users = await this.userModel.find(userFilter).limit(limit).lean().exec();
@@ -118,6 +152,9 @@ export class HomeService {
     return users
       .map((user) => {
         const profile = profileByUserId.get(user._id.toString());
+        if (query.gender && !profile) {
+          return null;
+        }
         const userInterestTagIds = interestLinks
           .filter((l) => l.user_id.toString() === user._id.toString())
           .map((l) => l.tag_id.toString());
@@ -125,17 +162,42 @@ export class HomeService {
           .map((id) => tagById.get(id))
           .filter(Boolean)
           .map((t: any) => ({ id: t._id.toString(), name: t.name, type: t.type }));
+        const age = calculateAge(user.birth_date) ?? profile?.age ?? DEFAULT_LEGACY_AGE;
+        const languages = (profile?.languages ?? []).map((item: any) => ({
+          language: item.language,
+          level: item.level,
+        }));
+
+        if (query.ageMin !== undefined && age < query.ageMin) {
+          return null;
+        }
+
+        if (query.ageMax !== undefined && age > query.ageMax) {
+          return null;
+        }
+
+        if (
+          query.japaneseLevels?.length &&
+          !languages.some(
+            (item) =>
+              item.language === 'Japanese' &&
+              this.matchesJapaneseLevel(item.level, query.japaneseLevels ?? []),
+          )
+        ) {
+          return null;
+        }
 
         return {
           id: user._id.toString(),
           fullName: user.full_name,
           nationality: user.nationality,
-          age: calculateAge(user.birth_date) ?? profile?.age ?? DEFAULT_LEGACY_AGE,
+          age,
           gender: profile?.gender ?? null,
           location: profile?.location ?? '',
           occupation: profile?.occupation ?? '',
           bio: String(profile?.bio ?? '').slice(0, MAX_BIO_LENGTH),
           avatarUrl: profile?.avatar_url ?? '',
+          languages,
           photos: (profile?.photos ?? []).map((p: any) => ({
             id: p._id.toString(),
             url: p.url,
@@ -155,7 +217,179 @@ export class HomeService {
       .filter(Boolean);
   }
 
+  async showInterest(currentUserId: string, targetUserId: string) {
+    const currentObjectId = this.objectIdFromParam(currentUserId, 'currentUserId');
+    const targetObjectId = this.objectIdFromParam(targetUserId, 'userId');
+
+    if (currentObjectId.equals(targetObjectId)) {
+      throw new BadRequestException('cannot show interest in yourself');
+    }
+
+    const [currentUser, targetUser] = await Promise.all([
+      this.userModel.findById(currentObjectId).lean().exec(),
+      this.userModel.findById(targetObjectId).lean().exec(),
+    ]);
+
+    if (!currentUser || !targetUser) {
+      throw new NotFoundException('user was not found');
+    }
+
+    const existingMatch = await this.matchModel
+      .findOne({
+        $or: [
+          { requester_id: currentObjectId, receiver_id: targetObjectId },
+          { requester_id: targetObjectId, receiver_id: currentObjectId },
+        ],
+      })
+      .exec();
+
+    if (existingMatch) {
+      if (existingMatch.status === 'accepted') {
+        return this.matchedInterestResponse(existingMatch, targetObjectId, targetUser);
+      }
+
+      const isReversePending =
+        existingMatch.status === 'pending' &&
+        existingMatch.requester_id.equals(targetObjectId) &&
+        existingMatch.receiver_id.equals(currentObjectId);
+
+      if (isReversePending) {
+        existingMatch.status = 'accepted';
+        await existingMatch.save();
+        return this.matchedInterestResponse(existingMatch, targetObjectId, targetUser);
+      }
+
+      if (
+        existingMatch.requester_id.equals(currentObjectId) &&
+        existingMatch.receiver_id.equals(targetObjectId)
+      ) {
+        if (existingMatch.status === 'rejected') {
+          existingMatch.status = 'pending';
+          await existingMatch.save();
+        }
+
+        return {
+          status: 'pending',
+          matchId: existingMatch._id.toString(),
+        };
+      }
+    }
+
+    const match = await this.matchModel.create({
+      requester_id: currentObjectId,
+      receiver_id: targetObjectId,
+      status: 'pending',
+      created_at: new Date(),
+    });
+
+    return {
+      status: 'pending',
+      matchId: match._id.toString(),
+    };
+  }
+
+  getNavSummary(_userId: string) {
+    return {
+      unreadMessagesCount: 0,
+      unreadEventsCount: 0,
+    };
+  }
+
+  private validateDiscoverQuery(query: DiscoverQuery) {
+    if (query.gender && !['male', 'female', 'other'].includes(query.gender)) {
+      throw new BadRequestException('gender is not supported');
+    }
+
+    if (query.nationality && !['VN', 'JP'].includes(query.nationality)) {
+      throw new BadRequestException('nationality is not supported');
+    }
+
+    for (const field of ['ageMin', 'ageMax'] as const) {
+      const value = query[field];
+      if (value !== undefined && (!Number.isInteger(value) || value < HOME_AGE_MIN || value > HOME_AGE_MAX)) {
+        throw new BadRequestException(`${field} must be an integer between ${HOME_AGE_MIN} and ${HOME_AGE_MAX}`);
+      }
+    }
+
+    if (
+      query.ageMin !== undefined &&
+      query.ageMax !== undefined &&
+      query.ageMin > query.ageMax
+    ) {
+      throw new BadRequestException('ageMin must be less than or equal to ageMax');
+    }
+
+    if (
+      query.distanceMax !== undefined &&
+      (!Number.isInteger(query.distanceMax) ||
+        query.distanceMax < 0 ||
+        query.distanceMax > HOME_DISTANCE_MAX)
+    ) {
+      throw new BadRequestException(`distanceMax must be an integer between 0 and ${HOME_DISTANCE_MAX}`);
+    }
+
+    const unsupportedJapaneseLevel = (query.japaneseLevels ?? []).find(
+      (level) => !HOME_JAPANESE_LEVELS.includes(level),
+    );
+
+    if (unsupportedJapaneseLevel) {
+      throw new BadRequestException(`japanese level "${unsupportedJapaneseLevel}" is not supported`);
+    }
+  }
+
+  private matchesJapaneseLevel(profileLevel: string, filterLevels: string[]) {
+    const normalizedLevel = profileLevel === 'Beginner' ? 'Basic' : profileLevel;
+    return filterLevels.includes(normalizedLevel);
+  }
+
+  private async matchedInterestResponse(
+    match: MatchDocument | Record<string, any>,
+    targetObjectId: Types.ObjectId,
+    targetUser: Record<string, any>,
+  ) {
+    const conversation = await this.conversationModel
+      .findOneAndUpdate(
+        { match_id: match._id },
+        { $setOnInsert: { match_id: match._id, created_at: new Date() } },
+        { new: true, upsert: true },
+      )
+      .lean()
+      .exec();
+    const targetProfile = await this.profileModel
+      .findOne({ user_id: targetObjectId })
+      .lean()
+      .exec();
+
+    return {
+      status: 'matched',
+      matchId: match._id.toString(),
+      conversation: {
+        id: conversation._id.toString(),
+        matchId: match._id.toString(),
+        createdAt: conversation.created_at,
+        partner: {
+          id: targetUser._id.toString(),
+          fullName: targetUser.full_name,
+          nationality: targetUser.nationality,
+          avatarUrl: targetProfile?.avatar_url ?? '',
+        },
+      },
+    };
+  }
+
+  private objectIdFromParam(value: string, name: string) {
+    if (!Types.ObjectId.isValid(value)) {
+      throw new BadRequestException(`${name} must be a valid ObjectId`);
+    }
+
+    return new Types.ObjectId(value);
+  }
+
   private async countConnectionsForUsers(userIds: Types.ObjectId[]) {
+    if (userIds.length === 0) {
+      return new Map<string, number>();
+    }
+
     const counts = await this.matchModel
       .aggregate<{ _id: Types.ObjectId; count: number }>([
         { $match: { status: 'accepted', $or: [{ requester_id: { $in: userIds } }, { receiver_id: { $in: userIds } }] } },

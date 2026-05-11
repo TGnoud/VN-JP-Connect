@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { clearStoredUserId } from "@/lib/auth-api";
+import { getHomeNavSummary } from "@/lib/profile-api";
 
 const NAV_ITEMS = [
   {
@@ -19,7 +21,7 @@ const NAV_ITEMS = [
   {
     label: "メッセージ",
     href: "/chat",
-    badge: 3,
+    badge: 0,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
@@ -51,6 +53,30 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [navSummary, setNavSummary] = useState({
+    unreadMessagesCount: 0,
+    unreadEventsCount: 0,
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    getHomeNavSummary()
+      .then((summary) => {
+        if (active) {
+          setNavSummary(summary);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setNavSummary({ unreadMessagesCount: 0, unreadEventsCount: 0 });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <aside className="flex flex-col w-56 min-h-screen shrink-0 bg-white border-r border-gray-100">
@@ -64,6 +90,12 @@ export default function Sidebar() {
       {/* Nav links */}
       <nav className="flex flex-col gap-1 px-3 flex-1">
         {NAV_ITEMS.map((item) => {
+          const badge =
+            item.href === "/chat"
+              ? navSummary.unreadMessagesCount
+              : item.href === "/events"
+                ? navSummary.unreadEventsCount
+                : item.badge;
           const isActive =
           pathname === item.href ||
           pathname.startsWith(item.href + "/") ||
@@ -87,9 +119,9 @@ export default function Sidebar() {
             >
               {item.icon}
               <span>{item.label}</span>
-              {item.badge > 0 && (
+              {badge > 0 && (
                 <span className="ml-auto text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" style={{ backgroundColor: "#1B4332" }}>
-                  {item.badge}
+                  {badge}
                 </span>
               )}
             </Link>
