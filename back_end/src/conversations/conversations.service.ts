@@ -52,7 +52,7 @@ export class ConversationsService {
       .exec();
 
     if (!match) {
-      throw new ForbiddenException('accepted match is required before messaging this user');
+      throw new ForbiddenException('メッセージを送るには、先にこのユーザーとマッチする必要があります。');
     }
 
     const conversation = await this.conversationModel
