@@ -464,77 +464,79 @@ export default function UserDetailPage() {
 
       <div className="max-w-2xl mx-auto pt-6">
 
-        {/* ── Cover photo ── */}
-        <div className="relative h-44 bg-gradient-to-br from-emerald-100 to-gray-200 overflow-hidden rounded-t-xl">
-          <Image
-            src={coverUrl}
-            alt="cover"
-            fill
-            className="object-cover"
-            unoptimized
-            onError={() => setFailedMedia((current) => ({ ...current, coverUrl: rawCoverUrl }))}
-          />
-        </div>
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+          {/* ── Cover photo ── */}
+          <div className="relative h-44 bg-gradient-to-br from-emerald-100 to-gray-200 overflow-hidden">
+            <Image
+              src={coverUrl}
+              alt="cover"
+              fill
+              className="object-cover"
+              unoptimized
+              onError={() => setFailedMedia((current) => ({ ...current, coverUrl: rawCoverUrl }))}
+            />
+          </div>
 
-        {/* ── Profile hero ── */}
-        <div className="bg-white px-5 pb-4">
-          {/* Avatar + name + buttons — avatar has -mt-10 independently */}
-          <div className="flex gap-4 mb-3">
-            <div className="relative w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-100 shrink-0 -mt-10">
-              <Image
-                src={avatarUrl}
-                alt={user.fullName}
-                fill
-                className="object-cover"
-                unoptimized
-                onError={() => setFailedMedia((current) => ({ ...current, avatarUrl: rawAvatarUrl }))}
-              />
-            </div>
-            {/* Name + buttons: start cleanly in white section */}
-            <div className="flex flex-1 items-start justify-between gap-2 mt-2">
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold text-gray-900 leading-tight">{user.fullName}</h1>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-0.5">
-                  <span className="flex items-center gap-1"><PinIcon />{user.location}</span>
-                  <span className="flex items-center gap-1"><BriefcaseIcon />{user.occupation}</span>
-                  <span className="flex items-center gap-1"><CalendarIcon />{joinedLabel}</span>
+          {/* ── Profile hero ── */}
+          <div className="bg-white px-5 pb-4">
+            {/* Avatar + name + buttons — avatar has -mt-10 independently */}
+            <div className="flex gap-4 mb-3">
+              <div className="relative w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-100 shrink-0 -mt-10">
+                <Image
+                  src={avatarUrl}
+                  alt={user.fullName}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                  onError={() => setFailedMedia((current) => ({ ...current, avatarUrl: rawAvatarUrl }))}
+                />
+              </div>
+              {/* Name + buttons: start cleanly in white section */}
+              <div className="flex flex-1 items-start justify-between gap-2 mt-2">
+                <div className="min-w-0">
+                  <h1 className="text-xl font-bold text-gray-900 leading-tight">{user.fullName}</h1>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-0.5">
+                    <span className="flex items-center gap-1"><PinIcon />{user.location}</span>
+                    <span className="flex items-center gap-1"><BriefcaseIcon />{user.occupation}</span>
+                    <span className="flex items-center gap-1"><CalendarIcon />{joinedLabel}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => { void handleMessageClick(); }}
+                    disabled={openingChat}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors"
+                    style={{ backgroundColor: "#1B4332" }}
+                  >
+                    <ChatBubbleIcon /> {openingChat ? "接続中..." : "メッセージ"}
+                  </button>
+                  <button
+                    onClick={() => setShowReport(true)}
+                    className="p-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                  >
+                    <FlagReportIcon />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => { void handleMessageClick(); }}
-                  disabled={openingChat}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors"
-                  style={{ backgroundColor: "#1B4332" }}
-                >
-                  <ChatBubbleIcon /> {openingChat ? "接続中..." : "メッセージ"}
-                </button>
-                <button
-                  onClick={() => setShowReport(true)}
-                  className="p-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
-                >
-                  <FlagReportIcon />
-                </button>
+            </div>
+
+            {/* Stats */}
+            <div className="flex items-center gap-6 pt-3 border-t border-gray-100">
+              <div className="flex items-center gap-1.5">
+                <ThumbsUpIcon />
+                <span className="text-sm font-bold text-gray-900">{user.likeRate}%</span>
+                <span className="text-xs text-gray-400">高評価</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <PeopleGroupIcon />
+                <span className="text-sm font-bold text-gray-900">{user.connectionsCount}</span>
+                <span className="text-xs text-gray-400">つながり</span>
               </div>
             </div>
+            {messageError && (
+              <p className="text-xs text-red-500 mt-2">{messageError}</p>
+            )}
           </div>
-
-          {/* Stats */}
-          <div className="flex items-center gap-6 pt-3 border-t border-gray-100">
-            <div className="flex items-center gap-1.5">
-              <ThumbsUpIcon />
-              <span className="text-sm font-bold text-gray-900">{user.likeRate}%</span>
-              <span className="text-xs text-gray-400">高評価</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <PeopleGroupIcon />
-              <span className="text-sm font-bold text-gray-900">{user.connectionsCount}</span>
-              <span className="text-xs text-gray-400">つながり</span>
-            </div>
-          </div>
-          {messageError && (
-            <p className="text-xs text-red-500 mt-2">{messageError}</p>
-          )}
         </div>
 
         {/* ── Content cards ── */}
