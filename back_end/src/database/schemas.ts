@@ -14,6 +14,8 @@ export const MESSAGE_TYPES = [
 ] as const;
 export const MESSAGE_STATUSES = ['sent', 'read'] as const;
 export const CONVERSATION_FEEDBACK_VALUES = ['liked', 'skipped'] as const;
+export const EVENT_FORMATS = ['in-person', 'online', 'hybrid'] as const;
+export const EVENT_STATUSES = ['published', 'draft'] as const;
 export const PROFILE_GENDERS = ['male', 'female', 'other'] as const;
 export const USER_REPORT_REASONS = [
   'spam',
@@ -36,6 +38,8 @@ export type MessageType = (typeof MESSAGE_TYPES)[number];
 export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 export type ConversationFeedbackValue =
   (typeof CONVERSATION_FEEDBACK_VALUES)[number];
+export type EventFormat = (typeof EVENT_FORMATS)[number];
+export type EventStatus = (typeof EVENT_STATUSES)[number];
 export type ProfileGender = (typeof PROFILE_GENDERS)[number];
 export type UserReportReason = (typeof USER_REPORT_REASONS)[number];
 export type UserReportStatus = (typeof USER_REPORT_STATUSES)[number];
@@ -440,16 +444,75 @@ export class Event {
   @Prop({ required: true, trim: true })
   title: string;
 
+  @Prop({ trim: true, default: '' })
+  description: string;
+
+  @Prop({ trim: true, default: '' })
+  category: string;
+
+  @Prop({ trim: true, default: '' })
+  language: string;
+
+  @Prop({
+    required: true,
+    type: String,
+    enum: EVENT_FORMATS,
+    default: 'in-person',
+  })
+  format: EventFormat;
+
   @Prop({ required: true })
   event_date: Date;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ trim: true, default: '' })
+  start_date: string;
+
+  @Prop({ trim: true, default: '' })
+  start_time: string;
+
+  @Prop({ trim: true, default: '' })
+  end_date: string;
+
+  @Prop({ trim: true, default: '' })
+  end_time: string;
+
+  @Prop({ trim: true, default: '' })
   location: string;
+
+  @Prop({ trim: true, default: '' })
+  online_url: string;
+
+  @Prop({ type: Number, min: 1, default: null })
+  capacity: number | null;
+
+  @Prop({ min: 0, default: 0 })
+  current_participants: number;
+
+  @Prop({ trim: true, default: '' })
+  cover_image_url: string;
+
+  @Prop({
+    required: true,
+    type: String,
+    enum: EVENT_STATUSES,
+    default: 'draft',
+  })
+  status: EventStatus;
+
+  @Prop({ required: true, default: Date.now })
+  created_at: Date;
+
+  @Prop({ required: true, default: Date.now })
+  updated_at: Date;
 }
 
 export const EventSchema = SchemaFactory.createForClass(Event);
 EventSchema.index({ organizer_id: 1 }, { name: 'events_organizer_id_idx' });
 EventSchema.index({ event_date: 1 }, { name: 'events_event_date_idx' });
+EventSchema.index(
+  { status: 1, event_date: 1 },
+  { name: 'events_status_event_date_idx' },
+);
 
 @Schema({ collection: 'event_participants', versionKey: false })
 export class EventParticipant {

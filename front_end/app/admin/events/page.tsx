@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { clsx } from "clsx";
+import {
+  createAdminEvent,
+  deleteAdminEvent,
+  getAdminEvents,
+  resolveAdminEventMediaUrl,
+  updateAdminEvent,
+  uploadAdminEventCover,
+  type AdminEventPayload,
+} from "@/lib/admin-events-api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -149,6 +158,44 @@ function formatDateJa(dateStr: string) {
   return `${y}年${parseInt(m)}月${parseInt(d)}日`;
 }
 
+function payloadFromCreateForm(form: CreateForm, status: EventStatus): AdminEventPayload {
+  return {
+    title: form.title,
+    description: form.description,
+    category: form.category,
+    language: form.language,
+    format: form.format,
+    location: form.location,
+    onlineUrl: form.onlineUrl,
+    startDate: form.startDate,
+    startTime: form.startTime,
+    endDate: form.endDate || form.startDate,
+    endTime: form.endTime,
+    capacity: form.capacity ? parseInt(form.capacity, 10) : null,
+    coverImageUrl: form.coverImageUrl,
+    status,
+  };
+}
+
+function payloadFromEditForm(event: AdminEvent, form: EditForm): AdminEventPayload {
+  return {
+    title: form.title,
+    description: form.description,
+    category: form.category,
+    language: event.language,
+    format: form.format,
+    location: form.format !== "online" ? form.locationOrLink : "",
+    onlineUrl: form.format !== "in-person" ? form.locationOrLink : "",
+    startDate: form.date,
+    startTime: form.startTime,
+    endDate: form.date,
+    endTime: form.endTime || form.startTime,
+    capacity: form.capacity ? parseInt(form.capacity, 10) : null,
+    coverImageUrl: form.coverImageUrl,
+    status: form.status,
+  };
+}
+
 // ─── Shared sub-components (create form) ─────────────────────────────────────
 
 function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -191,11 +238,32 @@ export default function AdminEventsPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [toast, setToast]         = useState<{ msg: string; ok: boolean } | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const editCoverInputRef = useRef<HTMLInputElement>(null);
 
   function showToast(msg: string, ok = true) {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 3000);
   }
+
+  useEffect(() => {
+    let active = true;
+
+    getAdminEvents()
+      .then((response) => {
+        if (active) {
+          setEvents(response.events);
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          showToast(error instanceof Error ? error.message : "イベント一覧を取得できませんでした", false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function getCreateErrors(f: CreateForm) {
     const e: Partial<Record<keyof CreateForm, string>> = {};
@@ -229,29 +297,24 @@ export default function AdminEventsPage() {
     setCreateForm((f) => ({ ...f, [k]: v }));
   }
 
-  function saveCreate(status: EventStatus) {
+  async function saveCreate(status: EventStatus) {
     setSubmitted(true);
     const errs = getCreateErrors(createForm);
     if (Object.keys(errs).length > 0) {
       showToast("入力内容にエラーがあります", false);
       return;
     }
-    const capacity = createForm.capacity ? parseInt(createForm.capacity, 10) : null;
-    const newEvent: AdminEvent = {
-      id: `e${Date.now()}`,
-      title: createForm.title, description: createForm.description,
-      category: createForm.category, language: createForm.language,
-      format: createForm.format,
-      location: createForm.location, onlineUrl: createForm.onlineUrl,
-      startDate: createForm.startDate, startTime: createForm.startTime,
-      endDate: createForm.endDate || createForm.startDate, endTime: createForm.endTime,
-      capacity, currentParticipants: 0,
-      coverImageUrl: createForm.coverImageUrl,
-      status,
-    };
-    setEvents((prev) => [newEvent, ...prev]);
-    setView("list");
-    showToast(status === "draft" ? "下書きとして保存しました" : "イベントを公開しました");
+
+    try {
+      const created = await createAdminEvent(payloadFromCreateForm(createForm, status));
+      setEvents((prev) => [created, ...prev]);
+      setCreateForm(EMPTY_CREATE);
+      setSubmitted(false);
+      setView("list");
+      showToast(status === "draft" ? "下書きとして保存しました" : "イベントを公開しました");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "イベントを保存できませんでした", false);
+    }
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
@@ -277,41 +340,59 @@ export default function AdminEventsPage() {
     setEditForm((f) => f ? { ...f, [k]: v } : f);
   }
 
-  function saveEdit() {
+  async function handleEditCoverFile(file?: File) {
+    if (!file || !editForm) return;
+
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      showToast("JPGまたはPNG画像を選択してください", false);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("画像は5MB以下にしてください", false);
+      return;
+    }
+
+    try {
+      const uploaded = await uploadAdminEventCover(file);
+      setEditField("coverImageUrl", uploaded.url);
+      showToast("画像をアップロードしました");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "画像をアップロードできませんでした", false);
+    }
+  }
+
+  async function saveEdit() {
     if (!editModal || !editForm) return;
-    const capacity = editForm.capacity ? parseInt(editForm.capacity, 10) : null;
-    setEvents((prev) =>
-      prev.map((e) =>
-        e.id === editModal.id
-          ? {
-              ...e,
-              title: editForm.title,
-              description: editForm.description,
-              startDate: editForm.date,
-              startTime: editForm.startTime,
-              endDate: editForm.date,
-              endTime: editForm.endTime,
-              format: editForm.format,
-              category: editForm.category,
-              status: editForm.status,
-              location: editForm.format !== "online" ? editForm.locationOrLink : e.location,
-              onlineUrl: editForm.format !== "in-person" ? editForm.locationOrLink : e.onlineUrl,
-              capacity,
-              coverImageUrl: editForm.coverImageUrl,
-            }
-          : e
-      )
-    );
-    setEditModal(null);
-    setEditForm(null);
+
+    try {
+      const updated = await updateAdminEvent(
+        editModal.id,
+        payloadFromEditForm(editModal, editForm),
+      );
+      setEvents((prev) => prev.map((event) => (event.id === updated.id ? updated : event)));
+      setEditModal(null);
+      setEditForm(null);
+      showToast("変更を保存しました");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "イベントを更新できませんでした", false);
+    }
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!deleteId) return;
-    setEvents((prev) => prev.filter((e) => e.id !== deleteId));
-    setDeleteId(null);
+
+    try {
+      const deletedEventId = deleteId;
+      await deleteAdminEvent(deletedEventId);
+      setEvents((prev) => prev.filter((event) => event.id !== deletedEventId));
+      setDeleteId(null);
+      showToast("削除しました");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "イベントを削除できませんでした", false);
+    }
   }
 
   // ── Create page ───────────────────────────────────────────────────────────
@@ -324,7 +405,7 @@ export default function AdminEventsPage() {
       errs[field] ? "border-red-300 bg-red-50/40 focus:ring-red-200" : "";
     const errSelect = (field: keyof CreateForm) =>
       errs[field] ? "border-red-300 bg-red-50/40 focus:ring-red-200" : "";
-    const ErrMsg = ({ field }: { field: keyof CreateForm }) =>
+    const renderErrMsg = (field: keyof CreateForm) =>
       errs[field] ? (
         <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">
           <svg xmlns="http://www.w3.org/2000/svg" className="size-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
@@ -373,12 +454,12 @@ export default function AdminEventsPage() {
               <div>
                 <FormLabel required>イベント名</FormLabel>
                 <input type="text" value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="イベントの魅力的なタイトルを入力してください" className={`${inputCls} ${errInput("title")}`} />
-                <ErrMsg field="title" />
+                {renderErrMsg("title")}
               </div>
               <div>
                 <FormLabel required>詳細説明</FormLabel>
                 <textarea value={f.description} onChange={(e) => set("description", e.target.value)} placeholder="イベントの内容、参加者が期待できること、必要な条件などを記述してください" rows={4} className={`${inputCls} resize-y ${errInput("description")}`} />
-                <ErrMsg field="description" />
+                {renderErrMsg("description")}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -390,7 +471,7 @@ export default function AdminEventsPage() {
                     </select>
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                   </div>
-                  <ErrMsg field="category" />
+                  {renderErrMsg("category")}
                 </div>
                 <div>
                   <FormLabel required>言語</FormLabel>
@@ -401,7 +482,7 @@ export default function AdminEventsPage() {
                     </select>
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                   </div>
-                  <ErrMsg field="language" />
+                  {renderErrMsg("language")}
                 </div>
               </div>
             </div>
@@ -434,7 +515,7 @@ export default function AdminEventsPage() {
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
                     <input type="text" value={f.location} onChange={(e) => set("location", e.target.value)} placeholder="開催場所の住所を入力してください" className={`${inputCls} pl-11 ${errInput("location")}`} />
                   </div>
-                  <ErrMsg field="location" />
+                  {renderErrMsg("location")}
                 </div>
               )}
               {(f.format === "online" || f.format === "hybrid") && (
@@ -444,7 +525,7 @@ export default function AdminEventsPage() {
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
                     <input type="url" value={f.onlineUrl} onChange={(e) => set("onlineUrl", e.target.value)} placeholder="https://zoom.us/j/..." className={`${inputCls} pl-11 ${errInput("onlineUrl")}`} />
                   </div>
-                  <ErrMsg field="onlineUrl" />
+                  {renderErrMsg("onlineUrl")}
                 </div>
               )}
             </div>
@@ -456,7 +537,7 @@ export default function AdminEventsPage() {
               <div>
                 <FormLabel required>開始日</FormLabel>
                 <input type="date" value={f.startDate} onChange={(e) => set("startDate", e.target.value)} className={`${inputCls} ${errInput("startDate")}`} />
-                <ErrMsg field="startDate" />
+                {renderErrMsg("startDate")}
               </div>
               <div>
                 <FormLabel required>開始時間</FormLabel>
@@ -464,12 +545,12 @@ export default function AdminEventsPage() {
                   <svg xmlns="http://www.w3.org/2000/svg" className="size-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   <input type="time" value={f.startTime} onChange={(e) => set("startTime", e.target.value)} className={`${inputCls} pl-11 ${errInput("startTime")}`} />
                 </div>
-                <ErrMsg field="startTime" />
+                {renderErrMsg("startTime")}
               </div>
               <div>
                 <FormLabel required>終了日</FormLabel>
                 <input type="date" value={f.endDate} onChange={(e) => set("endDate", e.target.value)} className={`${inputCls} ${errInput("endDate")}`} />
-                <ErrMsg field="endDate" />
+                {renderErrMsg("endDate")}
               </div>
               <div>
                 <FormLabel required>終了時間</FormLabel>
@@ -477,7 +558,7 @@ export default function AdminEventsPage() {
                   <svg xmlns="http://www.w3.org/2000/svg" className="size-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   <input type="time" value={f.endTime} onChange={(e) => set("endTime", e.target.value)} className={`${inputCls} pl-11 ${errInput("endTime")}`} />
                 </div>
-                <ErrMsg field="endTime" />
+                {renderErrMsg("endTime")}
               </div>
             </div>
           </SectionCard>
@@ -520,7 +601,7 @@ export default function AdminEventsPage() {
                 {/* Cover image */}
                 <div className="w-full h-52 bg-gray-100 rounded-t-2xl overflow-hidden flex flex-col items-center justify-center shrink-0 relative">
                   {f.coverImageUrl ? (
-                    <Image src={f.coverImageUrl} alt="cover" fill className="object-cover" unoptimized />
+                    <Image src={resolveAdminEventMediaUrl(f.coverImageUrl)} alt="cover" fill className="object-cover" unoptimized />
                   ) : (
                     <>
                       <svg xmlns="http://www.w3.org/2000/svg" className="size-12 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -722,7 +803,25 @@ export default function AdminEventsPage() {
               {/* サムネイル画像 */}
               <div>
                 <FormLabel>サムネイル画像</FormLabel>
-                <div className="border-2 border-dashed border-gray-200 rounded-xl py-8 flex flex-col items-center gap-2 cursor-pointer hover:border-gray-300 transition-colors bg-gray-50/50">
+                <div
+                  onClick={() => editCoverInputRef.current?.click()}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    void handleEditCoverFile(event.dataTransfer.files?.[0]);
+                  }}
+                  className="border-2 border-dashed border-gray-200 rounded-xl py-8 flex flex-col items-center gap-2 cursor-pointer hover:border-gray-300 transition-colors bg-gray-50/50"
+                >
+                  <input
+                    ref={editCoverInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    className="hidden"
+                    onChange={(event) => {
+                      void handleEditCoverFile(event.target.files?.[0]);
+                      event.target.value = "";
+                    }}
+                  />
                   <svg xmlns="http://www.w3.org/2000/svg" className="size-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                   </svg>
@@ -794,7 +893,7 @@ function EventCard({ event, onEdit, onDelete }: { event: AdminEvent; onEdit: () 
       {/* Image */}
       <div className="w-44 shrink-0 relative bg-gray-100">
         {event.coverImageUrl ? (
-          <Image src={event.coverImageUrl} alt={event.title} fill className="object-cover" unoptimized />
+          <Image src={resolveAdminEventMediaUrl(event.coverImageUrl)} alt={event.title} fill className="object-cover" unoptimized />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-4xl bg-gradient-to-br from-green-50 to-emerald-100">🎌</div>
         )}

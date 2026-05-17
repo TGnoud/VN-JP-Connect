@@ -15,6 +15,7 @@ import {
   translateConversationText,
   type ChatConversation,
   type ChatMessage,
+  type MatchedConversationUser,
 } from "@/lib/profile-api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -45,6 +46,14 @@ interface Msg {
 type ToolPanel = "attachment" | "emoji" | "voice" | "suggestions" | "translate" | null;
 type AttachModal = "photo" | "document" | null;
 
+interface GroupModalState {
+  open: boolean;
+  name: string;
+  users: MatchedConversationUser[];
+  selectedIds: Set<string>;
+  submitting: boolean;
+}
+
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 const MOCK_ROOMS: MockRoom[] = [
@@ -55,6 +64,14 @@ const MOCK_ROOMS: MockRoom[] = [
   { id: "chat5", name: "山本 大輝",   location: "福岡, 日本",       level: "ベトナム語 A1", avatar: "https://api.dicebear.com/7.x/personas/svg?seed=yamamoto", lastMsg: "フォーの作り方を教えてください！",               time: "2週間前",  unread: 0 },
   { id: "chat6", name: "チャン・リン", location: "ダナン, ベトナム",   level: "日本語 N4",    avatar: "https://api.dicebear.com/7.x/personas/svg?seed=chanlinh", lastMsg: "日本の文化についてもっと教えて！",              time: "3週間前",  unread: 0 },
 ];
+
+const MOCK_GROUP_USERS: MatchedConversationUser[] = MOCK_ROOMS.map((room) => ({
+  id: room.id,
+  fullName: room.name,
+  nationality: (room.location.includes("日本") ? "JP" : "VN") as "JP" | "VN",
+  avatarUrl: room.avatar,
+  location: room.location,
+}));
 
 const MOCK_MESSAGES: Record<string, Msg[]> = {
   chat1: [
@@ -76,6 +93,35 @@ const MOCK_MESSAGES: Record<string, Msg[]> = {
     { id: "m4b", senderId: "partner", content: "来月日本に行く予定です！",              time: "先週", status: "read" },
   ],
 };
+
+const MOCK_TRANSLATIONS: Record<string, string> = {
+  "こんにちは！元気ですか？": "Xin chào! Bạn có khỏe không?",
+  "先週のベトナム料理イベント、すごく楽しかったです！": "Sự kiện ẩm thực Việt Nam tuần trước vui lắm!",
+  "次回は一緒に行きましょう！来月また開催されるみたいです。": "Lần sau cùng đi nhé! Hình như tháng tới sẽ tổ chức lại.",
+  "こんにちは！昨日のイベントはいかがでしたか？": "Xin chào! Sự kiện hôm qua thế nào?",
+  "週末に一緒に勉強しませんか？": "Cuối tuần cùng học nhé?",
+  "カフェで会いましょう！": "Hẹn gặp ở quán cà phê nhé!",
+  "来月日本に行く予定です！": "Tháng tới tôi dự định đi Nhật!",
+  "元気ですよ！ありがとう。最近どうですか？": "Tôi khỏe! Cảm ơn bạn. Dạo này bạn thế nào?",
+  "本当ですか？私も行きたかったです！": "Thật sao? Tôi cũng muốn đi!",
+  "ぜひ次回も参加したいですね。": "Tôi nhất định muốn tham gia lần sau.",
+  "はい、とても楽しかったです！": "Vâng, vui lắm!",
+  "来月日本に来るんですね！楽しみですね。": "Tháng tới bạn đến Nhật à! Mong lắm đấy.",
+};
+
+function mockTranslate(text: string, direction: "ja-vi" | "vi-ja"): Promise<string> {
+  return new Promise((resolve) =>
+    setTimeout(() => {
+      if (MOCK_TRANSLATIONS[text]) {
+        resolve(MOCK_TRANSLATIONS[text]);
+      } else if (direction === "ja-vi") {
+        resolve(`[Bản dịch] ${text}`);
+      } else {
+        resolve(`[翻訳] ${text}`);
+      }
+    }, 600),
+  );
+}
 
 const EMOJIS = ["😀","😂","❤️","👍","🎉","🙏","🥰","🔥","✨","🌸","🍜","🇻🇳","🇯🇵","☕","📚","⭐","💪","🤝","😁","🥹"];
 
@@ -215,7 +261,17 @@ function RoomItem({ room, isActive, onClick }: { room: MockRoom; isActive: boole
   );
 }
 
-function MsgBubble({ msg, onTranslate }: { msg: Msg; onTranslate: (content: string) => void }) {
+function MsgBubble({
+  msg,
+  onTranslate,
+  translation,
+  isTranslating,
+}: {
+  msg: Msg;
+  onTranslate: (msgId: string, content: string) => void;
+  translation?: string;
+  isTranslating?: boolean;
+}) {
   const isMe = msg.senderId === "me";
   return (
     <div className={clsx("flex", isMe ? "justify-end" : "justify-start")}>
@@ -225,21 +281,38 @@ function MsgBubble({ msg, onTranslate }: { msg: Msg; onTranslate: (content: stri
           style={isMe ? { backgroundColor: "#1B4332" } : undefined}
         >
           {msg.content}
+          {(translation || isTranslating) && (
+            <>
+              <div className={clsx("border-t my-2", isMe ? "border-white/20" : "border-gray-100")} />
+              <p className={clsx("text-xs font-medium mb-0.5", isMe ? "text-white/60" : "text-gray-400")}>
+                vn Bản dịch:
+              </p>
+              {isTranslating ? (
+                <p className={clsx("text-xs italic", isMe ? "text-white/50" : "text-gray-400")}>翻訳中...</p>
+              ) : (
+                <p className={clsx("text-xs", isMe ? "text-white/90" : "text-gray-600")}>{translation}</p>
+              )}
+            </>
+          )}
         </div>
-        <div className={clsx("flex items-center gap-1.5 mt-1 px-1", isMe ? "flex-row-reverse" : "flex-row")}>
+        <div className={clsx("flex items-center gap-1.5 mt-1 px-1", isMe ? "flex-row justify-end" : "flex-row")}>
           <span className="text-xs text-gray-400">{msg.time}</span>
-          {isMe ? (
+          {isMe && (
             <svg width="18" height="10" viewBox="0 0 18 10" fill="none" className="text-gray-400 shrink-0">
               <path d="M1 5L4.5 8.5L11 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M6 5L9.5 8.5L16 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          ) : (
-            <button onClick={() => onTranslate(msg.content)} className="text-gray-300 hover:text-gray-500 transition-colors" title="翻訳">
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" />
-              </svg>
-            </button>
           )}
+          <button
+            onClick={() => onTranslate(msg.id, msg.content)}
+            disabled={isTranslating}
+            className={clsx("transition-colors", isTranslating ? "text-emerald-400" : "text-gray-300 hover:text-gray-500")}
+            title="翻訳"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
@@ -271,6 +344,16 @@ export default function ChatPage() {
   const [translateDir, setTranslateDir] = useState<"ja-vi" | "vi-ja">("ja-vi");
   const [isRecording, setIsRecording] = useState(false);
   const [search, setSearch] = useState("");
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
+  const [translationErrors, setTranslationErrors] = useState<Set<string>>(new Set());
+  const [groupModal, setGroupModal] = useState<GroupModalState>({
+    open: false,
+    name: "",
+    users: [],
+    selectedIds: new Set(),
+    submitting: false,
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
@@ -394,9 +477,26 @@ export default function ChatPage() {
     setOpenTool((prev) => (prev === tool ? null : tool));
   }
 
-  function handleTranslateMessage(content: string) {
-    setTranslateInput(content);
-    setOpenTool("translate");
+  async function handleTranslateMessage(msgId: string, content: string) {
+    setTranslatingIds((prev) => new Set(prev).add(msgId));
+    setTranslationErrors((prev) => {
+      const next = new Set(prev);
+      next.delete(msgId);
+      return next;
+    });
+    try {
+      const result = await translateConversationText({ text: content, direction: translateDir });
+      setTranslations((prev) => ({ ...prev, [msgId]: result.translatedText }));
+    } catch {
+      const fallback = await mockTranslate(content, translateDir);
+      setTranslations((prev) => ({ ...prev, [msgId]: fallback }));
+    } finally {
+      setTranslatingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(msgId);
+        return next;
+      });
+    }
   }
 
   async function handleTranslateSubmit() {
@@ -422,45 +522,35 @@ export default function ChatPage() {
   }
 
   async function handleCreateGroupClick() {
+    setGroupModal({ open: true, name: "", users: [], selectedIds: new Set(), submitting: true });
     try {
-      const matchedUsers = await getMatchedConversationUsers();
-      if (matchedUsers.length < 2) {
-        window.alert("Need at least 2 matched users to create a group.");
-        return;
-      }
+      const users = await getMatchedConversationUsers();
+      setGroupModal((prev) => ({ ...prev, users, submitting: false }));
+    } catch {
+      setGroupModal((prev) => ({ ...prev, users: MOCK_GROUP_USERS, submitting: false }));
+    }
+  }
 
-      const name = window.prompt("Group name");
-      if (!name?.trim()) return;
+  function closeGroupModal() {
+    setGroupModal({ open: false, name: "", users: [], selectedIds: new Set(), submitting: false });
+  }
 
-      const memberPrompt = window.prompt(
-        [
-          "Select at least 2 members by number, separated with commas:",
-          ...matchedUsers.map((user, index) => `${index + 1}. ${user.fullName}`),
-        ].join("\n"),
-      );
-      if (!memberPrompt) return;
-
-      const memberIds = memberPrompt
-        .split(",")
-        .map((item) => Number(item.trim()) - 1)
-        .filter((index) => Number.isInteger(index) && index >= 0 && index < matchedUsers.length)
-        .map((index) => matchedUsers[index].id);
-      const uniqueMemberIds = Array.from(new Set(memberIds));
-
-      if (uniqueMemberIds.length < 2) {
-        window.alert("Please select at least 2 members.");
-        return;
-      }
-
+  async function handleCreateGroup() {
+    const { name, selectedIds } = groupModal;
+    if (!name.trim() || selectedIds.size < 2) return;
+    setGroupModal((prev) => ({ ...prev, submitting: true }));
+    try {
       const createdGroup = await createGroupConversation({
         name: name.trim(),
-        memberIds: uniqueMemberIds,
+        memberIds: Array.from(selectedIds),
       });
       const room = mapConversation(createdGroup);
-
       setRooms((prev) => [room, ...prev.filter((item) => item.id !== room.id)]);
       setActiveRoomId(room.id);
+      closeGroupModal();
     } catch (error) {
+      console.error(error);
+      setGroupModal((prev) => ({ ...prev, submitting: false }));
       window.alert(error instanceof Error ? error.message : "Could not create group.");
     }
   }
@@ -545,7 +635,13 @@ export default function ChatPage() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
           {roomMessages.map((msg) => (
-            <MsgBubble key={msg.id} msg={msg} onTranslate={handleTranslateMessage} />
+            <MsgBubble
+              key={msg.id}
+              msg={msg}
+              onTranslate={handleTranslateMessage}
+              translation={translations[msg.id]}
+              isTranslating={translatingIds.has(msg.id)}
+            />
           ))}
           {roomMessages.length === 0 && (
             <div className="flex-1 flex items-center justify-center">
@@ -723,6 +819,120 @@ export default function ChatPage() {
               <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white opacity-40" style={{ backgroundColor: "#1B4332" }}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z" /></svg>
                 送信する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Group creation modal ─────────────────────────────────────────────── */}
+      {groupModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="size-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+                  </svg>
+                </div>
+                <h3 className="text-sm font-bold text-gray-900">グループを作成</h3>
+              </div>
+              <button onClick={closeGroupModal} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+              グループ名 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={groupModal.name}
+              onChange={(e) => setGroupModal((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="例: 東京言語交換グループ"
+              maxLength={50}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:border-transparent placeholder:text-gray-400 bg-gray-50 mb-4"
+            />
+
+            <div className="mb-1.5">
+              <span className="text-xs font-semibold text-gray-700">メンバーを選択</span>
+              <span className="text-xs text-gray-400 ml-1">（2人以上）</span>
+            </div>
+            <div className="border border-gray-200 rounded-xl overflow-hidden mb-5">
+              <div className="max-h-52 overflow-y-auto divide-y divide-gray-100">
+                {groupModal.submitting && groupModal.users.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-gray-400">読み込み中...</div>
+                ) : groupModal.users.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-gray-400">マッチしたユーザーがいません</div>
+                ) : (
+                  groupModal.users.map((user) => {
+                    const selected = groupModal.selectedIds.has(user.id);
+                    return (
+                      <button
+                        key={user.id}
+                        onClick={() =>
+                          setGroupModal((prev) => {
+                            const next = new Set(prev.selectedIds);
+                            if (next.has(user.id)) next.delete(user.id);
+                            else next.add(user.id);
+                            return { ...prev, selectedIds: next };
+                          })
+                        }
+                        className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                      >
+                        <div className="relative w-10 h-10 shrink-0">
+                          <div className="w-full h-full rounded-full overflow-hidden bg-gray-200">
+                            <Image
+                              src={resolveMediaUrl(user.avatarUrl, 80) || EMPTY_ROOM.avatar}
+                              alt={user.fullName}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">{user.fullName}</p>
+                          <p className="text-xs text-gray-500 truncate">{user.location}</p>
+                        </div>
+                        <div
+                          className={clsx(
+                            "w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center",
+                            selected ? "border-emerald-600" : "border-gray-300",
+                          )}
+                          style={selected ? { backgroundColor: "#1B4332", borderColor: "#1B4332" } : undefined}
+                        >
+                          {selected && (
+                            <svg className="size-3 text-white" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={closeGroupModal}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => void handleCreateGroup()}
+                disabled={!groupModal.name.trim() || groupModal.selectedIds.size < 2 || groupModal.submitting}
+                className={clsx(
+                  "flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity",
+                  !groupModal.name.trim() || groupModal.selectedIds.size < 2 || groupModal.submitting ? "opacity-40" : "opacity-100",
+                )}
+                style={{ backgroundColor: "#1B4332" }}
+              >
+                作成する
               </button>
             </div>
           </div>

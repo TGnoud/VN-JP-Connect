@@ -8,6 +8,7 @@ import { HomeModule } from './home/home.module';
 import { UsersModule } from './users/users.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { DevModule } from './dev/dev.module';
+import { AdminEventsModule } from './admin-events/admin-events.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { DevModule } from './dev/dev.module';
     UsersModule,
     ConversationsModule,
     DevModule,
+    AdminEventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
