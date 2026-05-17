@@ -44,11 +44,12 @@ interface Msg {
   attachments?: ChatAttachment[];
   time: string;
   sentAt?: string;
-  status: "sent" | "read";
+  status: "sending" | "sent" | "read";
 }
 
 type ToolPanel = "attachment" | "emoji" | "voice" | "suggestions" | "translate" | null;
 type AttachModal = "photo" | "document" | null;
+type AttachmentMessageType = "file" | "media" | "voice";
 
 interface GroupModalState {
   open: boolean;
@@ -267,6 +268,16 @@ function formatVoiceDuration(seconds: number) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
+function createTempId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function attachmentContent(messageType: AttachmentMessageType, fileName: string) {
+  if (messageType === "media") return `[Media] ${fileName}`;
+  if (messageType === "voice") return `[Voice] ${fileName}`;
+  return `[File] ${fileName}`;
+}
+
 function isSupportedDocumentFile(file: File) {
   const lowerName = file.name.toLowerCase();
   return (
@@ -413,7 +424,7 @@ function AttachmentPreview({ attachment, isMe }: { attachment: ChatAttachment; i
           onClick={() => void downloadAttachment(attachment)}
           className={clsx("mt-1 w-full px-1 text-left text-xs font-semibold transition-colors", isMe ? "text-white/80 hover:text-white" : "text-gray-500 hover:text-gray-700")}
         >
-          ãƒ€ã‚¦ãƒ³ãƒ­ãƒ¼ãƒ‰{size ? ` Â· ${size}` : ""}
+          Download{size ? ` · ${size}` : ""}
         </button>
       </div>
     );
@@ -436,6 +447,31 @@ function AttachmentPreview({ attachment, isMe }: { attachment: ChatAttachment; i
         </span>
       </span>
     </button>
+  );
+}
+
+function MessageStatusIcon({ status }: { status: Msg["status"] }) {
+  if (status === "sending") {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+      </svg>
+    );
+  }
+
+  if (status === "read") {
+    return (
+      <svg width="18" height="10" viewBox="0 0 18 10" fill="none" className="text-blue-500 shrink-0">
+        <path d="M1 5L4.5 8.5L11 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6 5L9.5 8.5L16 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg width="12" height="10" viewBox="0 0 12 10" fill="none" className="text-gray-400 shrink-0">
+      <path d="M1 5L4.5 8.5L11 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -491,12 +527,7 @@ function MsgBubble({
         </div>
         <div className={clsx("flex items-center gap-1.5 mt-1 px-1", isMe ? "flex-row justify-end" : "flex-row")}>
           <span className="text-xs text-gray-400">{msg.time}</span>
-          {isMe && (
-            <svg width="18" height="10" viewBox="0 0 18 10" fill="none" className="text-gray-400 shrink-0">
-              <path d="M1 5L4.5 8.5L11 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M6 5L9.5 8.5L16 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
+          {isMe && <MessageStatusIcon status={msg.status} />}
           {canTranslate && (
           <button
             onClick={() => onTranslate(msg.id, msg.content)}
@@ -536,6 +567,11 @@ export default function ChatPage() {
   const [inputText, setInputText] = useState("");
   const [openTool, setOpenTool] = useState<ToolPanel>(null);
   const [attachModal, setAttachModal] = useState<AttachModal>(null);
+  const [selectedAttachmentFile, setSelectedAttachmentFile] = useState<File | null>(null);
+  const [selectedAttachmentType, setSelectedAttachmentType] = useState<"file" | "media" | null>(null);
+  const [selectedAttachmentPreviewUrl, setSelectedAttachmentPreviewUrl] = useState("");
+  const [attachmentError, setAttachmentError] = useState("");
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [translateInput, setTranslateInput] = useState("");
   const [translateDir, setTranslateDir] = useState<"ja-vi" | "vi-ja">("ja-vi");
   const [isRecording, setIsRecording] = useState(false);
@@ -591,6 +627,14 @@ export default function ChatPage() {
       releaseVoiceStream();
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (selectedAttachmentPreviewUrl) {
+        URL.revokeObjectURL(selectedAttachmentPreviewUrl);
+      }
+    };
+  }, [selectedAttachmentPreviewUrl]);
 
   useEffect(() => {
     let active = true;
@@ -658,24 +702,16 @@ export default function ChatPage() {
     };
   }, [activeRoomId]);
 
-  function applySavedMessage(savedMessage: ChatMessage, conversationId = activeRoomId) {
-    if (!conversationId) return;
-
-    const newMsg = mapMessage(savedMessage);
-
-    setMessages((prev) => ({
-      ...prev,
-      [conversationId]: [...(prev[conversationId] ?? []), newMsg],
-    }));
+  function updateRoomLastMessage(conversationId: string, content: string, sentAt: string) {
     setRooms((prev) =>
       prev
         .map((room) =>
           room.id === conversationId
             ? {
                 ...room,
-                lastMsg: savedMessage.content,
-                lastMessageAt: savedMessage.sentAt,
-                time: formatChatTime(savedMessage.sentAt),
+                lastMsg: content,
+                lastMessageAt: sentAt,
+                time: formatChatTime(sentAt),
               }
             : room,
         )
@@ -685,6 +721,41 @@ export default function ChatPage() {
           return new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
         }),
     );
+  }
+
+  function appendLocalMessage(message: Msg, conversationId = activeRoomId) {
+    if (!conversationId) return;
+
+    setMessages((prev) => ({
+      ...prev,
+      [conversationId]: [...(prev[conversationId] ?? []), message],
+    }));
+    updateRoomLastMessage(conversationId, message.content, message.sentAt ?? new Date().toISOString());
+    if (conversationId === activeRoomId) {
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    }
+  }
+
+  function removeLocalMessage(conversationId: string, messageId: string) {
+    setMessages((prev) => ({
+      ...prev,
+      [conversationId]: (prev[conversationId] ?? []).filter((message) => message.id !== messageId),
+    }));
+  }
+
+  function applySavedMessage(savedMessage: ChatMessage, conversationId = activeRoomId, replaceMessageId?: string) {
+    if (!conversationId) return;
+
+    const newMsg = mapMessage(savedMessage);
+
+    setMessages((prev) => ({
+      ...prev,
+      [conversationId]:
+        replaceMessageId && (prev[conversationId] ?? []).some((message) => message.id === replaceMessageId)
+          ? (prev[conversationId] ?? []).map((message) => (message.id === replaceMessageId ? newMsg : message))
+          : [...(prev[conversationId] ?? []), newMsg],
+    }));
+    updateRoomLastMessage(conversationId, savedMessage.content, savedMessage.sentAt);
     if (conversationId === activeRoomId) {
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     }
@@ -693,15 +764,82 @@ export default function ChatPage() {
   async function sendMessage(content: string, messageType: "text" | "file" | "media" | "voice" = "text") {
     if (!content.trim() || !activeRoomId) return;
 
+    const conversationId = activeRoomId;
+    const cleanContent = content.trim();
+    const sentAt = new Date().toISOString();
+    const tempId = createTempId("msg");
+    appendLocalMessage(
+      {
+        id: tempId,
+        senderId: "me",
+        content: cleanContent,
+        messageType,
+        attachments: [],
+        time: formatChatTime(sentAt),
+        sentAt,
+        status: "sending",
+      },
+      conversationId,
+    );
+    if (messageType === "text") {
+      setInputText("");
+    }
+
     try {
-      const savedMessage = await sendConversationMessage(activeRoomId, {
-        content: content.trim(),
+      const savedMessage = await sendConversationMessage(conversationId, {
+        content: cleanContent,
         messageType,
       });
-      applySavedMessage(savedMessage);
-      setInputText("");
+      applySavedMessage(savedMessage, conversationId, tempId);
     } catch (error) {
       console.error(error);
+      removeLocalMessage(conversationId, tempId);
+      window.alert(error instanceof Error ? error.message : "Could not send message.");
+      if (messageType === "text") {
+        setInputText(cleanContent);
+      }
+    }
+  }
+
+  async function sendAttachmentWithOptimistic(
+    conversationId: string,
+    file: File,
+    messageType: AttachmentMessageType,
+  ) {
+    const objectUrl = URL.createObjectURL(file);
+    const sentAt = new Date().toISOString();
+    const tempId = createTempId(messageType);
+    const content = attachmentContent(messageType, file.name);
+
+    appendLocalMessage(
+      {
+        id: tempId,
+        senderId: "me",
+        content,
+        messageType,
+        attachments: [
+          {
+            url: objectUrl,
+            file_name: file.name,
+            mime_type: file.type,
+            size: file.size,
+          },
+        ],
+        time: formatChatTime(sentAt),
+        sentAt,
+        status: "sending",
+      },
+      conversationId,
+    );
+
+    try {
+      const savedMessage = await sendConversationAttachment(conversationId, file, messageType);
+      applySavedMessage(savedMessage, conversationId, tempId);
+    } catch (error) {
+      removeLocalMessage(conversationId, tempId);
+      throw error;
+    } finally {
+      URL.revokeObjectURL(objectUrl);
     }
   }
 
@@ -726,8 +864,7 @@ export default function ChatPage() {
 
     setIsVoiceSending(true);
     try {
-      const savedMessage = await sendConversationAttachment(conversationId, file, "voice");
-      applySavedMessage(savedMessage, conversationId);
+      await sendAttachmentWithOptimistic(conversationId, file, "voice");
       setOpenTool(null);
     } catch (error) {
       console.error(error);
@@ -860,6 +997,24 @@ export default function ChatPage() {
     setOpenTool((prev) => (prev === tool ? null : tool));
   }
 
+  function openAttachmentModal(modal: Exclude<AttachModal, null>) {
+    setSelectedAttachmentFile(null);
+    setSelectedAttachmentType(modal === "photo" ? "media" : "file");
+    setSelectedAttachmentPreviewUrl("");
+    setAttachmentError("");
+    setAttachModal(modal);
+    setOpenTool(null);
+  }
+
+  function closeAttachmentModal() {
+    setSelectedAttachmentFile(null);
+    setSelectedAttachmentType(null);
+    setSelectedAttachmentPreviewUrl("");
+    setAttachmentError("");
+    setIsUploadingAttachment(false);
+    setAttachModal(null);
+  }
+
   async function handleTranslateMessage(msgId: string, content: string) {
     setTranslatingIds((prev) => new Set(prev).add(msgId));
     try {
@@ -933,33 +1088,54 @@ export default function ChatPage() {
     }
   }
 
-  async function handleFileSelected(file: File | undefined, messageType: "file" | "media") {
+  function handleFileSelected(file: File | undefined, messageType: "file" | "media") {
+    setAttachmentError("");
+    setSelectedAttachmentFile(null);
+    setSelectedAttachmentType(messageType);
+    setSelectedAttachmentPreviewUrl("");
+
     if (!file) return;
 
     if (file.size > MAX_ATTACHMENT_SIZE) {
-      window.alert("File too large. Max size is 25MB.");
+      setAttachmentError("File too large. Max size is 25MB.");
       return;
     }
 
     if (messageType === "media" && !file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-      window.alert("Please choose an image or video file.");
+      setAttachmentError("Please choose an image or video file.");
       return;
     }
 
     if (messageType === "file" && !isSupportedDocumentFile(file)) {
-      window.alert("Unsupported document type.");
+      setAttachmentError("Unsupported document type.");
       return;
     }
 
-    if (!activeRoomId) return;
+    setSelectedAttachmentFile(file);
+    if (messageType === "media") {
+      setSelectedAttachmentPreviewUrl(URL.createObjectURL(file));
+    }
+  }
 
+  async function handleAttachmentSubmit() {
+    if (!selectedAttachmentFile || !selectedAttachmentType || !activeRoomId || attachmentError) {
+      return;
+    }
+
+    const conversationId = activeRoomId;
+    setIsUploadingAttachment(true);
     try {
-      const savedMessage = await sendConversationAttachment(activeRoomId, file, messageType);
-      applySavedMessage(savedMessage);
-      setAttachModal(null);
+      await sendAttachmentWithOptimistic(
+        conversationId,
+        selectedAttachmentFile,
+        selectedAttachmentType,
+      );
+      closeAttachmentModal();
     } catch (error) {
       console.error(error);
       window.alert(error instanceof Error ? error.message : "Could not upload file.");
+    } finally {
+      setIsUploadingAttachment(false);
     }
   }
 
@@ -1054,7 +1230,7 @@ export default function ChatPage() {
           {openTool === "attachment" && (
             <div className="absolute bottom-full left-3 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-20 min-w-[180px]">
               <button
-                onClick={() => { setAttachModal("photo"); setOpenTool(null); }}
+                onClick={() => openAttachmentModal("photo")}
                 className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 transition-colors text-sm font-medium text-gray-800"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" /></svg>
@@ -1062,7 +1238,7 @@ export default function ChatPage() {
               </button>
               <div className="h-px bg-gray-100 mx-3" />
               <button
-                onClick={() => { setAttachModal("document"); setOpenTool(null); }}
+                onClick={() => openAttachmentModal("document")}
                 className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 transition-colors text-sm font-medium text-gray-800"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" /></svg>
@@ -1198,7 +1374,11 @@ export default function ChatPage() {
                   {attachModal === "photo" ? "写真・動画をアップロード" : "ドキュメントをアップロード"}
                 </h3>
               </div>
-              <button onClick={() => setAttachModal(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button
+                onClick={closeAttachmentModal}
+                disabled={isUploadingAttachment}
+                className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -1212,11 +1392,56 @@ export default function ChatPage() {
               <p className="text-sm font-medium text-gray-700">クリックしてファイルを選択</p>
               <p className="text-xs text-gray-400">{attachModal === "photo" ? "JPG, PNG, GIF, MP4 — 最大 25MB" : "PDF, DOC, XLSX, PPT — 最大 25MB"}</p>
             </div>
+            {selectedAttachmentFile && (
+              <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                {selectedAttachmentPreviewUrl && selectedAttachmentFile.type.startsWith("image/") && (
+                  <Image
+                    src={selectedAttachmentPreviewUrl}
+                    alt={selectedAttachmentFile.name}
+                    width={320}
+                    height={180}
+                    className="mb-2 max-h-40 w-full rounded-lg object-cover"
+                    unoptimized
+                  />
+                )}
+                {selectedAttachmentPreviewUrl && selectedAttachmentFile.type.startsWith("video/") && (
+                  <video
+                    src={selectedAttachmentPreviewUrl}
+                    controls
+                    className="mb-2 max-h-40 w-full rounded-lg bg-black"
+                  />
+                )}
+                <p className="truncate text-sm font-semibold text-gray-800">{selectedAttachmentFile.name}</p>
+                <p className="text-xs text-gray-400">
+                  {formatAttachmentSize(selectedAttachmentFile.size)}
+                  {selectedAttachmentFile.type ? ` · ${selectedAttachmentFile.type}` : ""}
+                </p>
+              </div>
+            )}
+            {attachmentError && (
+              <p className="mb-4 rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                {attachmentError}
+              </p>
+            )}
             <div className="flex gap-3">
-              <button onClick={() => setAttachModal(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">キャンセル</button>
-              <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white opacity-40" style={{ backgroundColor: "#1B4332" }}>
+              <button
+                onClick={closeAttachmentModal}
+                disabled={isUploadingAttachment}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-40"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => void handleAttachmentSubmit()}
+                disabled={!selectedAttachmentFile || Boolean(attachmentError) || isUploadingAttachment}
+                className={clsx(
+                  "flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity",
+                  selectedAttachmentFile && !attachmentError && !isUploadingAttachment ? "opacity-100" : "opacity-40",
+                )}
+                style={{ backgroundColor: "#1B4332" }}
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z" /></svg>
-                送信する
+                {isUploadingAttachment ? "Sending..." : "送信する"}
               </button>
             </div>
           </div>
