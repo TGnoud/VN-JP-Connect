@@ -332,42 +332,41 @@ export default function AdminEventsPage() {
         </p>
       ) : null;
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="px-8 py-6 bg-white border-b border-gray-100">
-          <h1 className="text-2xl font-bold text-gray-900">イベント作成</h1>
-          <p className="text-sm text-gray-500 mt-1">ユーザーが閲覧および参加するためのイベントを作成・管理します</p>
-        </div>
-
-        {/* Toolbar */}
-        <div className="sticky top-0 z-20 bg-white border-b border-gray-100 px-8 py-3 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-gray-400" />
-            <span className="text-sm font-semibold text-gray-700">新規イベント</span>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-3xl mx-auto px-8 flex flex-col gap-5">
+          {/* Page title */}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">イベント作成</h1>
+            <p className="text-sm text-gray-500 mt-1">ユーザーが閲覧および参加するためのイベントを作成・管理します</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowPreview(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              プレビュー
-            </button>
-            <button onClick={() => setView("list")} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors">キャンセル</button>
-            <button onClick={() => saveCreate("draft")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
-              下書き保存
-            </button>
-            <button onClick={() => saveCreate("published")} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: "#1B4332" }}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              イベントを公開
-            </button>
+          {/* Toolbar card */}
+          <div className="bg-white rounded-2xl border border-gray-100 px-5 py-3 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              <span className="text-sm font-semibold text-gray-700">新規イベント</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowPreview(true)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                プレビュー
+              </button>
+              <button onClick={() => setView("list")} className="px-3.5 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors">キャンセル</button>
+              <button onClick={() => saveCreate("draft")} className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                下書き保存
+              </button>
+              <button onClick={() => saveCreate("published")} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: "#1B4332" }}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                イベントを公開
+              </button>
+            </div>
           </div>
-        </div>
-
-        <div className="px-8 py-6 flex flex-col gap-5 max-w-3xl">
           {/* 基本情報 */}
           <SectionCard title="基本情報" icon={<svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>}>
             <div className="flex flex-col gap-4">
@@ -502,7 +501,6 @@ export default function AdminEventsPage() {
             </div>
           </SectionCard>
 
-          <div className="h-4" />
         </div>
 
         {/* Preview modal */}
@@ -578,24 +576,25 @@ export default function AdminEventsPage() {
   // ── List view ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="px-8 py-6 bg-white border-b border-gray-100 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">イベント作成</h1>
-          <p className="text-sm text-gray-500 mt-1">ユーザーが閲覧および参加するためのイベントを作成・管理します</p>
+    <div className="min-h-screen bg-gray-50 py-6">
+      <div className="max-w-5xl mx-auto px-8 flex flex-col gap-6">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">イベント作成</h1>
+            <p className="text-sm text-gray-500 mt-1">ユーザーが閲覧および参加するためのイベントを作成・管理します</p>
+          </div>
+          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-opacity shrink-0" style={{ backgroundColor: "#1B4332" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+            </svg>
+            新規イベント作成
+          </button>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: "#1B4332" }}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-          </svg>
-          新規イベント作成
-        </button>
-      </div>
 
-      <div className="px-8 py-6">
+        <div>
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8 max-w-2xl">
+        <div className="grid grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" className="size-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
@@ -631,6 +630,7 @@ export default function AdminEventsPage() {
           )}
         </div>
       </div>
+    </div>
 
       {/* ── Edit modal ────────────────────────────────────────────────────────── */}
       {editModal && editForm && (
@@ -843,7 +843,7 @@ function EventCard({ event, onEdit, onDelete }: { event: AdminEvent; onEdit: () 
         {/* Progress bar */}
         {progressPct !== null && (
           <div className="mt-3">
-            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden w-48">
+            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden w-full max-w-xs">
               <div className="h-full rounded-full" style={{ width: `${progressPct}%`, backgroundColor: "#1B4332" }} />
             </div>
             <p className="text-xs text-gray-400 mt-1">{event.currentParticipants}/{event.capacity}人</p>
@@ -852,7 +852,7 @@ function EventCard({ event, onEdit, onDelete }: { event: AdminEvent; onEdit: () 
       </div>
 
       {/* Actions */}
-      <div className="flex flex-col items-center justify-center gap-3 px-4 border-l border-gray-50">
+      <div className="flex flex-col items-center justify-center gap-2 px-5">
         <button onClick={onEdit} title="編集" className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" className="size-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
         </button>
