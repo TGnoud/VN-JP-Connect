@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { forgotPassword, resetPassword } from "@/lib/auth-api";
+import {
+  completePasswordReset,
+  sendPasswordResetOtp,
+  verifyPasswordResetOtp,
+} from "@/lib/auth-api";
 
+/** Two-pane layout: メール確認 → パスワード設定（OTP + 新パスワードは同一画面） */
 type Step = "email" | "reset";
+
+const STRONG_PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+const PW_COMPLEXITY_JA =
+  "パスワードは8文字以上で、英大文字・英小文字・数字をそれぞれ1文字以上含めてください。";
 
 function ShieldIcon({ className = "size-8" }: { className?: string }) {
   return (
@@ -42,7 +53,7 @@ function EyeIcon() {
 
 function RefreshIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 fill-none stroke-currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M16.02 7.13A6.75 6.75 0 1 0 18.75 12m0-5.25v4.5h-4.5" />
     </svg>
   );
@@ -74,19 +85,25 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
         >
           2
         </span>
-        <span className={`text-sm font-semibold ${isReset ? "text-gray-900" : "text-gray-400"}`}>パスワード設定</span>
+        <span className={`text-sm font-semibold ${isReset ? "text-gray-900" : "text-gray-400"}`}>
+          パスワード設定
+        </span>
       </div>
     </div>
   );
 }
 
-function AppLogo() {
+function AppLogo({ muted = false }: { muted?: boolean }) {
   return (
     <div className="flex flex-col items-center gap-3 mb-6">
-      <div className="flex size-16 items-center justify-center rounded-2xl bg-[#1B4332] text-white">
+      <div
+        className={`flex size-16 items-center justify-center rounded-2xl text-white transition ${
+          muted ? "bg-[#9BC1AD]" : "bg-[#1B4332]"
+        }`}
+      >
         <ShieldIcon />
       </div>
-      <p className="text-base font-bold text-gray-900">VN-JP Admin</p>
+      <p className={`text-base font-bold ${muted ? "text-gray-400" : "text-gray-900"}`}>VN-JP Admin</p>
     </div>
   );
 }
@@ -95,39 +112,37 @@ export default function ForgotPasswordPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState<string[]>(Array(6).fill(""));
+  const [code, setCode] = useState<string[]>(() => Array(6).fill(""));
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+
   const codeRefs = useRef<Array<HTMLInputElement | null>>([]);
 
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const timer = window.setTimeout(() => setCountdown((v) => v - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [countdown]);
-
-  function resetCode() {
+  function resetDigits() {
     setCode(Array(6).fill(""));
-    codeRefs.current[0]?.focus();
+    window.setTimeout(() => codeRefs.current[0]?.focus(), 0);
   }
 
-  async function handleSendCode(e: React.FormEvent) {
-    e.preventDefault();
+  async function dispatchSendCode() {
     setError("");
     const trimmed = email.trim();
-    if (!trimmed) { setError("メールアドレスを入力してください。"); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) { setError("有効なメールアドレスを入力してください。"); return; }
+    if (!trimmed) {
+      setError("メールアドレスを入力してください。");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError("有効なメールアドレスを入力してください。");
+      return;
+    }
     setLoading(true);
     try {
-      await forgotPassword({ email: trimmed });
+      await sendPasswordResetOtp({ email: trimmed });
       setStep("reset");
-      setCountdown(60);
-      window.setTimeout(() => codeRefs.current[0]?.focus(), 0);
+      resetDigits();
     } catch (err) {
       setError(err instanceof Error ? err.message : "確認コードの送信に失敗しました。");
     } finally {
@@ -135,23 +150,47 @@ export default function ForgotPasswordPage() {
     }
   }
 
+  async function handleSendCode(e: React.FormEvent) {
+    e.preventDefault();
+    await dispatchSendCode();
+  }
+
+  /**
+   * UI は1フォーム；API は verify（OTP消費・resetToken発行）→ complete の順で不変。
+   */
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     const codeStr = code.join("");
-    if (codeStr.length !== 6) { setError("6桁の確認コードを入力してください。"); return; }
-    if (newPassword.length < 8) { setError("新しいパスワードは8文字以上で入力してください。"); return; }
-    if (newPassword !== confirmPassword) { setError("確認用パスワードが一致しません。"); return; }
+    if (codeStr.length !== 6) {
+      setError("6桁の確認コードを入力してください。");
+      return;
+    }
+    if (!STRONG_PASSWORD_REGEX.test(newPassword)) {
+      setError(PW_COMPLEXITY_JA);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("確認用パスワードが一致しません。");
+      return;
+    }
+
     setLoading(true);
     try {
-      await resetPassword({ email: email.trim(), code: codeStr, newPassword });
+      const verified = await verifyPasswordResetOtp({
+        email: email.trim(),
+        otp: codeStr,
+      });
+      await completePasswordReset({
+        email: email.trim(),
+        resetToken: verified.resetToken,
+        newPassword,
+      });
       router.push("/login?reset=success");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-      const lower = message.toLowerCase();
-      setError(lower.includes("not registered") || lower.includes("not found")
-        ? "このメールアドレスは登録されていません。"
-        : message || "パスワードの変更に失敗しました。");
+      setError(
+        err instanceof Error ? err.message : "パスワードの変更に失敗しました。",
+      );
     } finally {
       setLoading(false);
     }
@@ -159,61 +198,76 @@ export default function ForgotPasswordPage() {
 
   function handleCodeChange(index: number, value: string) {
     const digit = value.replace(/\D/g, "").slice(-1);
-    setCode((curr) => { const next = [...curr]; next[index] = digit; return next; });
+    setCode((curr) => {
+      const next = [...curr];
+      next[index] = digit;
+      return next;
+    });
     if (digit && index < 5) codeRefs.current[index + 1]?.focus();
   }
 
   function handleCodeKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Backspace" && !code[index] && index > 0) codeRefs.current[index - 1]?.focus();
+    if (e.key === "Backspace" && !code[index] && index > 0) {
+      codeRefs.current[index - 1]?.focus();
+    }
   }
 
-  const inputBase = "h-14 w-full rounded-xl border border-gray-200 bg-white text-base text-gray-900 outline-none transition focus:border-[#1B4332] focus:ring-2 focus:ring-[#1B4332]/15";
+  const inputBase =
+    "h-14 w-full rounded-xl border border-gray-200 bg-white text-base text-gray-900 outline-none transition focus:border-[#1B4332] focus:ring-2 focus:ring-[#1B4332]/15";
 
   return (
     <main className="min-h-screen bg-gray-100 px-6 py-16">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
         <StepIndicator currentStep={step} />
 
-        <div className="grid grid-cols-2 gap-6 items-start">
-
-          {/* ── Left card: step 1 ── */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:items-start">
+          {/* 左：メール */}
           <section
-            className="rounded-2xl bg-white px-10 py-10 shadow-sm relative transition-all"
+            className="relative rounded-2xl bg-white px-10 py-10 shadow-sm transition-all"
             style={{
               border: step === "email" ? "2px solid #1B4332" : "1px solid #e5e7eb",
               opacity: step === "reset" ? 0.75 : 1,
             }}
           >
-            {step === "reset" && (
+            {step === "reset" ? (
               <div className="absolute top-4 right-4 flex items-center gap-1 text-xs font-semibold text-[#1B4332]">
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 完了
               </div>
-            )}
+            ) : null}
+
             <div className="flex flex-col items-center text-center">
-              <AppLogo />
+              <AppLogo muted={step === "reset"} />
               <h1 className="mb-3 text-2xl font-bold text-gray-900">パスワードのリセット</h1>
               <p className="mb-8 text-sm leading-6 text-gray-500">
-                登録したメールアドレスを入力してください。<br />
+                登録したメールアドレスを入力してください。
+                <br />
                 6桁の確認コードを送信します。
               </p>
+
               <form onSubmit={handleSendCode} noValidate className="w-full text-left">
-                <label htmlFor="email" className="mb-2 block text-sm font-semibold text-gray-700">メールアドレス</label>
+                <label htmlFor="email" className="mb-2 block text-sm font-semibold text-gray-700">
+                  メールアドレス
+                </label>
                 <div className="relative mb-6">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><MailIcon /></span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <MailIcon />
+                  </span>
                   <input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     readOnly={step === "reset"}
-                    placeholder="example@email.com"
+                    placeholder="admin@example.com"
                     className={`${inputBase} pl-12 pr-4 ${step === "reset" ? "bg-gray-50 text-gray-400" : ""}`}
                   />
                 </div>
-                {step === "email" && error && <p className="-mt-3 mb-4 text-sm text-red-500">{error}</p>}
+                {step === "email" && error ? (
+                  <p className="-mt-3 mb-4 text-sm text-red-500">{error}</p>
+                ) : null}
                 <button
                   type="submit"
                   disabled={loading || step === "reset"}
@@ -223,13 +277,14 @@ export default function ForgotPasswordPage() {
                   {loading && step === "email" ? "送信中..." : "確認コードを送信"}
                 </button>
               </form>
+
               <Link href="/login" className="mt-6 inline-flex items-center gap-2 text-sm text-gray-500 transition hover:text-gray-800">
                 <span>←</span> ログイン画面に戻る
               </Link>
             </div>
           </section>
 
-          {/* ── Right card: step 2 ── */}
+          {/* 右：確認コード + 新パスワード（同一フォーム） */}
           <section
             className="rounded-2xl bg-white px-10 py-10 shadow-sm transition-all"
             style={{
@@ -239,10 +294,11 @@ export default function ForgotPasswordPage() {
             }}
           >
             <div className="flex flex-col items-center text-center">
-              <AppLogo />
+              <AppLogo muted={step === "email"} />
               <h2 className="mb-3 text-2xl font-bold text-gray-900">新しいパスワードの設定</h2>
               <p className="mb-4 text-sm leading-6 text-gray-500">
-                メールで届いた確認コードと、<br />
+                メールで届いた確認コードと、
+                <br />
                 新しいパスワードを入力してください。
               </p>
               <div className="mb-6 flex items-center gap-2 rounded-full bg-gray-100 px-4 py-1.5 text-sm text-gray-600">
@@ -256,54 +312,82 @@ export default function ForgotPasswordPage() {
                   {code.map((digit, i) => (
                     <input
                       key={i}
-                      ref={(node) => { codeRefs.current[i] = node; }}
+                      ref={(node) => {
+                        codeRefs.current[i] = node;
+                      }}
                       value={digit}
                       onChange={(e) => handleCodeChange(i, e.target.value)}
                       onKeyDown={(e) => handleCodeKeyDown(i, e)}
                       inputMode="numeric"
+                      autoComplete="one-time-code"
                       maxLength={1}
-                      className="h-14 rounded-xl border border-gray-200 bg-white text-center text-2xl font-bold text-gray-900 outline-none transition focus:border-[#1B4332] focus:ring-2 focus:ring-[#1B4332]/15"
+                      disabled={step === "email"}
+                      className="h-14 rounded-xl border border-gray-200 bg-white text-center text-2xl font-bold text-gray-900 outline-none transition focus:border-[#1B4332] focus:ring-2 focus:ring-[#1B4332]/15 disabled:bg-gray-50 disabled:text-gray-300"
                     />
                   ))}
                 </div>
 
-                <label htmlFor="new-password" className="mb-2 block text-sm font-semibold text-gray-700">新しいパスワード</label>
+                <label htmlFor="new-password" className="mb-2 block text-sm font-semibold text-gray-700">
+                  新しいパスワード
+                </label>
                 <div className="relative mb-5">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><LockIcon /></span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <LockIcon />
+                  </span>
                   <input
                     id="new-password"
                     type={showNewPassword ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
+                    disabled={step === "email"}
+                    autoComplete="new-password"
                     placeholder="••••••••"
-                    className={`${inputBase} pl-12 pr-12`}
+                    className={`${inputBase} pl-12 pr-12 ${step === "email" ? "bg-gray-50" : ""}`}
                   />
-                  <button type="button" onClick={() => setShowNewPassword((v) => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((v) => !v)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+                    tabIndex={-1}
+                  >
                     <EyeIcon />
                   </button>
                 </div>
 
-                <label htmlFor="confirm-password" className="mb-2 block text-sm font-semibold text-gray-700">新しいパスワード（確認）</label>
+                <label htmlFor="confirm-password" className="mb-2 block text-sm font-semibold text-gray-700">
+                  新しいパスワード（確認）
+                </label>
                 <div className="relative mb-6">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><LockIcon /></span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <LockIcon />
+                  </span>
                   <input
                     id="confirm-password"
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={step === "email"}
+                    autoComplete="new-password"
                     placeholder="••••••••"
-                    className={`${inputBase} pl-12 pr-12`}
+                    className={`${inputBase} pl-12 pr-12 ${step === "email" ? "bg-gray-50" : ""}`}
                   />
-                  <button type="button" onClick={() => setShowConfirmPassword((v) => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+                    tabIndex={-1}
+                  >
                     <EyeIcon />
                   </button>
                 </div>
 
-                {step === "reset" && error && <p className="-mt-3 mb-4 text-sm text-red-500">{error}</p>}
+                {step === "reset" && error ? (
+                  <p className="-mt-2 mb-4 text-sm text-red-500">{error}</p>
+                ) : null}
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || step === "email"}
                   className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#1B4332] text-base font-bold text-white transition hover:bg-[#14532d] disabled:opacity-60"
                 >
                   <ShieldIcon className="size-5" />
@@ -311,29 +395,20 @@ export default function ForgotPasswordPage() {
                 </button>
 
                 <div className="mt-5 text-center">
-                  {countdown > 0 ? (
-                    <span className="inline-flex items-center gap-1.5 text-sm text-gray-400">
-                      <RefreshIcon />
-                      コードを再送信（{countdown}秒）
-                    </span>
-                  ) : (
+                  {step === "reset" ? (
                     <button
                       type="button"
-                      onClick={async () => {
-                        resetCode();
-                        try {
-                          await forgotPassword({ email: email.trim() });
-                          setCountdown(60);
-                        } catch {
-                          setError("再送信に失敗しました。");
-                        }
+                      onClick={() => {
+                        resetDigits();
+                        setError("");
+                        void dispatchSendCode();
                       }}
                       className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1B4332] hover:underline"
                     >
                       <RefreshIcon />
-                      コードを再送信
+                      コードが届きませんか？ 再送信する
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </form>
             </div>

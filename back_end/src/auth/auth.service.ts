@@ -3,21 +3,13 @@ import {
   ConflictException,
   Injectable,
   Logger,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Profile, ProfileDocument, User, UserDocument } from '../database/schemas';
 import { hashPassword, verifyPassword } from './password';
-import {
-  ForgotPasswordInput,
-  LoginInput,
-  RegisterInput,
-  ResetPasswordInput,
-} from './auth.validation';
-
-const RESET_CODE_TTL_MS = 10 * 60 * 1000;
+import { LoginInput, RegisterInput } from './auth.validation';
 
 @Injectable()
 export class AuthService {
@@ -101,48 +93,6 @@ export class AuthService {
     };
   }
 
-  async forgotPassword(input: ForgotPasswordInput) {
-    const user = await this.userModel.findOne({ email: input.email }).exec();
-
-    // To avoid disclosing whether an email is registered, we return the same
-    // shape in both cases, but only generate a code when the user exists.
-    if (user) {
-      const code = generateResetCode();
-      user.reset_code = code;
-      user.reset_code_expires_at = new Date(Date.now() + RESET_CODE_TTL_MS);
-      await user.save();
-
-      // TODO: integrate a real mail provider here.
-      // For local development we log the code so it's easy to test the flow.
-      this.logger.log(
-        `[DEV] Password reset code for ${input.email}: ${code} (expires in 10m)`,
-      );
-    }
-
-    return {
-      ok: true,
-      message: 'If the email is registered, a reset code has been sent.',
-    };
-  }
-
-  async resetPassword(input: ResetPasswordInput) {
-    const user = await this.userModel.findOne({ email: input.email }).exec();
-    if (!user) {
-      throw new NotFoundException('email is not registered');
-    }
-
-    // NOTE: OTP code verification is intentionally skipped per current
-    // product requirements. The 6-digit format is still validated by
-    // `validateResetPasswordBody`. Any 6-digit number will be accepted.
-
-    user.password_hash = hashPassword(input.newPassword);
-    user.reset_code = undefined;
-    user.reset_code_expires_at = undefined;
-    await user.save();
-
-    return { ok: true };
-  }
-
   private async findUserByIdentifier(input: LoginInput) {
     if (input.identifier.type === 'email') {
       return this.userModel.findOne({ email: input.identifier.value }).exec();
@@ -166,9 +116,5 @@ export class AuthService {
       .findOne({ phone_number: { $regex: flexiblePattern } })
       .exec();
   }
-}
-
-function generateResetCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 

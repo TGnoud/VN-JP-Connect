@@ -135,36 +135,3 @@ export function validateLoginBody(body: unknown): LoginInput {
   const password = requireString(body.password, 'password');
   return { identifier, password };
 }
-
-export type ForgotPasswordInput = { email: string };
-
-export function validateForgotPasswordBody(body: unknown): ForgotPasswordInput {
-  if (!isRecord(body)) {
-    throw new BadRequestException('body must be an object');
-  }
-  const email = requireEmail(requireString(body.email, 'email').toLowerCase());
-  return { email };
-}
-
-export type ResetPasswordInput = {
-  email: string;
-  code: string;
-  newPassword: string;
-};
-
-export function validateResetPasswordBody(body: unknown): ResetPasswordInput {
-  if (!isRecord(body)) {
-    throw new BadRequestException('body must be an object');
-  }
-  const email = requireEmail(requireString(body.email, 'email').toLowerCase());
-  const code = requireString(body.code, 'code');
-  if (!/^\d{6}$/.test(code)) {
-    throw new BadRequestException('code must be a 6-digit number');
-  }
-  const newPassword = requireString(body.newPassword, 'newPassword');
-  if (newPassword.length < 6) {
-    throw new BadRequestException('newPassword must be at least 6 characters');
-  }
-  return { email, code, newPassword };
-}
-

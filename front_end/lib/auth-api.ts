@@ -16,7 +16,7 @@ export interface AuthResponse {
   createdAt?: string;
 }
 
-async function requestAuth(path: string, payload: unknown) {
+async function fetchPostThrowingMessage(path: string, payload: unknown) {
   let response: Response;
 
   try {
@@ -34,20 +34,63 @@ async function requestAuth(path: string, payload: unknown) {
     );
   }
 
-  if (!response.ok) {
-    let message = `Request failed with status ${response.status}`;
+  return response;
+}
 
+function parseNestErrorMessage(errorBody: unknown, fallback: string) {
+  if (!errorBody || typeof errorBody !== "object") {
+    return fallback;
+  }
+
+  const message = (errorBody as { message?: unknown }).message;
+  if (Array.isArray(message)) {
+    return message.map(String).join(", ");
+  }
+  if (typeof message === "string" && message.trim()) {
+    return message;
+  }
+
+  return fallback;
+}
+
+async function requestAuth(path: string, payload: unknown) {
+  const response = await fetchPostThrowingMessage(path, payload);
+
+  if (!response.ok) {
+    const fallback = `Request failed with status ${response.status}`;
+
+    let message = fallback;
     try {
-      const errorBody = await response.json();
-      message = errorBody.message ?? message;
+      const errorBody: unknown = await response.json();
+      message = parseNestErrorMessage(errorBody, fallback);
     } catch {
-      // Keep the status-based message when the response is not JSON.
+      message = fallback;
     }
 
     throw new Error(Array.isArray(message) ? message.join(", ") : message);
   }
 
   return response.json() as Promise<AuthResponse>;
+}
+
+async function requestJson<T>(path: string, payload: unknown): Promise<T> {
+  const response = await fetchPostThrowingMessage(path, payload);
+
+  if (!response.ok) {
+    const fallback = `Request failed with status ${response.status}`;
+
+    let message = fallback;
+    try {
+      const errorBody: unknown = await response.json();
+      message = parseNestErrorMessage(errorBody, fallback);
+    } catch {
+      message = fallback;
+    }
+
+    throw new Error(Array.isArray(message) ? message.join(", ") : message);
+  }
+
+  return response.json() as Promise<T>;
 }
 
 export function login(payload: { identifier: string; password: string }) {
@@ -65,16 +108,40 @@ export function register(payload: {
   return requestAuth("/auth/register", payload);
 }
 
-export function forgotPassword(payload: { email: string }) {
-  return requestAuth("/auth/forgot-password", payload);
+export interface PasswordResetAck {
+  ok: true;
+  message: string;
 }
 
-export function resetPassword(payload: {
+export interface VerifyOtpOk {
+  ok: true;
+  resetToken: string;
+  resetSessionExpiresAt: string;
+}
+
+/** Step ① — issues OTP + mails via Resend (backend enforces quotas). */
+export function sendPasswordResetOtp(payload: { email: string }) {
+  return requestJson<PasswordResetAck>(
+    "/auth/password-reset/send-otp",
+    payload,
+  );
+}
+
+/** Step ② — consumes OTP, returns privileged reset token. */
+export function verifyPasswordResetOtp(payload: { email: string; otp: string }) {
+  return requestJson<VerifyOtpOk>(
+    "/auth/password-reset/verify-otp",
+    payload,
+  );
+}
+
+/** Step ③ — exchanges reset token exactly once for a hashed password rotation. */
+export function completePasswordReset(payload: {
   email: string;
-  code: string;
+  resetToken: string;
   newPassword: string;
 }) {
-  return requestAuth("/auth/reset-password", payload);
+  return requestJson<{ ok: true }>("/auth/password-reset/complete", payload);
 }
 
 export function setStoredUserId(userId: string) {
