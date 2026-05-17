@@ -1,6 +1,18 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUserId } from '../profile/current-user-id.decorator';
 import { ConversationsService } from './conversations.service';
+
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
 
 @Controller('conversations')
 export class ConversationsController {
@@ -70,6 +82,26 @@ export class ConversationsController {
       currentUserId,
       conversationId,
       body ?? {},
+    );
+  }
+
+  @Post(':conversationId/attachments')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_ATTACHMENT_SIZE },
+    }),
+  )
+  uploadAttachment(
+    @CurrentUserId() currentUserId: string,
+    @Param('conversationId') conversationId: string,
+    @UploadedFile() file: any,
+    @Body('messageType') messageType?: string,
+  ) {
+    return this.conversationsService.uploadAttachment(
+      currentUserId,
+      conversationId,
+      file,
+      messageType,
     );
   }
 

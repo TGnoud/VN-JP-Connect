@@ -11,8 +11,10 @@ import {
   getMatchedConversationUsers,
   markConversationRead,
   resolveMediaUrl,
+  sendConversationAttachment,
   sendConversationMessage,
   translateConversationText,
+  type ChatAttachment,
   type ChatConversation,
   type ChatMessage,
   type MatchedConversationUser,
@@ -38,6 +40,8 @@ interface Msg {
   id: string;
   senderId: "me" | "partner";
   content: string;
+  messageType?: "text" | "file" | "media" | "voice" | "system";
+  attachments?: ChatAttachment[];
   time: string;
   sentAt?: string;
   status: "sent" | "read";
@@ -137,6 +141,17 @@ const TOPICS = [
 // ─── Toolbar button definitions ───────────────────────────────────────────────
 
 const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
+const DOCUMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+]);
+const DOCUMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"];
 const EMPTY_ROOM: MockRoom = {
   id: "",
   name: "-",
@@ -191,10 +206,66 @@ function mapMessage(message: ChatMessage): Msg {
     id: message.id,
     senderId: message.senderId,
     content: message.content,
+    messageType: message.messageType,
+    attachments: message.attachments,
     time: formatChatTime(message.sentAt),
     sentAt: message.sentAt,
     status: message.status,
   };
+}
+
+function attachmentFileName(attachment: ChatAttachment) {
+  const fallback = attachment.url.split("/").pop() || "download";
+  return attachment.file_name || fallback;
+}
+
+function formatAttachmentSize(size?: number) {
+  if (!size || size < 0) return "";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function isImageAttachment(attachment: ChatAttachment) {
+  return (attachment.mime_type ?? "").startsWith("image/");
+}
+
+function isVideoAttachment(attachment: ChatAttachment) {
+  return (attachment.mime_type ?? "").startsWith("video/");
+}
+
+function isSupportedDocumentFile(file: File) {
+  const lowerName = file.name.toLowerCase();
+  return (
+    DOCUMENT_MIME_TYPES.has(file.type) ||
+    DOCUMENT_EXTENSIONS.some((extension) => lowerName.endsWith(extension))
+  );
+}
+
+async function downloadAttachment(attachment: ChatAttachment) {
+  const url = resolveMediaUrl(attachment.url);
+  const fileName = attachmentFileName(attachment);
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`download failed with ${response.status}`);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.target = "_blank";
+    anchor.rel = "noreferrer";
+    anchor.download = fileName;
+    anchor.click();
+  }
 }
 
 function readStoredConversationId() {
@@ -261,6 +332,66 @@ function RoomItem({ room, isActive, onClick }: { room: MockRoom; isActive: boole
   );
 }
 
+function AttachmentPreview({ attachment, isMe }: { attachment: ChatAttachment; isMe: boolean }) {
+  const url = resolveMediaUrl(attachment.url);
+  const fileName = attachmentFileName(attachment);
+  const size = formatAttachmentSize(attachment.size);
+
+  if (isImageAttachment(attachment)) {
+    return (
+      <div className="overflow-hidden rounded-xl bg-black/5">
+        <Image
+          src={url}
+          alt={fileName}
+          width={320}
+          height={220}
+          className="max-h-64 w-full object-cover"
+          unoptimized
+        />
+        <button
+          onClick={() => void downloadAttachment(attachment)}
+          className={clsx("w-full px-3 py-2 text-left text-xs font-semibold transition-colors", isMe ? "bg-white/10 text-white hover:bg-white/15" : "bg-gray-50 text-gray-600 hover:bg-gray-100")}
+        >
+          ダウンロード{size ? ` · ${size}` : ""}
+        </button>
+      </div>
+    );
+  }
+
+  if (isVideoAttachment(attachment)) {
+    return (
+      <div className="overflow-hidden rounded-xl bg-black">
+        <video src={url} controls className="max-h-64 w-full bg-black" />
+        <button
+          onClick={() => void downloadAttachment(attachment)}
+          className={clsx("w-full px-3 py-2 text-left text-xs font-semibold transition-colors", isMe ? "bg-white/10 text-white hover:bg-white/15" : "bg-gray-50 text-gray-600 hover:bg-gray-100")}
+        >
+          ダウンロード{size ? ` · ${size}` : ""}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => void downloadAttachment(attachment)}
+      className={clsx("flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors", isMe ? "border-white/20 bg-white/10 text-white hover:bg-white/15" : "border-gray-100 bg-gray-50 text-gray-700 hover:bg-gray-100")}
+    >
+      <span className={clsx("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", isMe ? "bg-white/15" : "bg-white")}>
+        <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12" />
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{fileName}</span>
+        <span className={clsx("text-xs", isMe ? "text-white/70" : "text-gray-400")}>
+          {size ? `${size} · ` : ""}ダウンロード
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function MsgBubble({
   msg,
   onTranslate,
@@ -273,6 +404,11 @@ function MsgBubble({
   isTranslating?: boolean;
 }) {
   const isMe = msg.senderId === "me";
+  const attachments = msg.attachments ?? [];
+  const hasAttachments = attachments.length > 0;
+  const showText = Boolean(msg.content.trim()) && !hasAttachments;
+  const canTranslate = showText;
+
   return (
     <div className={clsx("flex", isMe ? "justify-end" : "justify-start")}>
       <div className={clsx("flex flex-col max-w-xs lg:max-w-md", isMe ? "items-end" : "items-start")}>
@@ -280,8 +416,19 @@ function MsgBubble({
           className={clsx("px-4 py-2.5 rounded-2xl text-sm leading-relaxed", isMe ? "text-white rounded-br-sm" : "bg-white text-gray-800 rounded-bl-sm shadow-sm")}
           style={isMe ? { backgroundColor: "#1B4332" } : undefined}
         >
-          {msg.content}
-          {(translation || isTranslating) && (
+          {showText && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+          {hasAttachments && (
+            <div className="flex flex-col gap-2">
+              {attachments.map((attachment) => (
+                <AttachmentPreview
+                  key={`${msg.id}-${attachment.url}`}
+                  attachment={attachment}
+                  isMe={isMe}
+                />
+              ))}
+            </div>
+          )}
+          {canTranslate && (translation || isTranslating) && (
             <>
               <div className={clsx("border-t my-2", isMe ? "border-white/20" : "border-gray-100")} />
               <p className={clsx("text-xs font-medium mb-0.5", isMe ? "text-white/60" : "text-gray-400")}>
@@ -303,6 +450,7 @@ function MsgBubble({
               <path d="M6 5L9.5 8.5L16 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
+          {canTranslate && (
           <button
             onClick={() => onTranslate(msg.id, msg.content)}
             disabled={isTranslating}
@@ -313,6 +461,7 @@ function MsgBubble({
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" />
             </svg>
           </button>
+          )}
         </div>
       </div>
     </div>
@@ -346,7 +495,6 @@ export default function ChatPage() {
   const [search, setSearch] = useState("");
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
-  const [translationErrors, setTranslationErrors] = useState<Set<string>>(new Set());
   const [groupModal, setGroupModal] = useState<GroupModalState>({
     open: false,
     name: "",
@@ -430,6 +578,34 @@ export default function ChatPage() {
     };
   }, [activeRoomId]);
 
+  function applySavedMessage(savedMessage: ChatMessage) {
+    const newMsg = mapMessage(savedMessage);
+
+    setMessages((prev) => ({
+      ...prev,
+      [activeRoomId]: [...(prev[activeRoomId] ?? []), newMsg],
+    }));
+    setRooms((prev) =>
+      prev
+        .map((room) =>
+          room.id === activeRoomId
+            ? {
+                ...room,
+                lastMsg: savedMessage.content,
+                lastMessageAt: savedMessage.sentAt,
+                time: formatChatTime(savedMessage.sentAt),
+              }
+            : room,
+        )
+        .sort((a, b) => {
+          if (a.id === activeRoomId) return -1;
+          if (b.id === activeRoomId) return 1;
+          return new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
+        }),
+    );
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  }
+
   async function sendMessage(content: string, messageType: "text" | "file" | "media" | "voice" = "text") {
     if (!content.trim() || !activeRoomId) return;
 
@@ -438,32 +614,8 @@ export default function ChatPage() {
         content: content.trim(),
         messageType,
       });
-      const newMsg = mapMessage(savedMessage);
-
-      setMessages((prev) => ({
-        ...prev,
-        [activeRoomId]: [...(prev[activeRoomId] ?? []), newMsg],
-      }));
-      setRooms((prev) =>
-        prev
-          .map((room) =>
-            room.id === activeRoomId
-              ? {
-                  ...room,
-                  lastMsg: savedMessage.content,
-                  lastMessageAt: savedMessage.sentAt,
-                  time: formatChatTime(savedMessage.sentAt),
-                }
-              : room,
-          )
-          .sort((a, b) => {
-            if (a.id === activeRoomId) return -1;
-            if (b.id === activeRoomId) return 1;
-            return new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
-          }),
-      );
+      applySavedMessage(savedMessage);
       setInputText("");
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     } catch (error) {
       console.error(error);
     }
@@ -479,11 +631,6 @@ export default function ChatPage() {
 
   async function handleTranslateMessage(msgId: string, content: string) {
     setTranslatingIds((prev) => new Set(prev).add(msgId));
-    setTranslationErrors((prev) => {
-      const next = new Set(prev);
-      next.delete(msgId);
-      return next;
-    });
     try {
       const result = await translateConversationText({ text: content, direction: translateDir });
       setTranslations((prev) => ({ ...prev, [msgId]: result.translatedText }));
@@ -555,7 +702,7 @@ export default function ChatPage() {
     }
   }
 
-  function handleFileSelected(file: File | undefined, messageType: "file" | "media") {
+  async function handleFileSelected(file: File | undefined, messageType: "file" | "media") {
     if (!file) return;
 
     if (file.size > MAX_ATTACHMENT_SIZE) {
@@ -563,8 +710,26 @@ export default function ChatPage() {
       return;
     }
 
-    void sendMessage(`${messageType === "media" ? "[Media]" : "[File]"} ${file.name}`, messageType);
-    setAttachModal(null);
+    if (messageType === "media" && !file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      window.alert("Please choose an image or video file.");
+      return;
+    }
+
+    if (messageType === "file" && !isSupportedDocumentFile(file)) {
+      window.alert("Unsupported document type.");
+      return;
+    }
+
+    if (!activeRoomId) return;
+
+    try {
+      const savedMessage = await sendConversationAttachment(activeRoomId, file, messageType);
+      applySavedMessage(savedMessage);
+      setAttachModal(null);
+    } catch (error) {
+      console.error(error);
+      window.alert(error instanceof Error ? error.message : "Could not upload file.");
+    }
   }
 
   return (
@@ -941,9 +1106,9 @@ export default function ChatPage() {
 
       {/* Hidden file inputs */}
       <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*"
-        onChange={(e) => { handleFileSelected(e.target.files?.[0], "media"); e.target.value = ""; }} />
-      <input ref={docInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.xlsx,.ppt,.pptx"
-        onChange={(e) => { handleFileSelected(e.target.files?.[0], "file"); e.target.value = ""; }} />
+        onChange={(e) => { void handleFileSelected(e.target.files?.[0], "media"); e.target.value = ""; }} />
+      <input ref={docInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+        onChange={(e) => { void handleFileSelected(e.target.files?.[0], "file"); e.target.value = ""; }} />
     </div>
   );
 }

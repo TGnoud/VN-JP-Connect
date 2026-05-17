@@ -128,6 +128,13 @@ export interface ChatConversation {
   updatedAt: string;
 }
 
+export interface ChatAttachment {
+  url: string;
+  file_name?: string;
+  mime_type?: string;
+  size?: number;
+}
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -138,12 +145,7 @@ export interface ChatMessage {
   messageType: "text" | "file" | "media" | "voice" | "system";
   status: "sent" | "read";
   readBy: string[];
-  attachments: Array<{
-    url: string;
-    file_name?: string;
-    mime_type?: string;
-    size?: number;
-  }>;
+  attachments: ChatAttachment[];
   sentAt: string;
 }
 
@@ -404,11 +406,27 @@ export function sendConversationMessage(
     content: string;
     messageType?: "text" | "file" | "media" | "voice" | "system";
     translatedContent?: string;
+    attachments?: ChatAttachment[];
   },
 ) {
   return requestApi<ChatMessage>(`/conversations/${conversationId}/messages`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function sendConversationAttachment(
+  conversationId: string,
+  file: File,
+  messageType: "file" | "media",
+) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("messageType", messageType);
+
+  return requestApi<ChatMessage>(`/conversations/${conversationId}/attachments`, {
+    method: "POST",
+    body: formData,
   });
 }
 

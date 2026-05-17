@@ -5,7 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { randomUUID } from 'crypto';
+import { mkdir, writeFile } from 'fs/promises';
 import { Model, Types } from 'mongoose';
+import { extname, join } from 'path';
 import {
   Conversation,
   ConversationDocument,
@@ -43,10 +46,37 @@ type FavoriteFeedbackPayload = {
   value?: unknown;
 };
 
+type UploadedAttachmentFile = {
+  buffer?: Buffer;
+  mimetype: string;
+  originalname?: string;
+  size?: number;
+};
+
 const MAX_GROUP_NAME_LENGTH = 50;
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TRANSLATE_LENGTH = 500;
 const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
+const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+]);
+const ALLOWED_DOCUMENT_EXTENSIONS = new Set([
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+  '.txt',
+]);
 const FAVORITE_PROMPT_MESSAGE_COUNT = 50;
 const MESSAGE_TYPES: MessageType[] = [
   'text',
@@ -294,6 +324,99 @@ export class ConversationsService {
       status: 'sent',
       read_by: [currentObjectId],
       attachments,
+      sent_at: now,
+    });
+
+    await this.conversationModel
+      .updateOne(
+        { _id: conversation._id },
+        {
+          $set: {
+            last_message_at: now,
+            updated_at: now,
+          },
+        },
+      )
+      .exec();
+
+    return this.messageResponse(
+      message.toObject(),
+      currentObjectId,
+      conversation.participant_ids.length,
+    );
+  }
+
+  async uploadAttachment(
+    currentUserId: string,
+    conversationId: string,
+    file: UploadedAttachmentFile,
+    rawMessageType?: string,
+  ) {
+    const currentObjectId = this.objectIdFromParam(
+      currentUserId,
+      'currentUserId',
+    );
+    const conversation = await this.requireConversationAccess(
+      currentObjectId,
+      conversationId,
+    );
+
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('file is required');
+    }
+
+    const messageType = rawMessageType === 'media' ? 'media' : 'file';
+    const safeOriginalName = this.safeFileName(file.originalname || 'attachment');
+    const lowerOriginalName = safeOriginalName.toLowerCase();
+    const isMedia =
+      file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/');
+    const isSupportedDocument =
+      ALLOWED_DOCUMENT_MIME_TYPES.has(file.mimetype) ||
+      Array.from(ALLOWED_DOCUMENT_EXTENSIONS).some((extension) =>
+        lowerOriginalName.endsWith(extension),
+      );
+
+    if (messageType === 'media' && !isMedia) {
+      throw new BadRequestException('media attachments must be images or videos');
+    }
+
+    if (
+      messageType === 'file' &&
+      isMedia === false &&
+      !isSupportedDocument
+    ) {
+      throw new BadRequestException('document attachment type is not supported');
+    }
+
+    if ((file.size ?? file.buffer.length) > MAX_ATTACHMENT_SIZE) {
+      throw new BadRequestException('attachment size must be at most 25MB');
+    }
+
+    const now = new Date();
+    const extension = extname(safeOriginalName).slice(0, 12);
+    const filename = `${randomUUID()}${extension}`;
+    const uploadDir = join(process.cwd(), 'uploads', 'messages');
+
+    await mkdir(uploadDir, { recursive: true });
+    await writeFile(join(uploadDir, filename), file.buffer);
+
+    const content = `${messageType === 'media' ? '[Media]' : '[File]'} ${safeOriginalName}`;
+    const attachment = {
+      url: `/uploads/messages/${filename}`,
+      file_name: safeOriginalName,
+      mime_type: file.mimetype,
+      size: file.size ?? file.buffer.length,
+    };
+
+    const message = await this.messageModel.create({
+      conversation_id: conversation._id,
+      sender_id: currentObjectId,
+      content,
+      translated_content: '',
+      message_type: messageType,
+      status: 'sent',
+      read_by: [currentObjectId],
+      attachments: [attachment],
       sent_at: now,
     });
 
@@ -869,6 +992,13 @@ export class ConversationsService {
     }
 
     return trimmed;
+  }
+
+  private safeFileName(value: string) {
+    const trimmed = value.trim().replace(/[\\/:*?"<>|]+/g, '_');
+    const compact = trimmed.replace(/\s+/g, ' ');
+
+    return compact.slice(0, 255) || 'attachment';
   }
 
   private optionalMessageType(value: unknown): MessageType {
