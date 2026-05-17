@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
-import { hashPassword } from '../password';
 import {
   PasswordResetOtp,
   PasswordResetOtpDocument,
@@ -17,6 +16,7 @@ import {
   User,
   UserDocument,
 } from '../../database/schemas';
+import { hashPassword } from '../password';
 import {
   FALLBACK_DEV_PEPPER,
   OTP_TTL_MS,
@@ -58,40 +58,47 @@ export class PasswordResetService implements OnModuleInit {
 
   onModuleInit() {
     const pepper = process.env.PASSWORD_RESET_SECRET?.trim();
+
     if (
       process.env.NODE_ENV === 'production' &&
       (!pepper || pepper.length < 32)
     ) {
-      throw new Error(
-        'PASSWORD_RESET_SECRET must be set to a strong secret (≥32 chars) in production.',
+      this.logger.error(
+        'PASSWORD_RESET_SECRET is missing or too short in production. Password reset endpoints will return 503 until a 32+ character secret is configured.',
       );
+      return;
     }
 
     if (!pepper || pepper.length < 32) {
       this.logger.warn(
-        `PASSWORD_RESET_SECRET is weak or unset — falling back to dev pepper "${FALLBACK_DEV_PEPPER}".`,
+        `PASSWORD_RESET_SECRET is weak or unset - falling back to dev pepper "${FALLBACK_DEV_PEPPER}".`,
       );
     }
 
     if (passwordResetUsesLogOnlyMail()) {
       this.logger.warn(
-        'PASSWORD_RESET_MAIL_MODE=log — OTPs are printed to this console (no outbound email).',
+        'PASSWORD_RESET_MAIL_MODE=log - OTPs are printed to this console (no outbound email).',
       );
     }
   }
 
   private pepper(): string {
-    const p = process.env.PASSWORD_RESET_SECRET?.trim();
-    if (!p || p.length < 32) {
+    const value = process.env.PASSWORD_RESET_SECRET?.trim();
+
+    if (!value || value.length < 32) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new HttpException(
+          PasswordResetMessages.passwordResetNotConfigured,
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
+
       return FALLBACK_DEV_PEPPER;
     }
-    return p;
+
+    return value;
   }
 
-  /**
-   * Acknowledge generically even for unknown inboxes; only real accounts receive OTP + mail.
-   * (Per product choice: no server-side send throttle — easier QA on /forgot-password.)
-   */
   async sendOtp(input: SendOtpBody) {
     const now = Date.now();
     let otpCreated = false;
@@ -116,6 +123,7 @@ export class PasswordResetService implements OnModuleInit {
 
       const otp = generateNumericOtp();
       const otpHashValue = hashOtp(this.pepper(), input.email, otp);
+
       await this.otpModel.create({
         email: input.email,
         otp_hash: otpHashValue,
@@ -178,8 +186,11 @@ export class PasswordResetService implements OnModuleInit {
     }
 
     const plaintextToken = generateResetToken();
-    const tokenDigest = hashResetToken(this.pepper(), input.email, plaintextToken);
-
+    const tokenDigest = hashResetToken(
+      this.pepper(),
+      input.email,
+      plaintextToken,
+    );
     const sessionExpiry = new Date(Date.now() + RESET_SESSION_TTL_MS);
 
     await Promise.all([
@@ -201,7 +212,11 @@ export class PasswordResetService implements OnModuleInit {
   }
 
   async completeReset(input: CompleteResetBody) {
-    const hashedIncoming = hashResetToken(this.pepper(), input.email, input.resetToken);
+    const hashedIncoming = hashResetToken(
+      this.pepper(),
+      input.email,
+      input.resetToken,
+    );
 
     const session = await this.resetSessionModel
       .findOne({
@@ -212,12 +227,16 @@ export class PasswordResetService implements OnModuleInit {
       .exec();
 
     if (!session || !safeEqualHex(session.token_hash, hashedIncoming)) {
-      throw new BadRequestException(PasswordResetMessages.invalidOrExpiredResetSession);
+      throw new BadRequestException(
+        PasswordResetMessages.invalidOrExpiredResetSession,
+      );
     }
 
     const user = await this.userModel.findOne({ email: input.email }).exec();
     if (!user) {
-      throw new BadRequestException(PasswordResetMessages.invalidOrExpiredResetSession);
+      throw new BadRequestException(
+        PasswordResetMessages.invalidOrExpiredResetSession,
+      );
     }
 
     await this.resetSessionModel.deleteOne({ _id: session._id }).exec();

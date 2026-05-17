@@ -20,6 +20,8 @@ export const PasswordResetMessages = {
     '確認コードの有効期限が切れました。コードを再送して再度お試しください。',
   mailSendFailedTryLater:
     'メール送信に失敗しました。時間をおいて再度お試しください。',
+  passwordResetNotConfigured:
+    'Password reset is currently unavailable.',
   invalidOrExpiredResetSession:
     'セッションが無効か有効期限切れです。最初からやり直してください。',
   passwordComplexity:
