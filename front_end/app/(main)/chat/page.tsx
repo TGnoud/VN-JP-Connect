@@ -234,6 +234,39 @@ function isVideoAttachment(attachment: ChatAttachment) {
   return (attachment.mime_type ?? "").startsWith("video/");
 }
 
+function isAudioAttachment(attachment: ChatAttachment) {
+  return (attachment.mime_type ?? "").startsWith("audio/");
+}
+
+function getSupportedAudioMimeType() {
+  if (typeof MediaRecorder === "undefined") return "";
+
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+  ];
+
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+}
+
+function audioExtensionFromMimeType(mimeType: string) {
+  if (mimeType.includes("webm")) return "webm";
+  if (mimeType.includes("mp4")) return "m4a";
+  if (mimeType.includes("ogg") || mimeType.includes("opus")) return "ogg";
+  if (mimeType.includes("wav")) return "wav";
+  if (mimeType.includes("mpeg")) return "mp3";
+  return "webm";
+}
+
+function formatVoiceDuration(seconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 function isSupportedDocumentFile(file: File) {
   const lowerName = file.name.toLowerCase();
   return (
@@ -372,6 +405,20 @@ function AttachmentPreview({ attachment, isMe }: { attachment: ChatAttachment; i
     );
   }
 
+  if (isAudioAttachment(attachment)) {
+    return (
+      <div className={clsx("overflow-hidden rounded-xl p-2", isMe ? "bg-white/10" : "bg-gray-50")}>
+        <audio src={url} controls className="h-10 w-64 max-w-full" preload="metadata" />
+        <button
+          onClick={() => void downloadAttachment(attachment)}
+          className={clsx("mt-1 w-full px-1 text-left text-xs font-semibold transition-colors", isMe ? "text-white/80 hover:text-white" : "text-gray-500 hover:text-gray-700")}
+        >
+          ãƒ€ã‚¦ãƒ³ãƒ­ãƒ¼ãƒ‰{size ? ` Â· ${size}` : ""}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <button
       onClick={() => void downloadAttachment(attachment)}
@@ -492,6 +539,8 @@ export default function ChatPage() {
   const [translateInput, setTranslateInput] = useState("");
   const [translateDir, setTranslateDir] = useState<"ja-vi" | "vi-ja">("ja-vi");
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [isVoiceSending, setIsVoiceSending] = useState(false);
   const [search, setSearch] = useState("");
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
@@ -505,12 +554,43 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingStartedAtRef = useRef(0);
+  const recordingConversationIdRef = useRef("");
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId) ?? rooms[0] ?? EMPTY_ROOM;
   const roomMessages = messages[activeRoomId] ?? [];
   const filteredRooms = search
     ? rooms.filter((r) => r.name.includes(search) || r.lastMsg.includes(search))
     : rooms;
+
+  function clearRecordingTimer() {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }
+
+  function releaseVoiceStream() {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+  }
+
+  useEffect(() => {
+    return () => {
+      clearRecordingTimer();
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.onstop = null;
+        recorder.stop();
+      }
+      mediaRecorderRef.current = null;
+      releaseVoiceStream();
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -578,17 +658,19 @@ export default function ChatPage() {
     };
   }, [activeRoomId]);
 
-  function applySavedMessage(savedMessage: ChatMessage) {
+  function applySavedMessage(savedMessage: ChatMessage, conversationId = activeRoomId) {
+    if (!conversationId) return;
+
     const newMsg = mapMessage(savedMessage);
 
     setMessages((prev) => ({
       ...prev,
-      [activeRoomId]: [...(prev[activeRoomId] ?? []), newMsg],
+      [conversationId]: [...(prev[conversationId] ?? []), newMsg],
     }));
     setRooms((prev) =>
       prev
         .map((room) =>
-          room.id === activeRoomId
+          room.id === conversationId
             ? {
                 ...room,
                 lastMsg: savedMessage.content,
@@ -598,12 +680,14 @@ export default function ChatPage() {
             : room,
         )
         .sort((a, b) => {
-          if (a.id === activeRoomId) return -1;
-          if (b.id === activeRoomId) return 1;
+          if (a.id === conversationId) return -1;
+          if (b.id === conversationId) return 1;
           return new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
         }),
     );
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    if (conversationId === activeRoomId) {
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    }
   }
 
   async function sendMessage(content: string, messageType: "text" | "file" | "media" | "voice" = "text") {
@@ -621,11 +705,158 @@ export default function ChatPage() {
     }
   }
 
+  async function uploadVoiceBlob(
+    blob: Blob,
+    mimeType: string,
+    conversationId: string,
+  ) {
+    if (!conversationId || blob.size === 0) return;
+
+    if (blob.size > MAX_ATTACHMENT_SIZE) {
+      window.alert("File too large. Max size is 25MB.");
+      return;
+    }
+
+    const normalizedMimeType = mimeType || "audio/webm";
+    const file = new File(
+      [blob],
+      `voice-${Date.now()}.${audioExtensionFromMimeType(normalizedMimeType)}`,
+      { type: normalizedMimeType },
+    );
+
+    setIsVoiceSending(true);
+    try {
+      const savedMessage = await sendConversationAttachment(conversationId, file, "voice");
+      applySavedMessage(savedMessage, conversationId);
+      setOpenTool(null);
+    } catch (error) {
+      console.error(error);
+      window.alert(error instanceof Error ? error.message : "Could not send voice message.");
+    } finally {
+      setIsVoiceSending(false);
+    }
+  }
+
+  async function startVoiceRecording() {
+    if (!activeRoomId || isRecording || isVoiceSending) return;
+
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === "undefined"
+    ) {
+      window.alert("Voice recording is not supported in this browser.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = getSupportedAudioMimeType();
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
+      audioChunksRef.current = [];
+      recordingConversationIdRef.current = activeRoomId;
+      mediaRecorderRef.current = recorder;
+      mediaStreamRef.current = stream;
+      recordingStartedAtRef.current = Date.now();
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        clearRecordingTimer();
+        releaseVoiceStream();
+        mediaRecorderRef.current = null;
+        audioChunksRef.current = [];
+        setIsRecording(false);
+        setRecordingSeconds(0);
+        window.alert("Could not record voice message.");
+      };
+
+      recorder.onstop = () => {
+        const chunks = audioChunksRef.current;
+        const conversationId = recordingConversationIdRef.current;
+        const resolvedMimeType = recorder.mimeType || mimeType || chunks[0]?.type || "audio/webm";
+        const blob = new Blob(chunks, { type: resolvedMimeType });
+
+        clearRecordingTimer();
+        releaseVoiceStream();
+        mediaRecorderRef.current = null;
+        audioChunksRef.current = [];
+        recordingConversationIdRef.current = "";
+        setIsRecording(false);
+        setRecordingSeconds(0);
+
+        void uploadVoiceBlob(blob, resolvedMimeType, conversationId);
+      };
+
+      recorder.start();
+      setRecordingSeconds(0);
+      setIsRecording(true);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds(
+          Math.floor((Date.now() - recordingStartedAtRef.current) / 1000),
+        );
+      }, 250);
+    } catch (error) {
+      console.error(error);
+      clearRecordingTimer();
+      releaseVoiceStream();
+      mediaRecorderRef.current = null;
+      setIsRecording(false);
+      setRecordingSeconds(0);
+      window.alert("Could not access microphone.");
+    }
+  }
+
+  function handleVoiceRecorderClick() {
+    if (isVoiceSending) return;
+
+    const recorder = mediaRecorderRef.current;
+    if (isRecording) {
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+      return;
+    }
+
+    void startVoiceRecording();
+  }
+
+  function cancelVoiceRecording() {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.onstop = null;
+      recorder.stop();
+    }
+    clearRecordingTimer();
+    releaseVoiceStream();
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    recordingConversationIdRef.current = "";
+    setIsRecording(false);
+    setRecordingSeconds(0);
+    setOpenTool(null);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(inputText); }
   }
 
   function toggleTool(tool: Exclude<ToolPanel, null>) {
+    if (openTool === "voice" && isRecording) {
+      cancelVoiceRecording();
+      if (tool !== "voice") {
+        setOpenTool(tool);
+      }
+      return;
+    }
+
     setOpenTool((prev) => (prev === tool ? null : tool));
   }
 
@@ -856,20 +1087,22 @@ export default function ChatPage() {
 
           {openTool === "voice" && (
             <div className="absolute bottom-full left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-10 px-5 py-4">
-              <PanelHeader title="ボイスメッセージ" onClose={() => { setOpenTool(null); setIsRecording(false); }} />
+              <PanelHeader title="ボイスメッセージ" onClose={cancelVoiceRecording} />
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => {
-                    if (isRecording) { setIsRecording(false); void sendMessage("Voice message (0:05)", "voice"); setOpenTool(null); }
-                    else { setIsRecording(true); }
-                  }}
-                  className={clsx("w-12 h-12 rounded-full flex items-center justify-center shrink-0", isRecording && "animate-pulse")}
+                  onClick={handleVoiceRecorderClick}
+                  disabled={isVoiceSending}
+                  className={clsx("w-12 h-12 rounded-full flex items-center justify-center shrink-0", isRecording && "animate-pulse", isVoiceSending && "opacity-60")}
                   style={{ backgroundColor: "#1B4332" }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="size-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>
                 </button>
                 <span className={clsx("text-sm", isRecording ? "text-red-500 font-medium" : "text-gray-500")}>
-                  {isRecording ? "録音中... タップして送信" : "タップして録音を開始"}
+                  {isVoiceSending
+                    ? "Sending..."
+                    : isRecording
+                      ? `Recording... ${formatVoiceDuration(recordingSeconds)}`
+                      : "Tap to record"}
                 </span>
               </div>
             </div>

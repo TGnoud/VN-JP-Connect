@@ -77,6 +77,16 @@ const ALLOWED_DOCUMENT_EXTENSIONS = new Set([
   '.pptx',
   '.txt',
 ]);
+const ALLOWED_AUDIO_EXTENSIONS = new Set([
+  '.aac',
+  '.m4a',
+  '.mp3',
+  '.oga',
+  '.ogg',
+  '.opus',
+  '.wav',
+  '.webm',
+]);
 const FAVORITE_PROMPT_MESSAGE_COUNT = 50;
 const MESSAGE_TYPES: MessageType[] = [
   'text',
@@ -365,11 +375,21 @@ export class ConversationsService {
       throw new BadRequestException('file is required');
     }
 
-    const messageType = rawMessageType === 'media' ? 'media' : 'file';
+    const messageType =
+      rawMessageType === 'media'
+        ? 'media'
+        : rawMessageType === 'voice'
+          ? 'voice'
+          : 'file';
     const safeOriginalName = this.safeFileName(file.originalname || 'attachment');
     const lowerOriginalName = safeOriginalName.toLowerCase();
     const isMedia =
       file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/');
+    const isAudio =
+      file.mimetype.startsWith('audio/') ||
+      Array.from(ALLOWED_AUDIO_EXTENSIONS).some((extension) =>
+        lowerOriginalName.endsWith(extension),
+      );
     const isSupportedDocument =
       ALLOWED_DOCUMENT_MIME_TYPES.has(file.mimetype) ||
       Array.from(ALLOWED_DOCUMENT_EXTENSIONS).some((extension) =>
@@ -378,6 +398,10 @@ export class ConversationsService {
 
     if (messageType === 'media' && !isMedia) {
       throw new BadRequestException('media attachments must be images or videos');
+    }
+
+    if (messageType === 'voice' && !isAudio) {
+      throw new BadRequestException('voice attachments must be audio files');
     }
 
     if (
@@ -400,7 +424,13 @@ export class ConversationsService {
     await mkdir(uploadDir, { recursive: true });
     await writeFile(join(uploadDir, filename), file.buffer);
 
-    const content = `${messageType === 'media' ? '[Media]' : '[File]'} ${safeOriginalName}`;
+    const content = `${
+      messageType === 'media'
+        ? '[Media]'
+        : messageType === 'voice'
+          ? '[Voice]'
+          : '[File]'
+    } ${safeOriginalName}`;
     const attachment = {
       url: `/uploads/messages/${filename}`,
       file_name: safeOriginalName,

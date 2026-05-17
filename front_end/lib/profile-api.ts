@@ -418,7 +418,7 @@ export function sendConversationMessage(
 export function sendConversationAttachment(
   conversationId: string,
   file: File,
-  messageType: "file" | "media",
+  messageType: "file" | "media" | "voice",
 ) {
   const formData = new FormData();
   formData.append("file", file);
