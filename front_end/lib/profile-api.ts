@@ -102,6 +102,65 @@ export interface ConversationResponse {
   };
 }
 
+export interface ChatParticipant {
+  id: string;
+  fullName: string;
+  nationality: "JP" | "VN";
+  avatarUrl: string;
+  location: string;
+  level: string;
+}
+
+export interface ChatConversation {
+  id: string;
+  type: "direct" | "group";
+  matchId: string | null;
+  partnerId: string | null;
+  name: string;
+  location: string;
+  level: string;
+  avatar: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+  participants: ChatParticipant[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderUserId: string;
+  senderId: "me" | "partner";
+  content: string;
+  translatedContent: string;
+  messageType: "text" | "file" | "media" | "voice" | "system";
+  status: "sent" | "read";
+  readBy: string[];
+  attachments: Array<{
+    url: string;
+    file_name?: string;
+    mime_type?: string;
+    size?: number;
+  }>;
+  sentAt: string;
+}
+
+export interface ChatMessagesResponse {
+  messages: ChatMessage[];
+  totalCount: number;
+  requiresFavoritePrompt: boolean;
+}
+
+export interface MatchedConversationUser {
+  id: string;
+  fullName: string;
+  nationality: "JP" | "VN";
+  avatarUrl: string;
+  location: string;
+}
+
 export interface HomeFilterOptions {
   genders: Array<"male" | "female" | "other">;
   nationalities: Array<"JP" | "VN">;
@@ -318,6 +377,82 @@ export function openConversationWithUser(userId: string) {
   return requestApi<ConversationResponse>(`/conversations/with/${userId}`, {
     method: "POST",
   });
+}
+
+export function getConversations(search = "") {
+  const params = new URLSearchParams();
+
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+
+  const queryString = params.toString();
+  return requestApi<ChatConversation[]>(
+    queryString ? `/conversations?${queryString}` : "/conversations",
+  );
+}
+
+export function getConversationMessages(conversationId: string) {
+  return requestApi<ChatMessagesResponse>(
+    `/conversations/${conversationId}/messages?limit=100`,
+  );
+}
+
+export function sendConversationMessage(
+  conversationId: string,
+  payload: {
+    content: string;
+    messageType?: "text" | "file" | "media" | "voice" | "system";
+    translatedContent?: string;
+  },
+) {
+  return requestApi<ChatMessage>(`/conversations/${conversationId}/messages`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function markConversationRead(conversationId: string) {
+  return requestApi<{ unreadCount: number }>(`/conversations/${conversationId}/read`, {
+    method: "POST",
+  });
+}
+
+export function translateConversationText(payload: {
+  text: string;
+  direction: "ja-vi" | "vi-ja";
+}) {
+  return requestApi<{ direction: "ja-vi" | "vi-ja"; translatedText: string }>(
+    "/conversations/translate",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function getMatchedConversationUsers() {
+  return requestApi<MatchedConversationUser[]>("/conversations/matched-users");
+}
+
+export function createGroupConversation(payload: { name: string; memberIds: string[] }) {
+  return requestApi<ChatConversation>("/conversations/groups", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function submitConversationFavoriteFeedback(
+  conversationId: string,
+  value: "liked" | "skipped",
+) {
+  return requestApi<{ conversationId: string; targetUserId: string; value: string }>(
+    `/conversations/${conversationId}/favorite-feedback`,
+    {
+      method: "POST",
+      body: JSON.stringify({ value }),
+    },
+  );
 }
 
 export function getProfileOptions() {

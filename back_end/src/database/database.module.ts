@@ -4,6 +4,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { resolveMongoConfig } from './database.config';
 import {
   Conversation,
+  ConversationFeedback,
+  ConversationFeedbackSchema,
   ConversationSchema,
   Event,
   EventParticipant,
@@ -27,9 +29,7 @@ import {
 
 const mongoConfig = resolveMongoConfig();
 
-console.log(
-  `MongoDB target: ${mongoConfig.target} (${mongoConfig.dbName})`,
-);
+console.log(`MongoDB target: ${mongoConfig.target} (${mongoConfig.dbName})`);
 
 @Module({
   imports: [
@@ -40,6 +40,7 @@ console.log(
       { name: UserInterest.name, schema: UserInterestSchema },
       { name: Match.name, schema: MatchSchema },
       { name: Conversation.name, schema: ConversationSchema },
+      { name: ConversationFeedback.name, schema: ConversationFeedbackSchema },
       { name: Message.name, schema: MessageSchema },
       { name: Profile.name, schema: ProfileSchema },
       { name: UserReport.name, schema: UserReportSchema },

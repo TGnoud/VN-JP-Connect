@@ -4,6 +4,16 @@ import { HydratedDocument, Types } from 'mongoose';
 export const NATIONALITIES = ['JP', 'VN'] as const;
 export const TAG_TYPES = ['interest', 'purpose'] as const;
 export const MATCH_STATUSES = ['pending', 'accepted', 'rejected'] as const;
+export const CONVERSATION_TYPES = ['direct', 'group'] as const;
+export const MESSAGE_TYPES = [
+  'text',
+  'file',
+  'media',
+  'voice',
+  'system',
+] as const;
+export const MESSAGE_STATUSES = ['sent', 'read'] as const;
+export const CONVERSATION_FEEDBACK_VALUES = ['liked', 'skipped'] as const;
 export const PROFILE_GENDERS = ['male', 'female', 'other'] as const;
 export const USER_REPORT_REASONS = [
   'spam',
@@ -12,11 +22,20 @@ export const USER_REPORT_REASONS = [
   'fake_profile',
   'other',
 ] as const;
-export const USER_REPORT_STATUSES = ['pending', 'reviewed', 'dismissed'] as const;
+export const USER_REPORT_STATUSES = [
+  'pending',
+  'reviewed',
+  'dismissed',
+] as const;
 
 export type Nationality = (typeof NATIONALITIES)[number];
 export type TagType = (typeof TAG_TYPES)[number];
 export type MatchStatus = (typeof MATCH_STATUSES)[number];
+export type ConversationType = (typeof CONVERSATION_TYPES)[number];
+export type MessageType = (typeof MESSAGE_TYPES)[number];
+export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
+export type ConversationFeedbackValue =
+  (typeof CONVERSATION_FEEDBACK_VALUES)[number];
 export type ProfileGender = (typeof PROFILE_GENDERS)[number];
 export type UserReportReason = (typeof USER_REPORT_REASONS)[number];
 export type UserReportStatus = (typeof USER_REPORT_STATUSES)[number];
@@ -27,6 +46,8 @@ export type UserInterestDocument = HydratedDocument<UserInterest>;
 export type MatchDocument = HydratedDocument<Match>;
 export type ConversationDocument = HydratedDocument<Conversation>;
 export type MessageDocument = HydratedDocument<Message>;
+export type ConversationFeedbackDocument =
+  HydratedDocument<ConversationFeedback>;
 export type EventDocument = HydratedDocument<Event>;
 export type EventParticipantDocument = HydratedDocument<EventParticipant>;
 export type ProfileDocument = HydratedDocument<Profile>;
@@ -88,7 +109,11 @@ export class LanguageSkill {
 }
 
 export class ProfilePhoto {
-  @Prop({ required: true, type: Types.ObjectId, default: () => new Types.ObjectId() })
+  @Prop({
+    required: true,
+    type: Types.ObjectId,
+    default: () => new Types.ObjectId(),
+  })
   _id: Types.ObjectId;
 
   @Prop({ required: true, trim: true })
@@ -153,7 +178,10 @@ export class Profile {
 }
 
 export const ProfileSchema = SchemaFactory.createForClass(Profile);
-ProfileSchema.index({ user_id: 1 }, { unique: true, name: 'profiles_user_id_unique' });
+ProfileSchema.index(
+  { user_id: 1 },
+  { unique: true, name: 'profiles_user_id_unique' },
+);
 
 @Schema({ collection: 'tags', versionKey: false })
 export class Tag {
@@ -165,7 +193,10 @@ export class Tag {
 }
 
 export const TagSchema = SchemaFactory.createForClass(Tag);
-TagSchema.index({ name: 1, type: 1 }, { unique: true, name: 'tags_name_type_unique' });
+TagSchema.index(
+  { name: 1, type: 1 },
+  { unique: true, name: 'tags_name_type_unique' },
+);
 
 @Schema({ collection: 'user_interests', versionKey: false })
 export class UserInterest {
@@ -191,7 +222,12 @@ export class Match {
   @Prop({ required: true, type: Types.ObjectId, ref: User.name })
   receiver_id: Types.ObjectId;
 
-  @Prop({ required: true, type: String, enum: MATCH_STATUSES, default: 'pending' })
+  @Prop({
+    required: true,
+    type: String,
+    enum: MATCH_STATUSES,
+    default: 'pending',
+  })
   status: MatchStatus;
 
   @Prop({ required: true, default: Date.now })
@@ -207,18 +243,63 @@ MatchSchema.index({ receiver_id: 1 }, { name: 'matches_receiver_id_idx' });
 
 @Schema({ collection: 'conversations', versionKey: false })
 export class Conversation {
-  @Prop({ required: true, type: Types.ObjectId, ref: Match.name })
-  match_id: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: Match.name })
+  match_id?: Types.ObjectId;
+
+  @Prop({
+    required: true,
+    type: String,
+    enum: CONVERSATION_TYPES,
+    default: 'direct',
+  })
+  type: ConversationType;
+
+  @Prop({ trim: true, maxlength: 50, default: '' })
+  title: string;
+
+  @Prop({ type: Types.ObjectId, ref: User.name })
+  created_by?: Types.ObjectId;
+
+  @Prop({ required: true, type: [Types.ObjectId], ref: User.name, default: [] })
+  participant_ids: Types.ObjectId[];
 
   @Prop({ required: true, default: Date.now })
   created_at: Date;
+
+  @Prop({ required: true, default: Date.now })
+  updated_at: Date;
+
+  @Prop({ default: Date.now })
+  last_message_at?: Date;
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
 ConversationSchema.index(
   { match_id: 1 },
-  { unique: true, name: 'conversations_match_id_unique' },
+  {
+    unique: true,
+    name: 'conversations_match_id_unique',
+    partialFilterExpression: { match_id: { $type: 'objectId' } },
+  },
 );
+ConversationSchema.index(
+  { participant_ids: 1, last_message_at: -1 },
+  { name: 'conversations_participant_last_message_idx' },
+);
+
+export class MessageAttachment {
+  @Prop({ required: true, trim: true })
+  url: string;
+
+  @Prop({ trim: true, default: '' })
+  file_name?: string;
+
+  @Prop({ trim: true, default: '' })
+  mime_type?: string;
+
+  @Prop({ min: 0, default: 0 })
+  size?: number;
+}
 
 @Schema({ collection: 'messages', versionKey: false })
 export class Message {
@@ -231,8 +312,25 @@ export class Message {
   @Prop({ required: true })
   content: string;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
   translated_content: string;
+
+  @Prop({ required: true, type: String, enum: MESSAGE_TYPES, default: 'text' })
+  message_type: MessageType;
+
+  @Prop({
+    required: true,
+    type: String,
+    enum: MESSAGE_STATUSES,
+    default: 'sent',
+  })
+  status: MessageStatus;
+
+  @Prop({ type: [Types.ObjectId], ref: User.name, default: [] })
+  read_by: Types.ObjectId[];
+
+  @Prop({ type: [MessageAttachment], default: [] })
+  attachments: MessageAttachment[];
 
   @Prop({ required: true, default: Date.now })
   sent_at: Date;
@@ -244,6 +342,39 @@ MessageSchema.index(
   { name: 'messages_conversation_sent_at_idx' },
 );
 MessageSchema.index({ sender_id: 1 }, { name: 'messages_sender_id_idx' });
+MessageSchema.index(
+  { conversation_id: 1, sender_id: 1, read_by: 1 },
+  { name: 'messages_unread_lookup_idx' },
+);
+
+@Schema({ collection: 'conversation_feedbacks', versionKey: false })
+export class ConversationFeedback {
+  @Prop({ required: true, type: Types.ObjectId, ref: Conversation.name })
+  conversation_id: Types.ObjectId;
+
+  @Prop({ required: true, type: Types.ObjectId, ref: User.name })
+  reviewer_id: Types.ObjectId;
+
+  @Prop({ required: true, type: Types.ObjectId, ref: User.name })
+  target_user_id: Types.ObjectId;
+
+  @Prop({ required: true, type: String, enum: CONVERSATION_FEEDBACK_VALUES })
+  value: ConversationFeedbackValue;
+
+  @Prop({ required: true, default: Date.now })
+  created_at: Date;
+}
+
+export const ConversationFeedbackSchema =
+  SchemaFactory.createForClass(ConversationFeedback);
+ConversationFeedbackSchema.index(
+  { conversation_id: 1, reviewer_id: 1 },
+  { unique: true, name: 'conversation_feedbacks_conversation_reviewer_unique' },
+);
+ConversationFeedbackSchema.index(
+  { target_user_id: 1, value: 1 },
+  { name: 'conversation_feedbacks_target_value_idx' },
+);
 
 export class UserReportEvidence {
   @Prop({ required: true, trim: true })
@@ -279,7 +410,12 @@ export class UserReport {
   @Prop({ type: [UserReportEvidence], default: [] })
   evidence_files: UserReportEvidence[];
 
-  @Prop({ required: true, type: String, enum: USER_REPORT_STATUSES, default: 'pending' })
+  @Prop({
+    required: true,
+    type: String,
+    enum: USER_REPORT_STATUSES,
+    default: 'pending',
+  })
   status: UserReportStatus;
 
   @Prop({ required: true, default: Date.now })
@@ -291,7 +427,10 @@ UserReportSchema.index(
   { reporter_id: 1, reported_user_id: 1, created_at: -1 },
   { name: 'user_reports_reporter_reported_created_idx' },
 );
-UserReportSchema.index({ reported_user_id: 1, status: 1 }, { name: 'user_reports_reported_status_idx' });
+UserReportSchema.index(
+  { reported_user_id: 1, status: 1 },
+  { name: 'user_reports_reported_status_idx' },
+);
 
 @Schema({ collection: 'events', versionKey: false })
 export class Event {
@@ -324,7 +463,8 @@ export class EventParticipant {
   joined_at: Date;
 }
 
-export const EventParticipantSchema = SchemaFactory.createForClass(EventParticipant);
+export const EventParticipantSchema =
+  SchemaFactory.createForClass(EventParticipant);
 EventParticipantSchema.index(
   { event_id: 1, user_id: 1 },
   { unique: true, name: 'event_participants_event_user_unique' },
