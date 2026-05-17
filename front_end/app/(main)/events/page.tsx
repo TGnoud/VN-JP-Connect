@@ -338,7 +338,7 @@ function EventDetail({
         </div>
       </div>
 
-      <div className="p-6 flex flex-col gap-5">
+      <div className="p-6 flex flex-col gap-4 max-w-2xl mx-auto w-full">
         {/* Action buttons */}
         <div className="flex gap-3">
           <button
@@ -370,39 +370,46 @@ function EventDetail({
         {/* Date & Location */}
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white rounded-2xl border border-gray-100 p-4">
-            <div className="flex items-center gap-2 text-gray-400 text-xs font-medium mb-3">
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-              </svg>
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-3">
+              <span className="flex size-7 items-center justify-center rounded-lg shrink-0" style={{ backgroundColor: "#d1fae5" }}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="#1B4332" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                </svg>
+              </span>
               日時
             </div>
-            <p className="text-sm font-semibold text-gray-800">
-              {event.date}（{event.weekday}）
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              ⏰ {event.startTime} - {event.endTime}
-            </p>
+            <p className="text-sm font-bold text-gray-900">{event.date}（{event.weekday}）</p>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-gray-500">{event.startTime} - {event.endTime}</p>
+            </div>
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 p-4">
-            <div className="flex items-center gap-2 text-gray-400 text-xs font-medium mb-3">
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-              </svg>
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-3">
+              <span className="flex size-7 items-center justify-center rounded-lg shrink-0" style={{ backgroundColor: "#d1fae5" }}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="#1B4332" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
+              </span>
               場所
             </div>
-            <p className="text-sm font-semibold text-gray-800">{event.venue}</p>
-            <p className="text-xs text-gray-500 mt-1">{event.address}</p>
+            <p className="text-sm font-bold text-gray-900">{event.venue}</p>
+            <p className="text-xs text-gray-500 mt-1.5">{event.address}</p>
           </div>
         </div>
 
         {/* Participants */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-              </svg>
+            <div className="flex items-center gap-2 font-semibold text-sm text-gray-700">
+              <span className="flex size-7 items-center justify-center rounded-lg shrink-0" style={{ backgroundColor: "#d1fae5" }}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="#1B4332" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                </svg>
+              </span>
               参加者
             </div>
             <span className="text-xs font-semibold text-gray-400">残り{spotsLeft}枚</span>
@@ -431,23 +438,20 @@ function EventDetail({
               {event.currentParticipants}/{event.maxParticipants} 参加中
             </span>
           </div>
-          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{ width: `${progressPct}%`, backgroundColor: "#1B4332" }}
-            />
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all" style={{ width: `${progressPct}%`, backgroundColor: "#1B4332" }} />
           </div>
         </div>
 
         {/* About */}
-        <div>
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <h4 className="font-bold text-gray-900 text-sm mb-2">イベントについて</h4>
           <p className="text-sm text-gray-500 leading-relaxed">{event.about}</p>
         </div>
 
         {/* Expectations */}
         {event.expectations.length > 0 && (
-          <div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <h4 className="font-bold text-gray-900 text-sm mb-3">期待できること</h4>
             <div className="flex flex-col gap-2.5">
               {event.expectations.map((item, i) => (
@@ -480,6 +484,7 @@ export default function EventsPage() {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("すべて");
   const [showFilterChips, setShowFilterChips] = useState(false);
+  const [showDetail, setShowDetail] = useState(true);
 
   const selectedEvent = events.find((e) => e.id === selectedId) ?? events[0];
   const filteredEvents = events.filter((e) => {
@@ -514,12 +519,16 @@ export default function EventsPage() {
   return (
     <div className="flex overflow-hidden" style={{ height: "100vh" }}>
       {/* Left panel */}
-      <div className="w-[380px] shrink-0 flex flex-col border-r border-gray-100 bg-white overflow-hidden">
+      <div
+        className="flex flex-col border-r border-gray-100 bg-white overflow-hidden shrink-0 transition-all duration-300"
+        style={{ width: showDetail ? 380 : "100%" }}
+      >
         {/* Header */}
         <div className="px-5 pt-5 pb-4 flex items-center justify-between shrink-0">
           <h1 className="text-lg font-bold text-gray-900">イベント</h1>
-          <button
-            onClick={() => setShowFilterChips((v) => !v)}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilterChips((v) => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors"
             style={
               showFilterChips
@@ -532,6 +541,7 @@ export default function EventsPage() {
             </svg>
             フィルター
           </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -573,7 +583,7 @@ export default function EventsPage() {
         )}
 
         {/* List */}
-        <div className="flex-1 overflow-y-auto px-5 pb-5 flex flex-col gap-3">
+        <div className={`flex-1 overflow-y-auto px-5 pb-5 gap-4 ${showDetail ? "flex flex-col" : "grid grid-cols-2 xl:grid-cols-3 auto-rows-min"}`}>
           {filteredEvents.length === 0 ? (
             <div className="py-16 text-center text-gray-400 text-sm">
               イベントが見つかりません
@@ -583,8 +593,15 @@ export default function EventsPage() {
               <EventListCard
                 key={event.id}
                 event={event}
-                isSelected={event.id === selectedId}
-                onSelect={() => setSelectedId(event.id)}
+                isSelected={event.id === selectedId && showDetail}
+                onSelect={() => {
+                  if (event.id === selectedId) {
+                    setShowDetail((v) => !v);
+                  } else {
+                    setSelectedId(event.id);
+                    setShowDetail(true);
+                  }
+                }}
                 onToggleBookmark={handleToggleBookmark}
               />
             ))
@@ -593,15 +610,17 @@ export default function EventsPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 bg-gray-50 overflow-hidden">
-        {selectedEvent && (
-          <EventDetail
-            event={selectedEvent}
-            onToggleJoin={handleToggleJoin}
-            onToggleBookmark={handleToggleBookmark}
-          />
-        )}
-      </div>
+      {showDetail && (
+        <div className="flex-1 bg-gray-50 overflow-hidden relative">
+          {selectedEvent && (
+            <EventDetail
+              event={selectedEvent}
+              onToggleJoin={handleToggleJoin}
+              onToggleBookmark={handleToggleBookmark}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
