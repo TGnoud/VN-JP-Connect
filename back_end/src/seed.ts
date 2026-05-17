@@ -452,7 +452,7 @@ async function seedMessages(
   );
 }
 
-async function seedEvent(db: Db, organizerId: ObjectId) {
+async function seedEvent(db: Db, organizerId: ObjectId, now: Date) {
   return upsertAndGetId(
     db.collection('events'),
     { seed_key: 'local-event-language-exchange' },
@@ -460,8 +460,23 @@ async function seedEvent(db: Db, organizerId: ObjectId) {
       seed_key: 'local-event-language-exchange',
       organizer_id: organizerId,
       title: 'VN-JP Local Language Exchange',
+      description: 'Local language exchange event for Vietnamese and Japanese learners.',
+      category: 'Language Exchange',
+      language: 'Japanese-Vietnamese',
+      format: 'in-person',
       event_date: new Date('2026-06-01T10:00:00.000Z'),
+      start_date: '2026-06-01',
+      start_time: '10:00',
+      end_date: '2026-06-01',
+      end_time: '12:00',
       location: 'Ho Chi Minh City',
+      online_url: '',
+      capacity: 40,
+      current_participants: 0,
+      cover_image_url: '',
+      status: 'published',
+      created_at: now,
+      updated_at: now,
     },
   );
 }
@@ -527,7 +542,7 @@ async function seed() {
       users.jpStudentId,
     );
 
-    const eventId = await seedEvent(db, users.organizerId);
+    const eventId = await seedEvent(db, users.organizerId, now);
 
     await seedEventParticipants(
       db,
