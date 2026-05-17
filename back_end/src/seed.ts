@@ -388,11 +388,24 @@ async function seedMatches(
   return { acceptedMatchId, pendingMatchId };
 }
 
-async function seedConversation(db: Db, matchId: ObjectId, now: Date) {
+async function seedConversation(
+  db: Db,
+  matchId: ObjectId,
+  participantIds: ObjectId[],
+  now: Date,
+) {
   return upsertAndGetId(
     db.collection('conversations'),
     { match_id: matchId },
-    { match_id: matchId, created_at: now },
+    {
+      match_id: matchId,
+      type: 'direct',
+      title: '',
+      participant_ids: participantIds,
+      created_at: now,
+      updated_at: now,
+      last_message_at: now,
+    },
   );
 }
 
@@ -413,6 +426,10 @@ async function seedMessages(
       sender_id: vnStudentId,
       content: 'Xin chao, minh muon luyen tieng Nhat.',
       translated_content: 'こんにちは、日本語を練習したいです。',
+      message_type: 'text',
+      status: 'read',
+      read_by: [vnStudentId, jpStudentId],
+      attachments: [],
       sent_at: new Date('2026-05-11T02:00:00.000Z'),
     },
   );
@@ -426,6 +443,10 @@ async function seedMessages(
       sender_id: jpStudentId,
       content: 'こんにちは。ベトナム語も勉強しています。',
       translated_content: 'Xin chao. Minh cung dang hoc tieng Viet.',
+      message_type: 'text',
+      status: 'sent',
+      read_by: [jpStudentId],
+      attachments: [],
       sent_at: new Date('2026-05-11T02:05:00.000Z'),
     },
   );
@@ -492,7 +513,12 @@ async function seed() {
       users.organizerId,
       now,
     );
-    const conversationId = await seedConversation(db, acceptedMatchId, now);
+    const conversationId = await seedConversation(
+      db,
+      acceptedMatchId,
+      [users.vnStudentId, users.jpStudentId],
+      now,
+    );
 
     await seedMessages(
       db,

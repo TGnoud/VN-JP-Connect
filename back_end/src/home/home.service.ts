@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -6,6 +10,8 @@ import {
   ConversationDocument,
   Match,
   MatchDocument,
+  Message,
+  MessageDocument,
   Profile,
   ProfileDocument,
   Tag,
@@ -39,13 +45,16 @@ const HOME_JAPANESE_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1', 'Basic', 'Native'];
 export class HomeService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    @InjectModel(Profile.name) private readonly profileModel: Model<ProfileDocument>,
+    @InjectModel(Profile.name)
+    private readonly profileModel: Model<ProfileDocument>,
     @InjectModel(UserInterest.name)
     private readonly userInterestModel: Model<UserInterestDocument>,
     @InjectModel(Tag.name) private readonly tagModel: Model<TagDocument>,
     @InjectModel(Match.name) private readonly matchModel: Model<MatchDocument>,
     @InjectModel(Conversation.name)
     private readonly conversationModel: Model<ConversationDocument>,
+    @InjectModel(Message.name)
+    private readonly messageModel: Model<MessageDocument>,
   ) {}
 
   async getFilterOptions() {
@@ -81,7 +90,10 @@ export class HomeService {
       throw new BadRequestException('limit must be between 1 and 50');
     }
 
-    const currentUserObjectId = this.objectIdFromParam(currentUserId, 'currentUserId');
+    const currentUserObjectId = this.objectIdFromParam(
+      currentUserId,
+      'currentUserId',
+    );
     this.validateDiscoverQuery(query);
     const excludeObjectIds = (query.excludeUserIds ?? []).map((id) =>
       this.objectIdFromParam(id, 'excludeUserIds'),
@@ -104,7 +116,9 @@ export class HomeService {
     if (query.interestTagIds?.length) {
       const tagObjectIds = query.interestTagIds.map((id) => {
         if (!Types.ObjectId.isValid(id)) {
-          throw new BadRequestException('interestTagIds must be valid ObjectIds');
+          throw new BadRequestException(
+            'interestTagIds must be valid ObjectIds',
+          );
         }
         return new Types.ObjectId(id);
       });
@@ -113,7 +127,9 @@ export class HomeService {
         .countDocuments({ _id: { $in: tagObjectIds }, type: 'interest' })
         .exec();
       if (existingCount !== tagObjectIds.length) {
-        throw new BadRequestException('interestTagIds must reference existing interest tags');
+        throw new BadRequestException(
+          'interestTagIds must reference existing interest tags',
+        );
       }
 
       const userIds = await this.userInterestModel
@@ -123,7 +139,11 @@ export class HomeService {
       userFilter._id = { $nin: excludedUserIds, $in: allowedUserIds };
     }
 
-    const users = await this.userModel.find(userFilter).limit(limit).lean().exec();
+    const users = await this.userModel
+      .find(userFilter)
+      .limit(limit)
+      .lean()
+      .exec();
     const userIds = users.map((u) => u._id);
     const profiles = await this.profileModel
       .find({ user_id: { $in: userIds }, ...profileFilter })
@@ -138,7 +158,9 @@ export class HomeService {
       .find({ user_id: { $in: userIds } })
       .lean()
       .exec();
-    const tagIds = Array.from(new Set(interestLinks.map((l) => l.tag_id.toString())));
+    const tagIds = Array.from(
+      new Set(interestLinks.map((l) => l.tag_id.toString())),
+    );
     const tags = tagIds.length
       ? await this.tagModel
           .find({ _id: { $in: tagIds.map((id) => new Types.ObjectId(id)) } })
@@ -147,7 +169,8 @@ export class HomeService {
       : [];
     const tagById = new Map(tags.map((t) => [t._id.toString(), t]));
 
-    const connectionsCountByUserId = await this.countConnectionsForUsers(userIds);
+    const connectionsCountByUserId =
+      await this.countConnectionsForUsers(userIds);
 
     return users
       .map((user) => {
@@ -161,8 +184,13 @@ export class HomeService {
         const interests = userInterestTagIds
           .map((id) => tagById.get(id))
           .filter(Boolean)
-          .map((t: any) => ({ id: t._id.toString(), name: t.name, type: t.type }));
-        const age = calculateAge(user.birth_date) ?? profile?.age ?? DEFAULT_LEGACY_AGE;
+          .map((t: any) => ({
+            id: t._id.toString(),
+            name: t.name,
+            type: t.type,
+          }));
+        const age =
+          calculateAge(user.birth_date) ?? profile?.age ?? DEFAULT_LEGACY_AGE;
         const languages = (profile?.languages ?? []).map((item: any) => ({
           language: item.language,
           level: item.level,
@@ -218,7 +246,10 @@ export class HomeService {
   }
 
   async showInterest(currentUserId: string, targetUserId: string) {
-    const currentObjectId = this.objectIdFromParam(currentUserId, 'currentUserId');
+    const currentObjectId = this.objectIdFromParam(
+      currentUserId,
+      'currentUserId',
+    );
     const targetObjectId = this.objectIdFromParam(targetUserId, 'userId');
 
     if (currentObjectId.equals(targetObjectId)) {
@@ -245,7 +276,11 @@ export class HomeService {
 
     if (existingMatch) {
       if (existingMatch.status === 'accepted') {
-        return this.matchedInterestResponse(existingMatch, targetObjectId, targetUser);
+        return this.matchedInterestResponse(
+          existingMatch,
+          targetObjectId,
+          targetUser,
+        );
       }
 
       const isReversePending =
@@ -256,7 +291,11 @@ export class HomeService {
       if (isReversePending) {
         existingMatch.status = 'accepted';
         await existingMatch.save();
-        return this.matchedInterestResponse(existingMatch, targetObjectId, targetUser);
+        return this.matchedInterestResponse(
+          existingMatch,
+          targetObjectId,
+          targetUser,
+        );
       }
 
       if (
@@ -288,9 +327,29 @@ export class HomeService {
     };
   }
 
-  getNavSummary(_userId: string) {
+  async getNavSummary(userId: string) {
+    const currentObjectId = this.objectIdFromParam(userId, 'currentUserId');
+    await this.ensureDirectConversationParticipants(currentObjectId);
+    const conversations = await this.conversationModel
+      .find({ participant_ids: currentObjectId })
+      .select({ _id: 1 })
+      .lean()
+      .exec();
+    const conversationIds = conversations.map(
+      (conversation) => conversation._id,
+    );
+    const unreadMessagesCount = conversationIds.length
+      ? await this.messageModel
+          .countDocuments({
+            conversation_id: { $in: conversationIds },
+            sender_id: { $ne: currentObjectId },
+            read_by: { $ne: currentObjectId },
+          })
+          .exec()
+      : 0;
+
     return {
-      unreadMessagesCount: 0,
+      unreadMessagesCount,
       unreadEventsCount: 0,
     };
   }
@@ -306,8 +365,15 @@ export class HomeService {
 
     for (const field of ['ageMin', 'ageMax'] as const) {
       const value = query[field];
-      if (value !== undefined && (!Number.isInteger(value) || value < HOME_AGE_MIN || value > HOME_AGE_MAX)) {
-        throw new BadRequestException(`${field} must be an integer between ${HOME_AGE_MIN} and ${HOME_AGE_MAX}`);
+      if (
+        value !== undefined &&
+        (!Number.isInteger(value) ||
+          value < HOME_AGE_MIN ||
+          value > HOME_AGE_MAX)
+      ) {
+        throw new BadRequestException(
+          `${field} must be an integer between ${HOME_AGE_MIN} and ${HOME_AGE_MAX}`,
+        );
       }
     }
 
@@ -316,7 +382,9 @@ export class HomeService {
       query.ageMax !== undefined &&
       query.ageMin > query.ageMax
     ) {
-      throw new BadRequestException('ageMin must be less than or equal to ageMax');
+      throw new BadRequestException(
+        'ageMin must be less than or equal to ageMax',
+      );
     }
 
     if (
@@ -325,7 +393,9 @@ export class HomeService {
         query.distanceMax < 0 ||
         query.distanceMax > HOME_DISTANCE_MAX)
     ) {
-      throw new BadRequestException(`distanceMax must be an integer between 0 and ${HOME_DISTANCE_MAX}`);
+      throw new BadRequestException(
+        `distanceMax must be an integer between 0 and ${HOME_DISTANCE_MAX}`,
+      );
     }
 
     const unsupportedJapaneseLevel = (query.japaneseLevels ?? []).find(
@@ -333,12 +403,15 @@ export class HomeService {
     );
 
     if (unsupportedJapaneseLevel) {
-      throw new BadRequestException(`japanese level "${unsupportedJapaneseLevel}" is not supported`);
+      throw new BadRequestException(
+        `japanese level "${unsupportedJapaneseLevel}" is not supported`,
+      );
     }
   }
 
   private matchesJapaneseLevel(profileLevel: string, filterLevels: string[]) {
-    const normalizedLevel = profileLevel === 'Beginner' ? 'Basic' : profileLevel;
+    const normalizedLevel =
+      profileLevel === 'Beginner' ? 'Basic' : profileLevel;
     return filterLevels.includes(normalizedLevel);
   }
 
@@ -350,7 +423,19 @@ export class HomeService {
     const conversation = await this.conversationModel
       .findOneAndUpdate(
         { match_id: match._id },
-        { $setOnInsert: { match_id: match._id, created_at: new Date() } },
+        {
+          $setOnInsert: {
+            match_id: match._id,
+            title: '',
+            created_at: new Date(),
+            last_message_at: new Date(),
+          },
+          $set: {
+            type: 'direct',
+            participant_ids: [match.requester_id, match.receiver_id],
+            updated_at: new Date(),
+          },
+        },
         { new: true, upsert: true },
       )
       .lean()
@@ -392,7 +477,15 @@ export class HomeService {
 
     const counts = await this.matchModel
       .aggregate<{ _id: Types.ObjectId; count: number }>([
-        { $match: { status: 'accepted', $or: [{ requester_id: { $in: userIds } }, { receiver_id: { $in: userIds } }] } },
+        {
+          $match: {
+            status: 'accepted',
+            $or: [
+              { requester_id: { $in: userIds } },
+              { receiver_id: { $in: userIds } },
+            ],
+          },
+        },
         {
           $project: {
             participants: ['$requester_id', '$receiver_id'],
@@ -409,5 +502,44 @@ export class HomeService {
     }
     return map;
   }
-}
 
+  private async ensureDirectConversationParticipants(
+    currentObjectId: Types.ObjectId,
+  ) {
+    const matches = await this.matchModel
+      .find({
+        status: 'accepted',
+        $or: [
+          { requester_id: currentObjectId },
+          { receiver_id: currentObjectId },
+        ],
+      })
+      .lean()
+      .exec();
+
+    await Promise.all(
+      matches.map((match) => {
+        const now = new Date();
+        return this.conversationModel
+          .findOneAndUpdate(
+            { match_id: match._id },
+            {
+              $setOnInsert: {
+                match_id: match._id,
+                title: '',
+                created_at: now,
+                last_message_at: now,
+              },
+              $set: {
+                type: 'direct',
+                participant_ids: [match.requester_id, match.receiver_id],
+                updated_at: now,
+              },
+            },
+            { upsert: true },
+          )
+          .exec();
+      }),
+    );
+  }
+}

@@ -1,19 +1,35 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
+import {
+  createGroupConversation,
+  getConversationMessages,
+  getConversations,
+  getMatchedConversationUsers,
+  markConversationRead,
+  resolveMediaUrl,
+  sendConversationMessage,
+  translateConversationText,
+  type ChatConversation,
+  type ChatMessage,
+} from "@/lib/profile-api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface MockRoom {
   id: string;
+  type?: "direct" | "group";
+  partnerId?: string | null;
   name: string;
   location: string;
   level: string;
   avatar: string;
   lastMsg: string;
   time: string;
+  lastMessageAt?: string;
   unread: number;
 }
 
@@ -22,6 +38,7 @@ interface Msg {
   senderId: "me" | "partner";
   content: string;
   time: string;
+  sentAt?: string;
   status: "sent" | "read";
 }
 
@@ -72,6 +89,76 @@ const TOPICS = [
 ];
 
 // ─── Toolbar button definitions ───────────────────────────────────────────────
+
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
+const EMPTY_ROOM: MockRoom = {
+  id: "",
+  name: "-",
+  location: "",
+  level: "",
+  avatar: "https://api.dicebear.com/7.x/personas/svg?seed=empty-chat",
+  lastMsg: "",
+  time: "",
+  unread: 0,
+};
+
+function formatChatTime(value?: string) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const messageDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((today.getTime() - messageDay.getTime()) / 86400000);
+
+  if (diffDays === 0) {
+    return date.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  if (diffDays === 1) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit" });
+}
+
+function mapConversation(conversation: ChatConversation): MockRoom {
+  return {
+    id: conversation.id,
+    type: conversation.type,
+    partnerId: conversation.partnerId,
+    name: conversation.name,
+    location: conversation.location,
+    level: conversation.level,
+    avatar: resolveMediaUrl(conversation.avatar, 160) || EMPTY_ROOM.avatar,
+    lastMsg: conversation.lastMessage,
+    time: formatChatTime(conversation.lastMessageAt),
+    lastMessageAt: conversation.lastMessageAt,
+    unread: conversation.unreadCount,
+  };
+}
+
+function mapMessage(message: ChatMessage): Msg {
+  return {
+    id: message.id,
+    senderId: message.senderId,
+    content: message.content,
+    time: formatChatTime(message.sentAt),
+    sentAt: message.sentAt,
+    status: message.status,
+  };
+}
+
+function readStoredConversationId() {
+  try {
+    const storedConversation = sessionStorage.getItem("vn_jp_active_conversation");
+    return storedConversation ? JSON.parse(storedConversation)?.id ?? "" : "";
+  } catch {
+    return "";
+  }
+}
 
 const TOOLBAR_BTNS: { id: Exclude<ToolPanel, null>; title: string; icon: React.ReactNode }[] = [
   {
@@ -173,8 +260,10 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ChatPage() {
-  const [activeRoomId, setActiveRoomId] = useState<string>(MOCK_ROOMS[0].id);
-  const [messages, setMessages] = useState(MOCK_MESSAGES);
+  const router = useRouter();
+  const [rooms, setRooms] = useState<MockRoom[]>([]);
+  const [activeRoomId, setActiveRoomId] = useState<string>("");
+  const [messages, setMessages] = useState<Record<string, Msg[]>>({});
   const [inputText, setInputText] = useState("");
   const [openTool, setOpenTool] = useState<ToolPanel>(null);
   const [attachModal, setAttachModal] = useState<AttachModal>(null);
@@ -186,28 +275,119 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
 
-  const activeRoom = MOCK_ROOMS.find((r) => r.id === activeRoomId)!;
+  const activeRoom = rooms.find((r) => r.id === activeRoomId) ?? rooms[0] ?? EMPTY_ROOM;
   const roomMessages = messages[activeRoomId] ?? [];
   const filteredRooms = search
-    ? MOCK_ROOMS.filter((r) => r.name.includes(search) || r.lastMsg.includes(search))
-    : MOCK_ROOMS;
+    ? rooms.filter((r) => r.name.includes(search) || r.lastMsg.includes(search))
+    : rooms;
 
-  function sendMessage(content: string) {
-    if (!content.trim()) return;
-    const newMsg: Msg = {
-      id: `msg-${Date.now()}`,
-      senderId: "me",
-      content: content.trim(),
-      time: new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }),
-      status: "sent",
+  useEffect(() => {
+    let active = true;
+
+    getConversations()
+      .then((conversations) => {
+        if (!active) return;
+
+        const nextRooms = conversations.map(mapConversation);
+        const urlConversationId = new URLSearchParams(window.location.search).get("conversationId");
+        const storedConversationId = readStoredConversationId();
+        const preferredRoomId = urlConversationId || storedConversationId;
+        const nextActiveRoomId =
+          nextRooms.find((room) => room.id === preferredRoomId)?.id ||
+          nextRooms[0]?.id ||
+          "";
+
+        setRooms(nextRooms);
+        setActiveRoomId((current) =>
+          nextRooms.some((room) => room.id === current) ? current : nextActiveRoomId,
+        );
+      })
+      .catch((error) => {
+        console.error(error);
+        setRooms(MOCK_ROOMS);
+        setMessages(MOCK_MESSAGES);
+        setActiveRoomId(MOCK_ROOMS[0]?.id ?? "");
+      });
+
+    return () => {
+      active = false;
     };
-    setMessages((prev) => ({ ...prev, [activeRoomId]: [...(prev[activeRoomId] ?? []), newMsg] }));
-    setInputText("");
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  }, []);
+
+  useEffect(() => {
+    if (!activeRoomId) return;
+
+    let active = true;
+
+    getConversationMessages(activeRoomId)
+      .then((response) => {
+        if (!active) return;
+
+        setMessages((prev) => ({
+          ...prev,
+          [activeRoomId]: response.messages.map(mapMessage),
+        }));
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+
+        return markConversationRead(activeRoomId);
+      })
+      .then(() => {
+        if (!active) return;
+
+        setRooms((prev) =>
+          prev.map((room) => (room.id === activeRoomId ? { ...room, unread: 0 } : room)),
+        );
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activeRoomId]);
+
+  async function sendMessage(content: string, messageType: "text" | "file" | "media" | "voice" = "text") {
+    if (!content.trim() || !activeRoomId) return;
+
+    try {
+      const savedMessage = await sendConversationMessage(activeRoomId, {
+        content: content.trim(),
+        messageType,
+      });
+      const newMsg = mapMessage(savedMessage);
+
+      setMessages((prev) => ({
+        ...prev,
+        [activeRoomId]: [...(prev[activeRoomId] ?? []), newMsg],
+      }));
+      setRooms((prev) =>
+        prev
+          .map((room) =>
+            room.id === activeRoomId
+              ? {
+                  ...room,
+                  lastMsg: savedMessage.content,
+                  lastMessageAt: savedMessage.sentAt,
+                  time: formatChatTime(savedMessage.sentAt),
+                }
+              : room,
+          )
+          .sort((a, b) => {
+            if (a.id === activeRoomId) return -1;
+            if (b.id === activeRoomId) return 1;
+            return new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
+          }),
+      );
+      setInputText("");
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(inputText); }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(inputText); }
   }
 
   function toggleTool(tool: Exclude<ToolPanel, null>) {
@@ -219,13 +399,91 @@ export default function ChatPage() {
     setOpenTool("translate");
   }
 
+  async function handleTranslateSubmit() {
+    if (!translateInput.trim()) return;
+
+    try {
+      const result = await translateConversationText({
+        text: translateInput,
+        direction: translateDir,
+      });
+      setInputText(result.translatedText);
+      setTranslateInput("");
+      setOpenTool(null);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  function handleRoomClick(roomId: string) {
+    setActiveRoomId(roomId);
+    setOpenTool(null);
+    setRooms((prev) => prev.map((room) => (room.id === roomId ? { ...room, unread: 0 } : room)));
+  }
+
+  async function handleCreateGroupClick() {
+    try {
+      const matchedUsers = await getMatchedConversationUsers();
+      if (matchedUsers.length < 2) {
+        window.alert("Need at least 2 matched users to create a group.");
+        return;
+      }
+
+      const name = window.prompt("Group name");
+      if (!name?.trim()) return;
+
+      const memberPrompt = window.prompt(
+        [
+          "Select at least 2 members by number, separated with commas:",
+          ...matchedUsers.map((user, index) => `${index + 1}. ${user.fullName}`),
+        ].join("\n"),
+      );
+      if (!memberPrompt) return;
+
+      const memberIds = memberPrompt
+        .split(",")
+        .map((item) => Number(item.trim()) - 1)
+        .filter((index) => Number.isInteger(index) && index >= 0 && index < matchedUsers.length)
+        .map((index) => matchedUsers[index].id);
+      const uniqueMemberIds = Array.from(new Set(memberIds));
+
+      if (uniqueMemberIds.length < 2) {
+        window.alert("Please select at least 2 members.");
+        return;
+      }
+
+      const createdGroup = await createGroupConversation({
+        name: name.trim(),
+        memberIds: uniqueMemberIds,
+      });
+      const room = mapConversation(createdGroup);
+
+      setRooms((prev) => [room, ...prev.filter((item) => item.id !== room.id)]);
+      setActiveRoomId(room.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Could not create group.");
+    }
+  }
+
+  function handleFileSelected(file: File | undefined, messageType: "file" | "media") {
+    if (!file) return;
+
+    if (file.size > MAX_ATTACHMENT_SIZE) {
+      window.alert("File too large. Max size is 25MB.");
+      return;
+    }
+
+    void sendMessage(`${messageType === "media" ? "[Media]" : "[File]"} ${file.name}`, messageType);
+    setAttachModal(null);
+  }
+
   return (
     <div className="flex-1 flex min-h-0">
       {/* ── Room list ─────────────────────────────────────────────────────────── */}
       <div className="w-72 shrink-0 border-r border-gray-100 bg-white flex flex-col">
         <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
           <h1 className="text-lg font-bold text-gray-900">メッセージ</h1>
-          <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <button onClick={handleCreateGroupClick} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
             </svg>
@@ -235,7 +493,7 @@ export default function ChatPage() {
           <div className="relative">
             <svg xmlns="http://www.w3.org/2000/svg" className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
             <input
-              type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              type="text" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={50}
               placeholder="名前またはキーワードで検索"
               className="w-full pl-9 pr-3 py-2 rounded-xl bg-gray-50 border border-gray-100 text-sm focus:outline-none focus:ring-2 focus:border-transparent placeholder:text-gray-400"
             />
@@ -243,8 +501,11 @@ export default function ChatPage() {
         </div>
         <div className="flex-1 overflow-y-auto">
           {filteredRooms.map((room) => (
-            <RoomItem key={room.id} room={room} isActive={room.id === activeRoomId} onClick={() => { setActiveRoomId(room.id); setOpenTool(null); }} />
+            <RoomItem key={room.id} room={room} isActive={room.id === activeRoomId} onClick={() => handleRoomClick(room.id)} />
           ))}
+          {filteredRooms.length === 0 && (
+            <p className="px-4 py-6 text-sm text-gray-400">結果が見つかりません</p>
+          )}
         </div>
       </div>
 
@@ -272,7 +533,11 @@ export default function ChatPage() {
               </div>
             </div>
           </div>
-          <button className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <button
+            onClick={() => activeRoom.partnerId && router.push(`/users/${activeRoom.partnerId}`)}
+            disabled={!activeRoom.partnerId}
+            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
           </button>
         </div>
@@ -320,7 +585,7 @@ export default function ChatPage() {
               <PanelHeader title="絵文字を選択" onClose={() => setOpenTool(null)} />
               <div className="flex flex-wrap gap-1.5">
                 {EMOJIS.map((emoji) => (
-                  <button key={emoji} onClick={() => { sendMessage(emoji); setOpenTool(null); }} className="text-2xl w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors">
+                  <button key={emoji} onClick={() => setInputText((prev) => `${prev}${emoji}`)} className="text-2xl w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors">
                     {emoji}
                   </button>
                 ))}
@@ -334,7 +599,7 @@ export default function ChatPage() {
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => {
-                    if (isRecording) { setIsRecording(false); sendMessage("🎤 音声メッセージ（0:05）"); setOpenTool(null); }
+                    if (isRecording) { setIsRecording(false); void sendMessage("Voice message (0:05)", "voice"); setOpenTool(null); }
                     else { setIsRecording(true); }
                   }}
                   className={clsx("w-12 h-12 rounded-full flex items-center justify-center shrink-0", isRecording && "animate-pulse")}
@@ -355,7 +620,7 @@ export default function ChatPage() {
               <p className="text-xs text-gray-400 mb-3 -mt-1">クリックするとメッセージとして送信されます</p>
               <div className="flex flex-wrap gap-2">
                 {TOPICS.map((t) => (
-                  <button key={t.label} onClick={() => { sendMessage(t.label); setOpenTool(null); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 text-sm text-gray-700 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 transition-all">
+                  <button key={t.label} onClick={() => { setInputText(t.label); setOpenTool(null); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 text-sm text-gray-700 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 transition-all">
                     <span>{t.emoji}</span>{t.label}
                   </button>
                 ))}
@@ -367,7 +632,7 @@ export default function ChatPage() {
             <div className="absolute bottom-full left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-10 px-5 py-4">
               <PanelHeader title="翻訳サポート" onClose={() => setOpenTool(null)} />
               <div className="flex items-center gap-2 mb-3">
-                <button onClick={() => setTranslateDir((d) => (d === "ja-vi" ? "vi-ja" : "ja-vi"))} className="flex items-center gap-2">
+                <button onClick={() => { setTranslateDir((d) => (d === "ja-vi" ? "vi-ja" : "ja-vi")); setTranslateInput(""); }} className="flex items-center gap-2">
                   <span className={clsx("px-2.5 py-1 rounded-full text-xs font-semibold", translateDir === "ja-vi" ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-500")}>JP 日本語</span>
                   <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
                   <span className={clsx("px-2.5 py-1 rounded-full text-xs font-semibold", translateDir === "vi-ja" ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-500")}>VN ベトナム語</span>
@@ -375,11 +640,13 @@ export default function ChatPage() {
               </div>
               <div className="flex gap-2">
                 <input
-                  type="text" value={translateInput} onChange={(e) => setTranslateInput(e.target.value)}
+                  type="text" value={translateInput} onChange={(e) => setTranslateInput(e.target.value)} maxLength={500}
                   placeholder={translateDir === "ja-vi" ? "日本語のテキストを入力..." : "ベトナム語のテキストを入力..."}
                   className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:border-transparent placeholder:text-gray-400 bg-gray-50"
                 />
                 <button
+                  onClick={handleTranslateSubmit}
+                  disabled={!translateInput.trim()}
                   className={clsx("flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shrink-0", translateInput.trim() ? "opacity-100" : "opacity-40")}
                   style={{ backgroundColor: "#1B4332" }}
                 >
@@ -403,13 +670,13 @@ export default function ChatPage() {
               </button>
             ))}
             <textarea
-              value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={handleKeyDown}
+              value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={handleKeyDown} maxLength={2000}
               placeholder="メッセージを入力..." rows={1}
               className="flex-1 resize-none rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent placeholder:text-gray-400 max-h-32 bg-gray-50"
             />
             <button
-              onClick={() => sendMessage(inputText)}
-              disabled={!inputText.trim()}
+              onClick={() => void sendMessage(inputText)}
+              disabled={!inputText.trim() || !activeRoomId}
               className={clsx("shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity", inputText.trim() ? "opacity-100" : "opacity-40")}
               style={{ backgroundColor: "#1B4332" }}
             >
@@ -464,9 +731,9 @@ export default function ChatPage() {
 
       {/* Hidden file inputs */}
       <input ref={fileInputRef} type="file" className="hidden" accept="image/*,video/*"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) { sendMessage(`🖼️ ${f.name}`); setAttachModal(null); e.target.value = ""; } }} />
+        onChange={(e) => { handleFileSelected(e.target.files?.[0], "media"); e.target.value = ""; }} />
       <input ref={docInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.xlsx,.ppt,.pptx"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) { sendMessage(`📎 ${f.name}`); setAttachModal(null); e.target.value = ""; } }} />
+        onChange={(e) => { handleFileSelected(e.target.files?.[0], "file"); e.target.value = ""; }} />
     </div>
   );
 }
