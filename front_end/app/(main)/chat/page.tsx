@@ -424,7 +424,7 @@ function AttachmentPreview({ attachment, isMe }: { attachment: ChatAttachment; i
           onClick={() => void downloadAttachment(attachment)}
           className={clsx("mt-1 w-full px-1 text-left text-xs font-semibold transition-colors", isMe ? "text-white/80 hover:text-white" : "text-gray-500 hover:text-gray-700")}
         >
-          Download{size ? ` · ${size}` : ""}
+          ダウンロード{size ? ` · ${size}` : ""}
         </button>
       </div>
     );
