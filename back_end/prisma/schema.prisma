@@ -1,0 +1,42 @@
+// PostgreSQL: OTP + rate-limit log + reset session (MongoDB remains canonical for Users).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PASSWORD_RESET_DATABASE_URL")
+}
+
+model PasswordResetOtp {
+  id        String   @id @default(cuid())
+  email     String
+  otpHash   String   @map("otp_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email])
+  @@map("password_reset_otps")
+}
+
+/// One row appended per send-otp API call once under throttle (enumeration-safe).
+model PasswordResetSendLog {
+  id        String   @id @default(cuid())
+  email     String
+  sentAt    DateTime @default(now()) @map("sent_at")
+
+  @@index([email, sentAt])
+  @@map("password_reset_send_logs")
+}
+
+/// Issued after a valid OTP verification; exchanged once for password change.
+model PasswordResetSession {
+  id        String   @id @default(cuid())
+  email     String
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email])
+  @@map("password_reset_sessions")
+}
