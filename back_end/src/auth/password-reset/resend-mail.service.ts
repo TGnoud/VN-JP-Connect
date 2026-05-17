@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Resend } from 'resend';
 import { buildPasswordResetEmailHtml } from './password-reset-email.template';
 
 export interface PasswordResetMailPayload {
@@ -21,14 +20,6 @@ export function passwordResetUsesLogOnlyMail(): boolean {
 export class ResendMailService {
   private readonly logger = new Logger(ResendMailService.name);
 
-  /** Null when RESEND_API_KEY is missing (blocked at send-time with a clear UX error). */
-  private readonly client: Resend | null;
-
-  constructor() {
-    const key = process.env.RESEND_API_KEY?.trim();
-    this.client = key ? new Resend(key) : null;
-  }
-
   async sendPasswordResetOtpMail(payload: PasswordResetMailPayload) {
     // Local QA without Resend: set PASSWORD_RESET_MAIL_MODE=log in .env — OTP is echoed to the server terminal.
     if (mailTransportMode() === 'log') {
@@ -38,7 +29,8 @@ export class ResendMailService {
       return { id: 'stdout-only' as const };
     }
 
-    if (!this.client) {
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (!apiKey) {
       this.logger.warn(
         'RESEND_API_KEY is unset; refusing to silently skip email delivery.',
       );
@@ -58,27 +50,36 @@ export class ResendMailService {
 
     const subject = `[VN-JP Connect] パスワード再設定 — 確認コード（${payload.otpTtlMinutes}分有効）`;
 
-    let data:
-      | { id?: string | null | undefined }
-      | null
-      | undefined;
+    let data: { id?: string | null } | null = null;
     try {
-      const result = await this.client.emails.send({
-        from,
-        to: payload.to,
-        subject,
-        html,
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from,
+          to: payload.to,
+          subject,
+          html,
+        }),
       });
-      data = result.data;
-      const error = result.error;
+      const body = (await response.json().catch(() => null)) as
+        | { id?: string | null; message?: string; error?: string }
+        | null;
 
-      if (error) {
+      if (!response.ok) {
+        const message =
+          body?.message ?? body?.error ?? `HTTP ${response.status}`;
         // Log full diagnostic; UI stays generic JP (enumeration / UX consistency).
         this.logger.error(
-          `Resend API error (${payload.to}) from="${from}": ${error.message}`,
+          `Resend API error (${payload.to}) from="${from}": ${message}`,
         );
-        throw new ResendRequestFailedError(error.message);
+        throw new ResendRequestFailedError(message);
       }
+
+      data = body;
     } catch (maybeErr: unknown) {
       if (maybeErr instanceof ResendRequestFailedError) {
         throw maybeErr;

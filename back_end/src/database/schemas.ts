@@ -45,6 +45,9 @@ export type UserReportReason = (typeof USER_REPORT_REASONS)[number];
 export type UserReportStatus = (typeof USER_REPORT_STATUSES)[number];
 
 export type UserDocument = HydratedDocument<User>;
+export type PasswordResetOtpDocument = HydratedDocument<PasswordResetOtp>;
+export type PasswordResetSessionDocument =
+  HydratedDocument<PasswordResetSession>;
 export type TagDocument = HydratedDocument<Tag>;
 export type UserInterestDocument = HydratedDocument<UserInterest>;
 export type MatchDocument = HydratedDocument<Match>;
@@ -92,6 +95,58 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.index({ email: 1 }, { unique: true, name: 'users_email_unique' });
+
+@Schema({ collection: 'password_reset_otps', versionKey: false })
+export class PasswordResetOtp {
+  @Prop({ required: true, trim: true, lowercase: true })
+  email: string;
+
+  @Prop({ required: true })
+  otp_hash: string;
+
+  @Prop({ required: true })
+  expires_at: Date;
+
+  @Prop({ required: true, default: Date.now })
+  created_at: Date;
+}
+
+export const PasswordResetOtpSchema =
+  SchemaFactory.createForClass(PasswordResetOtp);
+PasswordResetOtpSchema.index(
+  { email: 1, created_at: -1 },
+  { name: 'password_reset_otps_email_created_idx' },
+);
+PasswordResetOtpSchema.index(
+  { expires_at: 1 },
+  { expireAfterSeconds: 0, name: 'password_reset_otps_expires_ttl_idx' },
+);
+
+@Schema({ collection: 'password_reset_sessions', versionKey: false })
+export class PasswordResetSession {
+  @Prop({ required: true, trim: true, lowercase: true })
+  email: string;
+
+  @Prop({ required: true })
+  token_hash: string;
+
+  @Prop({ required: true })
+  expires_at: Date;
+
+  @Prop({ required: true, default: Date.now })
+  created_at: Date;
+}
+
+export const PasswordResetSessionSchema =
+  SchemaFactory.createForClass(PasswordResetSession);
+PasswordResetSessionSchema.index(
+  { email: 1, created_at: -1 },
+  { name: 'password_reset_sessions_email_created_idx' },
+);
+PasswordResetSessionSchema.index(
+  { expires_at: 1 },
+  { expireAfterSeconds: 0, name: 'password_reset_sessions_expires_ttl_idx' },
+);
 
 export class SocialLinks {
   @Prop({ trim: true, default: '' })

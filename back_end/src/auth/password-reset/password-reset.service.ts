@@ -9,8 +9,14 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { hashPassword } from '../password';
-import type { UserDocument } from '../../database/schemas';
-import { User } from '../../database/schemas';
+import {
+  PasswordResetOtp,
+  PasswordResetOtpDocument,
+  PasswordResetSession,
+  PasswordResetSessionDocument,
+  User,
+  UserDocument,
+} from '../../database/schemas';
 import {
   FALLBACK_DEV_PEPPER,
   OTP_TTL_MS,
@@ -25,7 +31,6 @@ import {
   hashResetToken,
   safeEqualHex,
 } from './password-reset.crypto';
-import { PrismaService } from '../../prisma/prisma.service';
 import type {
   CompleteResetBody,
   SendOtpBody,
@@ -43,9 +48,12 @@ export class PasswordResetService implements OnModuleInit {
   private readonly logger = new Logger(PasswordResetService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
     private readonly mail: ResendMailService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @InjectModel(PasswordResetOtp.name)
+    private readonly otpModel: Model<PasswordResetOtpDocument>,
+    @InjectModel(PasswordResetSession.name)
+    private readonly resetSessionModel: Model<PasswordResetSessionDocument>,
   ) {}
 
   onModuleInit() {
@@ -104,18 +112,15 @@ export class PasswordResetService implements OnModuleInit {
         return genericAck();
       }
 
-      await this.prisma.passwordResetOtp.deleteMany({
-        where: { email: input.email },
-      });
+      await this.otpModel.deleteMany({ email: input.email }).exec();
 
       const otp = generateNumericOtp();
       const otpHashValue = hashOtp(this.pepper(), input.email, otp);
-      await this.prisma.passwordResetOtp.create({
-        data: {
-          email: input.email,
-          otpHash: otpHashValue,
-          expiresAt: new Date(now + OTP_TTL_MS),
-        },
+      await this.otpModel.create({
+        email: input.email,
+        otp_hash: otpHashValue,
+        expires_at: new Date(now + OTP_TTL_MS),
+        created_at: new Date(now),
       });
       otpCreated = true;
 
@@ -128,8 +133,9 @@ export class PasswordResetService implements OnModuleInit {
       return genericAck();
     } catch (err) {
       if (otpCreated) {
-        await this.prisma.passwordResetOtp
-          .deleteMany({ where: { email: input.email } })
+        await this.otpModel
+          .deleteMany({ email: input.email })
+          .exec()
           .catch(() => undefined);
       }
 
@@ -153,18 +159,19 @@ export class PasswordResetService implements OnModuleInit {
   }
 
   async verifyOtp(input: VerifyOtpBody) {
-    const otpRow = await this.prisma.passwordResetOtp.findFirst({
-      where: { email: input.email },
-      orderBy: { createdAt: 'desc' },
-    });
+    const otpRow = await this.otpModel
+      .findOne({ email: input.email })
+      .sort({ created_at: -1 })
+      .lean()
+      .exec();
 
     const nowDate = new Date();
 
-    if (!otpRow || otpRow.expiresAt <= nowDate) {
+    if (!otpRow || otpRow.expires_at <= nowDate) {
       throw new BadRequestException(PasswordResetMessages.expiredOtp);
     }
 
-    const expectedHex = otpRow.otpHash;
+    const expectedHex = otpRow.otp_hash;
     const actualHex = hashOtp(this.pepper(), input.email, input.otp);
     if (!safeEqualHex(expectedHex, actualHex)) {
       throw new BadRequestException(PasswordResetMessages.wrongOtp);
@@ -175,18 +182,15 @@ export class PasswordResetService implements OnModuleInit {
 
     const sessionExpiry = new Date(Date.now() + RESET_SESSION_TTL_MS);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.passwordResetOtp.deleteMany({ where: { email: input.email } });
-      await tx.passwordResetSession.deleteMany({
-        where: { email: input.email },
-      });
-      await tx.passwordResetSession.create({
-        data: {
-          email: input.email,
-          tokenHash: tokenDigest,
-          expiresAt: sessionExpiry,
-        },
-      });
+    await Promise.all([
+      this.otpModel.deleteMany({ email: input.email }).exec(),
+      this.resetSessionModel.deleteMany({ email: input.email }).exec(),
+    ]);
+    await this.resetSessionModel.create({
+      email: input.email,
+      token_hash: tokenDigest,
+      expires_at: sessionExpiry,
+      created_at: new Date(),
     });
 
     return {
@@ -199,15 +203,15 @@ export class PasswordResetService implements OnModuleInit {
   async completeReset(input: CompleteResetBody) {
     const hashedIncoming = hashResetToken(this.pepper(), input.email, input.resetToken);
 
-    const session = await this.prisma.passwordResetSession.findFirst({
-      where: {
+    const session = await this.resetSessionModel
+      .findOne({
         email: input.email,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        expires_at: { $gt: new Date() },
+      })
+      .sort({ created_at: -1 })
+      .exec();
 
-    if (!session || !safeEqualHex(session.tokenHash, hashedIncoming)) {
+    if (!session || !safeEqualHex(session.token_hash, hashedIncoming)) {
       throw new BadRequestException(PasswordResetMessages.invalidOrExpiredResetSession);
     }
 
@@ -216,9 +220,7 @@ export class PasswordResetService implements OnModuleInit {
       throw new BadRequestException(PasswordResetMessages.invalidOrExpiredResetSession);
     }
 
-    await this.prisma.passwordResetSession.delete({
-      where: { id: session.id },
-    });
+    await this.resetSessionModel.deleteOne({ _id: session._id }).exec();
 
     user.password_hash = hashPassword(input.newPassword);
     user.reset_code = undefined;

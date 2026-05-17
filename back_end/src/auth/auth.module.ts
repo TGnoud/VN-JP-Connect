@@ -5,10 +5,9 @@ import { AuthService } from './auth.service';
 import { PasswordResetController } from './password-reset/password-reset.controller';
 import { PasswordResetService } from './password-reset/password-reset.service';
 import { ResendMailService } from './password-reset/resend-mail.service';
-import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  imports: [DatabaseModule, PrismaModule],
+  imports: [DatabaseModule],
   controllers: [AuthController, PasswordResetController],
   providers: [AuthService, PasswordResetService, ResendMailService],
 })
