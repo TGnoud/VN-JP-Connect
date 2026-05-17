@@ -539,6 +539,7 @@ export class ConversationsService {
 
     const now = new Date();
     const conversation = await this.conversationModel.create({
+      match_id: new Types.ObjectId(),
       type: 'group',
       title: name,
       created_by: currentObjectId,
@@ -880,7 +881,7 @@ export class ConversationsService {
     return {
       id: conversation._id.toString(),
       type: conversation.type ?? 'direct',
-      matchId: conversation.match_id?.toString?.() ?? null,
+      matchId: isGroup ? null : (conversation.match_id?.toString?.() ?? null),
       partnerId: isGroup ? null : (primaryPartner?.id ?? null),
       name,
       location: isGroup
