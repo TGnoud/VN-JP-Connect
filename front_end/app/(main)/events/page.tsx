@@ -153,6 +153,7 @@ function PlusCircleIcon() {
 
 function ShareDropdown({ onClose }: { onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -161,6 +162,14 @@ function ShareDropdown({ onClose }: { onClose: () => void }) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
+
+  function handleCopy() {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href);
+    }
+    setCopied(true);
+    setTimeout(() => onClose(), 1800);
+  }
 
   return (
     <div
@@ -190,22 +199,25 @@ function ShareDropdown({ onClose }: { onClose: () => void }) {
         <div className="border-t border-gray-100 mx-2 my-1" />
         <button
           className="flex items-center gap-4 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-left"
-          onClick={() => {
-            if (typeof navigator !== "undefined" && navigator.clipboard) {
-              navigator.clipboard.writeText(window.location.href);
-            }
-            onClose();
-          }}
+          onClick={handleCopy}
         >
           <span
-            className="rounded-full bg-gray-100 flex items-center justify-center shrink-0"
-            style={{ width: 36, height: 36 }}
+            className="rounded-full flex items-center justify-center shrink-0 transition-colors"
+            style={{ width: 36, height: 36, backgroundColor: copied ? "#d1fae5" : "#f3f4f6" }}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-            </svg>
+            {copied ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="#1B4332" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+              </svg>
+            )}
           </span>
-          <span className="text-gray-800 font-medium text-sm">リンクをコピー</span>
+          <span className="font-medium text-sm transition-colors" style={{ color: copied ? "#1B4332" : "#1f2937" }}>
+            {copied ? "コピーしました ✓" : "リンクをコピー"}
+          </span>
         </button>
       </div>
     </div>

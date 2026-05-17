@@ -196,6 +196,168 @@ function payloadFromEditForm(event: AdminEvent, form: EditForm): AdminEventPaylo
   };
 }
 
+// ─── Calendar Picker ─────────────────────────────────────────────────────────
+
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAY_NAMES = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+function CalendarPicker({ value, onChange, hasError }: { value: string; onChange: (v: string) => void; hasError?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const today = new Date();
+  const selected = value ? new Date(value + "T00:00:00") : null;
+  const [viewYear, setViewYear] = useState(selected?.getFullYear() ?? today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(selected?.getMonth() ?? today.getMonth());
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  useEffect(() => {
+    if (selected) { setViewYear(selected.getFullYear()); setViewMonth(selected.getMonth()); }
+  }, [value]);
+
+  const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+  type CalCell = { day: number; offset: -1 | 0 | 1 };
+  const cells: CalCell[] = [];
+  for (let i = firstDayOfWeek - 1; i >= 0; i--) cells.push({ day: daysInPrevMonth - i, offset: -1 });
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, offset: 0 });
+  let nd = 1;
+  while (cells.length < 42) cells.push({ day: nd++, offset: 1 });
+
+  function selectDate(year: number, month: number, day: number) {
+    const d = new Date(year, month, day);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    onChange(iso);
+    setOpen(false);
+  }
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); }
+    else setViewMonth((m) => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); }
+    else setViewMonth((m) => m + 1);
+  }
+
+  function displayValue() {
+    if (!value) return null;
+    const [y, m, d] = value.split("-");
+    return `${y}/${m}/${d}`;
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={clsx(
+          "w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-white flex items-center gap-2 text-left",
+          hasError ? "border-red-300 bg-red-50/40 focus:ring-red-200" : "border-gray-200",
+        )}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+        </svg>
+        <span className={displayValue() ? "text-gray-900" : "text-gray-400"}>
+          {displayValue() ?? "日付を選択"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-4 w-72">
+          {/* Month/Year header */}
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-bold text-gray-900">
+              {MONTH_NAMES[viewMonth]} {viewYear} ▾
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={prevMonth}
+                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={nextMonth}
+                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Day headers */}
+          <div className="grid grid-cols-7 mb-1">
+            {DAY_NAMES.map((d) => (
+              <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
+            ))}
+          </div>
+
+          {/* Days grid */}
+          <div className="grid grid-cols-7">
+            {cells.map((cell, i) => {
+              const cellYear = cell.offset === -1 ? (viewMonth === 0 ? viewYear - 1 : viewYear) : cell.offset === 1 ? (viewMonth === 11 ? viewYear + 1 : viewYear) : viewYear;
+              const cellMonth = cell.offset === -1 ? (viewMonth === 0 ? 11 : viewMonth - 1) : cell.offset === 1 ? (viewMonth === 11 ? 0 : viewMonth + 1) : viewMonth;
+              const isSelected = selected && selected.getFullYear() === cellYear && selected.getMonth() === cellMonth && selected.getDate() === cell.day;
+              const isToday = today.getFullYear() === cellYear && today.getMonth() === cellMonth && today.getDate() === cell.day;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => selectDate(cellYear, cellMonth, cell.day)}
+                  className={clsx(
+                    "h-9 w-full text-xs font-medium rounded-lg transition-colors",
+                    isSelected ? "text-white" : isToday ? "font-bold" : cell.offset !== 0 ? "text-gray-300" : "text-gray-700 hover:bg-gray-100",
+                    isSelected ? "" : isToday ? "text-emerald-700 hover:bg-emerald-50" : "",
+                  )}
+                  style={isSelected ? { backgroundColor: "#1B4332" } : undefined}
+                >
+                  {cell.day}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between mt-2 pt-2 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => { onChange(""); setOpen(false); }}
+              className="text-sm font-medium hover:underline"
+              style={{ color: "#1B4332" }}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={() => selectDate(today.getFullYear(), today.getMonth(), today.getDate())}
+              className="text-sm font-medium hover:underline"
+              style={{ color: "#1B4332" }}
+            >
+              Today
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Shared sub-components (create form) ─────────────────────────────────────
 
 function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
@@ -536,7 +698,7 @@ export default function AdminEventsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <FormLabel required>開始日</FormLabel>
-                <input type="date" value={f.startDate} onChange={(e) => set("startDate", e.target.value)} className={`${inputCls} ${errInput("startDate")}`} />
+                <CalendarPicker value={f.startDate} onChange={(v) => set("startDate", v)} hasError={!!errs.startDate} />
                 {renderErrMsg("startDate")}
               </div>
               <div>
@@ -549,7 +711,7 @@ export default function AdminEventsPage() {
               </div>
               <div>
                 <FormLabel required>終了日</FormLabel>
-                <input type="date" value={f.endDate} onChange={(e) => set("endDate", e.target.value)} className={`${inputCls} ${errInput("endDate")}`} />
+                <CalendarPicker value={f.endDate} onChange={(v) => set("endDate", v)} hasError={!!errs.endDate} />
                 {renderErrMsg("endDate")}
               </div>
               <div>
