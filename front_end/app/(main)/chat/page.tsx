@@ -281,22 +281,20 @@ function MsgBubble({
           style={isMe ? { backgroundColor: "#1B4332" } : undefined}
         >
           {msg.content}
+          {(translation || isTranslating) && (
+            <>
+              <div className={clsx("border-t my-2", isMe ? "border-white/20" : "border-gray-100")} />
+              <p className={clsx("text-xs font-medium mb-0.5", isMe ? "text-white/60" : "text-gray-400")}>
+                vn Bản dịch:
+              </p>
+              {isTranslating ? (
+                <p className={clsx("text-xs italic", isMe ? "text-white/50" : "text-gray-400")}>翻訳中...</p>
+              ) : (
+                <p className={clsx("text-xs", isMe ? "text-white/90" : "text-gray-600")}>{translation}</p>
+              )}
+            </>
+          )}
         </div>
-        {(translation || isTranslating) && (
-          <div
-            className={clsx(
-              "mt-1 px-4 py-2.5 rounded-2xl shadow-sm text-xs text-gray-800 leading-relaxed",
-              isMe ? "bg-white rounded-br-sm self-end" : "bg-white rounded-bl-sm self-start",
-            )}
-          >
-            <p className="text-gray-400 font-medium mb-0.5">vn Bản dịch:</p>
-            {isTranslating ? (
-              <span className="text-gray-400 italic">翻訳中...</span>
-            ) : (
-              <span>{translation}</span>
-            )}
-          </div>
-        )}
         <div className={clsx("flex items-center gap-1.5 mt-1 px-1", isMe ? "flex-row justify-end" : "flex-row")}>
           <span className="text-xs text-gray-400">{msg.time}</span>
           {isMe && (
