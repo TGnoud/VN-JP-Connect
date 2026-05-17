@@ -28,6 +28,32 @@ const DEFAULT_FILTER: FilterState = {
   nationality: "all",
   interests: [],
 };
+const DISCOVER_CURRENT_USER_STORAGE_KEY = "vn_jp_discover_current_user_id";
+
+function readStoredDiscoverUserId() {
+  try {
+    return typeof window === "undefined"
+      ? ""
+      : localStorage.getItem(DISCOVER_CURRENT_USER_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredDiscoverUserId(userId: string) {
+  try {
+    if (typeof window === "undefined") return;
+
+    if (userId) {
+      localStorage.setItem(DISCOVER_CURRENT_USER_STORAGE_KEY, userId);
+      return;
+    }
+
+    localStorage.removeItem(DISCOVER_CURRENT_USER_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures and keep Discover usable.
+  }
+}
 
 function calcAge(birthDate: string) {
   const diff = Date.now() - new Date(birthDate).getTime();
@@ -559,6 +585,21 @@ export default function DiscoverPage() {
   const [liking, setLiking] = useState(false);
   const [discoverError, setDiscoverError] = useState("");
 
+  function applyDiscoverProfiles(
+    profiles: DiscoverProfileData[],
+    preferredUserId = readStoredDiscoverUserId(),
+  ) {
+    const nextUsers = profiles.map(userFromDiscoverProfile);
+    const restoredIndex = preferredUserId
+      ? nextUsers.findIndex((user) => user.id === preferredUserId)
+      : -1;
+    const nextIndex = restoredIndex >= 0 ? restoredIndex : 0;
+
+    setUsers(nextUsers);
+    setCurrentIndex(nextIndex);
+    writeStoredDiscoverUserId(nextUsers[nextIndex]?.id ?? "");
+  }
+
   function nationalityToApi(value: FilterState["nationality"]) {
     if (value === "Japanese") return "JP";
     if (value === "Vietnamese") return "VN";
@@ -590,8 +631,7 @@ export default function DiscoverPage() {
         interestTagIds: selectedInterestTagIds(nextFilter, nextFilterOptions?.interests ?? []),
         excludeUserIds: nextExcludedUserIds,
       });
-      setUsers(profiles.map(userFromDiscoverProfile));
-      setCurrentIndex(0);
+      applyDiscoverProfiles(profiles);
     } catch (error) {
       setDiscoverError(error instanceof Error ? error.message : "ユーザーを読み込めませんでした。");
       setUsers([]);
@@ -613,8 +653,7 @@ export default function DiscoverPage() {
         const profiles = await getDiscoverProfiles();
         if (!active) return;
         setFilterOptions(options);
-        setUsers(profiles.map(userFromDiscoverProfile));
-        setCurrentIndex(0);
+        applyDiscoverProfiles(profiles);
       } catch (error) {
         if (!active) return;
         setDiscoverError(error instanceof Error ? error.message : "ユーザーを読み込めませんでした。");
@@ -637,12 +676,15 @@ export default function DiscoverPage() {
   function removeInterestedUser(userId: string) {
     const nextExcludedUserIds = Array.from(new Set([...excludedUserIds, userId]));
     const remainingUsers = users.filter((user) => user.id !== userId);
+    const nextIndex =
+      remainingUsers.length === 0
+        ? 0
+        : Math.min(currentIndex, remainingUsers.length - 1);
 
     setExcludedUserIds(nextExcludedUserIds);
     setUsers(remainingUsers);
-    setCurrentIndex((index) =>
-      remainingUsers.length === 0 ? 0 : Math.min(index, remainingUsers.length - 1),
-    );
+    setCurrentIndex(nextIndex);
+    writeStoredDiscoverUserId(remainingUsers[nextIndex]?.id ?? "");
   }
 
   function handleSkip() {
@@ -650,14 +692,17 @@ export default function DiscoverPage() {
 
     if (users.length <= 1) {
       setCurrentIndex(0);
+      writeStoredDiscoverUserId(current.id);
       return;
     }
 
     const remainingUsers = users.filter((user) => user.id !== current.id);
     const cycledUsers = [...remainingUsers, current];
+    const nextIndex = currentIndex >= users.length - 1 ? 0 : currentIndex;
 
     setUsers(cycledUsers);
-    setCurrentIndex(currentIndex >= users.length - 1 ? 0 : currentIndex);
+    setCurrentIndex(nextIndex);
+    writeStoredDiscoverUserId(cycledUsers[nextIndex]?.id ?? "");
   }
 
   async function handleLike() {

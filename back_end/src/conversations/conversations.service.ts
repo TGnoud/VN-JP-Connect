@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { UploadApiResponse, v2 as cloudinary } from 'cloudinary';
 import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { Model, Types } from 'mongoose';
@@ -53,6 +54,10 @@ type UploadedAttachmentFile = {
   size?: number;
 };
 
+type StoredMessageAttachment = {
+  url: string;
+};
+
 const MAX_GROUP_NAME_LENGTH = 50;
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TRANSLATE_LENGTH = 500;
@@ -98,6 +103,8 @@ const MESSAGE_TYPES: MessageType[] = [
 
 @Injectable()
 export class ConversationsService {
+  private readonly cloudinaryEnabled: boolean;
+
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(Profile.name)
@@ -109,7 +116,21 @@ export class ConversationsService {
     private readonly messageModel: Model<MessageDocument>,
     @InjectModel(ConversationFeedback.name)
     private readonly conversationFeedbackModel: Model<ConversationFeedbackDocument>,
-  ) {}
+  ) {
+    this.cloudinaryEnabled = Boolean(
+      process.env.CLOUDINARY_CLOUD_NAME &&
+        process.env.CLOUDINARY_API_KEY &&
+        process.env.CLOUDINARY_API_SECRET,
+    );
+
+    if (this.cloudinaryEnabled) {
+      cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+      });
+    }
+  }
 
   async listConversations(currentUserId: string, search = '') {
     const currentObjectId = this.objectIdFromParam(
@@ -417,12 +438,11 @@ export class ConversationsService {
     }
 
     const now = new Date();
-    const extension = extname(safeOriginalName).slice(0, 12);
-    const filename = `${randomUUID()}${extension}`;
-    const uploadDir = join(process.cwd(), 'uploads', 'messages');
-
-    await mkdir(uploadDir, { recursive: true });
-    await writeFile(join(uploadDir, filename), file.buffer);
+    const storedAttachment = await this.saveMessageAttachment(
+      file,
+      safeOriginalName,
+      messageType,
+    );
 
     const content = `${
       messageType === 'media'
@@ -432,7 +452,7 @@ export class ConversationsService {
           : '[File]'
     } ${safeOriginalName}`;
     const attachment = {
-      url: `/uploads/messages/${filename}`,
+      url: storedAttachment.url,
       file_name: safeOriginalName,
       mime_type: file.mimetype,
       size: file.size ?? file.buffer.length,
@@ -1030,6 +1050,97 @@ export class ConversationsService {
     const compact = trimmed.replace(/\s+/g, ' ');
 
     return compact.slice(0, 255) || 'attachment';
+  }
+
+  private async saveMessageAttachment(
+    file: UploadedAttachmentFile,
+    safeOriginalName: string,
+    messageType: MessageType,
+  ): Promise<StoredMessageAttachment> {
+    if (this.cloudinaryEnabled) {
+      return this.uploadMessageAttachmentToCloudinary(
+        file,
+        safeOriginalName,
+        messageType,
+      );
+    }
+
+    const extension = this.attachmentExtension(file.mimetype, safeOriginalName);
+    const filename = `${randomUUID()}${extension}`;
+    const uploadDir = join(process.cwd(), 'uploads', 'messages');
+
+    await mkdir(uploadDir, { recursive: true });
+    await writeFile(join(uploadDir, filename), file.buffer!);
+
+    return { url: `/uploads/messages/${filename}` };
+  }
+
+  private uploadMessageAttachmentToCloudinary(
+    file: UploadedAttachmentFile,
+    safeOriginalName: string,
+    messageType: MessageType,
+  ) {
+    return new Promise<StoredMessageAttachment>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: `vn-jp-connect/messages/${messageType}`,
+          resource_type: 'auto',
+          public_id: `${messageType}-${randomUUID()}`,
+          filename_override: safeOriginalName,
+        },
+        (error, result?: UploadApiResponse) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          if (!result?.secure_url) {
+            reject(new Error('Cloudinary upload did not return a secure URL'));
+            return;
+          }
+
+          resolve({ url: result.secure_url });
+        },
+      );
+
+      stream.end(file.buffer!);
+    });
+  }
+
+  private attachmentExtension(mimetype: string, safeOriginalName: string) {
+    const existingExtension = extname(safeOriginalName).slice(0, 12);
+
+    if (existingExtension) {
+      return existingExtension;
+    }
+
+    const extensions: Record<string, string> = {
+      'application/pdf': '.pdf',
+      'application/msword': '.doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        '.docx',
+      'application/vnd.ms-excel': '.xls',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+        '.xlsx',
+      'application/vnd.ms-powerpoint': '.ppt',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+        '.pptx',
+      'audio/mp4': '.m4a',
+      'audio/mpeg': '.mp3',
+      'audio/ogg': '.ogg',
+      'audio/wav': '.wav',
+      'audio/webm': '.webm',
+      'image/gif': '.gif',
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+      'text/plain': '.txt',
+      'video/mp4': '.mp4',
+      'video/quicktime': '.mov',
+      'video/webm': '.webm',
+    };
+
+    return extensions[mimetype] ?? '';
   }
 
   private optionalMessageType(value: unknown): MessageType {
