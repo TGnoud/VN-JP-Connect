@@ -309,7 +309,7 @@ function RoomItem({ room, isActive, onClick }: { room: MockRoom; isActive: boole
       className={clsx("w-full flex items-center gap-3 px-4 py-3 text-left transition-colors", isActive ? "bg-gray-100" : "hover:bg-gray-50")}
     >
       <div className="relative w-11 h-11 shrink-0">
-        <div className="w-full h-full rounded-full overflow-hidden bg-gray-200">
+        <div className="relative w-full h-full rounded-full overflow-hidden bg-gray-200">
           <Image src={room.avatar} alt={room.name} fill className="object-cover" unoptimized />
         </div>
         <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white" />
@@ -770,7 +770,7 @@ export default function ChatPage() {
         <div className="flex items-center justify-between px-5 py-3.5 bg-white border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 shrink-0">
-              <div className="w-full h-full rounded-full overflow-hidden bg-gray-200">
+              <div className="relative w-full h-full rounded-full overflow-hidden bg-gray-200">
                 <Image src={activeRoom.avatar} alt={activeRoom.name} fill className="object-cover" unoptimized />
               </div>
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white" />
@@ -1047,7 +1047,7 @@ export default function ChatPage() {
                         className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 transition-colors text-left"
                       >
                         <div className="relative w-10 h-10 shrink-0">
-                          <div className="w-full h-full rounded-full overflow-hidden bg-gray-200">
+                          <div className="relative w-full h-full rounded-full overflow-hidden bg-gray-200">
                             <Image
                               src={resolveMediaUrl(user.avatarUrl, 80) || EMPTY_ROOM.avatar}
                               alt={user.fullName}
