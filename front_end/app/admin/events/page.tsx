@@ -392,7 +392,7 @@ type View = "list" | "create";
 
 export default function AdminEventsPage() {
   const [view, setView]           = useState<View>("list");
-  const [events, setEvents]       = useState<AdminEvent[]>(INITIAL_EVENTS);
+  const [events, setEvents]       = useState<AdminEvent[]>([]);
   const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE);
   const [editModal, setEditModal] = useState<AdminEvent | null>(null);
   const [editForm, setEditForm]   = useState<EditForm | null>(null);

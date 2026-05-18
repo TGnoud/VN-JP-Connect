@@ -661,12 +661,12 @@ const CATEGORY_FILTERS = ["すべて", "文化交流", "料理", "言語学習",
 type CategoryFilter = (typeof CATEGORY_FILTERS)[number];
 
 export default function EventsPage() {
-  const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
-  const [selectedId, setSelectedId] = useState<string>(INITIAL_EVENTS[0].id);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("すべて");
   const [showFilterChips, setShowFilterChips] = useState(false);
-  const [showDetail, setShowDetail] = useState(true);
+  const [showDetail, setShowDetail] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [eventError, setEventError] = useState("");
   const [pendingEventIds, setPendingEventIds] = useState<Set<string>>(
