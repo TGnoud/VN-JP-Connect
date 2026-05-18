@@ -155,6 +155,20 @@ export interface ChatMessagesResponse {
   requiresFavoritePrompt: boolean;
 }
 
+export interface MessageCreatedRealtimeEvent {
+  type: "message.created";
+  conversationId: string;
+  message: ChatMessage;
+  conversation: ChatConversation;
+}
+
+export interface MessagesReadRealtimeEvent {
+  type: "messages.read";
+  conversationId: string;
+  readerUserId: string;
+  readAt: string;
+}
+
 export interface MatchedConversationUser {
   id: string;
   fullName: string;
@@ -284,6 +298,54 @@ async function requestApi<T>(path: string, init: RequestInit = {}) {
   }
 
   return response.json() as Promise<T>;
+}
+
+export function subscribeConversationEvents({
+  onMessageCreated,
+  onMessagesRead,
+  onError,
+}: {
+  onMessageCreated?: (event: MessageCreatedRealtimeEvent) => void;
+  onMessagesRead?: (event: MessagesReadRealtimeEvent) => void;
+  onError?: (event: Event) => void;
+}) {
+  if (typeof EventSource === "undefined") {
+    return () => undefined;
+  }
+
+  const url = new URL(`${API_BASE_URL}/conversations/events`);
+  url.searchParams.set("userId", requireCurrentUserId());
+  const source = new EventSource(url.toString());
+
+  source.addEventListener("message.created", (event) => {
+    try {
+      const data = JSON.parse((event as MessageEvent).data) as Omit<
+        MessageCreatedRealtimeEvent,
+        "type"
+      >;
+      onMessageCreated?.({ type: "message.created", ...data });
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  source.addEventListener("messages.read", (event) => {
+    try {
+      const data = JSON.parse((event as MessageEvent).data) as Omit<
+        MessagesReadRealtimeEvent,
+        "type"
+      >;
+      onMessagesRead?.({ type: "messages.read", ...data });
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  source.onerror = (event) => {
+    onError?.(event);
+  };
+
+  return () => source.close();
 }
 
 export function resolveMediaUrl(url?: string, preferredWidth = 1200) {

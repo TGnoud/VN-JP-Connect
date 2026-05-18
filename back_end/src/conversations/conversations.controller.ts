@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   Query,
+  Sse,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -61,6 +62,11 @@ export class ConversationsController {
     @Param('userId') userId: string,
   ) {
     return this.conversationsService.openWithUser(currentUserId, userId);
+  }
+
+  @Sse('events')
+  subscribeEvents(@Query('userId') userId?: string) {
+    return this.conversationsService.subscribeRealtimeEvents(userId ?? '');
   }
 
   @Get(':conversationId/messages')

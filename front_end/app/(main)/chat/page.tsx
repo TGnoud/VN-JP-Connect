@@ -14,6 +14,7 @@ import {
   resolveMediaUrl,
   sendConversationAttachment,
   sendConversationMessage,
+  subscribeConversationEvents,
   submitConversationFavoriteFeedback,
   translateConversationText,
   type ChatAttachment,
@@ -21,6 +22,8 @@ import {
   type ChatMessage,
   type ChatParticipant,
   type MatchedConversationUser,
+  type MessageCreatedRealtimeEvent,
+  type MessagesReadRealtimeEvent,
 } from "@/lib/profile-api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -49,6 +52,7 @@ interface Msg {
   time: string;
   sentAt?: string;
   status: "sending" | "sent" | "read";
+  readBy?: string[];
 }
 
 type ToolPanel = "attachment" | "emoji" | "voice" | "suggestions" | "translate" | null;
@@ -218,6 +222,7 @@ function mapMessage(message: ChatMessage): Msg {
     time: formatChatTime(message.sentAt),
     sentAt: message.sentAt,
     status: message.status,
+    readBy: message.readBy,
   };
 }
 
@@ -658,6 +663,8 @@ export default function ChatPage() {
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingStartedAtRef = useRef(0);
   const recordingConversationIdRef = useRef("");
+  const activeRoomIdRef = useRef("");
+  const roomsRef = useRef<MockRoom[]>([]);
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId) ?? rooms[0] ?? EMPTY_ROOM;
   const roomMessages = messages[activeRoomId] ?? [];
@@ -681,6 +688,14 @@ export default function ChatPage() {
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     mediaStreamRef.current = null;
   }
+
+  useEffect(() => {
+    activeRoomIdRef.current = activeRoomId;
+  }, [activeRoomId]);
+
+  useEffect(() => {
+    roomsRef.current = rooms;
+  }, [rooms]);
 
   useEffect(() => {
     return () => {
@@ -792,6 +807,103 @@ export default function ChatPage() {
 
     return () => window.clearTimeout(timer);
   }, [activeRoomId, rooms, messageCounts, favoritePromptRequired, feedbackDismissed]);
+
+  useEffect(() => {
+    try {
+      return subscribeConversationEvents({
+        onMessageCreated: handleRealtimeMessageCreated,
+        onMessagesRead: handleRealtimeMessagesRead,
+        onError: (event) => {
+          console.error("Conversation realtime stream error", event);
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      return undefined;
+    }
+  }, []);
+
+  function sortRoomsByActivity(nextRooms: MockRoom[]) {
+    return [...nextRooms].sort(
+      (a, b) =>
+        new Date(b.lastMessageAt ?? 0).getTime() -
+        new Date(a.lastMessageAt ?? 0).getTime(),
+    );
+  }
+
+  function upsertRealtimeRoom(conversation: ChatConversation, isActive: boolean) {
+    const nextRoom = mapConversation(conversation);
+    const roomForState = isActive ? { ...nextRoom, unread: 0 } : nextRoom;
+
+    setRooms((prev) => {
+      const exists = prev.some((room) => room.id === roomForState.id);
+      const next = exists
+        ? prev.map((room) =>
+            room.id === roomForState.id
+              ? {
+                  ...room,
+                  ...roomForState,
+                  unread: isActive ? 0 : roomForState.unread,
+                }
+              : room,
+          )
+        : [roomForState, ...prev];
+      const sorted = sortRoomsByActivity(next);
+      roomsRef.current = sorted;
+      return sorted;
+    });
+  }
+
+  function handleRealtimeMessageCreated(event: MessageCreatedRealtimeEvent) {
+    const conversationId = event.conversationId || event.message.conversationId;
+    if (!conversationId || event.message.senderId === "me") return;
+
+    const isActive = activeRoomIdRef.current === conversationId;
+    const nextMsg = mapMessage(event.message);
+
+    setMessages((prev) => {
+      const currentMessages = prev[conversationId] ?? [];
+      if (currentMessages.some((message) => message.id === nextMsg.id)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [conversationId]: [...currentMessages, nextMsg],
+      };
+    });
+    setMessageCounts((prev) => ({
+      ...prev,
+      [conversationId]: (prev[conversationId] ?? 0) + 1,
+    }));
+    upsertRealtimeRoom(event.conversation, isActive);
+
+    if (isActive) {
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      void markConversationRead(conversationId).catch((error) => console.error(error));
+    }
+  }
+
+  function handleRealtimeMessagesRead(event: MessagesReadRealtimeEvent) {
+    const room = roomsRef.current.find((item) => item.id === event.conversationId);
+    const participantCount = Math.max(room?.participants?.length ?? 2, 2);
+
+    setMessages((prev) => ({
+      ...prev,
+      [event.conversationId]: (prev[event.conversationId] ?? []).map((message) => {
+        if (message.senderId !== "me") return message;
+
+        const readBy = Array.from(new Set([...(message.readBy ?? []), event.readerUserId]));
+        const isRead = room?.type === "group" ? readBy.length >= participantCount : true;
+
+        return {
+          ...message,
+          readBy,
+          status: isRead ? "read" : message.status,
+        };
+      }),
+    }));
+  }
 
   function updateRoomLastMessage(conversationId: string, content: string, sentAt: string) {
     setRooms((prev) =>

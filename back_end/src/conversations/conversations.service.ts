@@ -10,6 +10,8 @@ import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { Model, Types } from 'mongoose';
 import { extname, join } from 'path';
+import { Observable, Subject, interval, merge } from 'rxjs';
+import { filter, map } from 'rxjs/operators';
 import {
   Conversation,
   ConversationDocument,
@@ -58,6 +60,31 @@ type StoredMessageAttachment = {
   url: string;
 };
 
+type ConversationRealtimeEvent =
+  | {
+      userId: string;
+      type: 'message.created';
+      data: {
+        conversationId: string;
+        message: Record<string, any>;
+        conversation: Record<string, any>;
+      };
+    }
+  | {
+      userId: string;
+      type: 'messages.read';
+      data: {
+        conversationId: string;
+        readerUserId: string;
+        readAt: string;
+      };
+    };
+
+type SseMessage = {
+  type: string;
+  data: unknown;
+};
+
 const MAX_GROUP_NAME_LENGTH = 50;
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TRANSLATE_LENGTH = 500;
@@ -104,6 +131,7 @@ const MESSAGE_TYPES: MessageType[] = [
 @Injectable()
 export class ConversationsService {
   private readonly cloudinaryEnabled: boolean;
+  private readonly realtimeEvents$ = new Subject<ConversationRealtimeEvent>();
 
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
@@ -130,6 +158,26 @@ export class ConversationsService {
         api_secret: process.env.CLOUDINARY_API_SECRET,
       });
     }
+  }
+
+  subscribeRealtimeEvents(userId: string): Observable<SseMessage> {
+    const userObjectId = this.objectIdFromParam(userId, 'userId');
+    const normalizedUserId = userObjectId.toString();
+    const events$ = this.realtimeEvents$.pipe(
+      filter((event) => event.userId === normalizedUserId),
+      map((event) => ({
+        type: event.type,
+        data: event.data,
+      })),
+    );
+    const heartbeat$ = interval(25000).pipe(
+      map(() => ({
+        type: 'heartbeat',
+        data: { now: new Date().toISOString() },
+      })),
+    );
+
+    return merge(events$, heartbeat$);
   }
 
   async listConversations(currentUserId: string, search = '') {
@@ -370,11 +418,24 @@ export class ConversationsService {
       )
       .exec();
 
-    return this.messageResponse(
-      message.toObject(),
+    const savedMessage = message.toObject();
+    const senderResponse = this.messageResponse(
+      savedMessage,
       currentObjectId,
       conversation.participant_ids.length,
     );
+
+    await this.emitMessageCreated(
+      {
+        ...conversation,
+        last_message_at: now,
+        updated_at: now,
+      },
+      savedMessage,
+      currentObjectId,
+    );
+
+    return senderResponse;
   }
 
   async uploadAttachment(
@@ -482,11 +543,24 @@ export class ConversationsService {
       )
       .exec();
 
-    return this.messageResponse(
-      message.toObject(),
+    const savedMessage = message.toObject();
+    const senderResponse = this.messageResponse(
+      savedMessage,
       currentObjectId,
       conversation.participant_ids.length,
     );
+
+    await this.emitMessageCreated(
+      {
+        ...conversation,
+        last_message_at: now,
+        updated_at: now,
+      },
+      savedMessage,
+      currentObjectId,
+    );
+
+    return senderResponse;
   }
 
   async markRead(currentUserId: string, conversationId: string) {
@@ -499,7 +573,7 @@ export class ConversationsService {
       conversationId,
     );
 
-    await this.messageModel
+    const result = await this.messageModel
       .updateMany(
         {
           conversation_id: conversation._id,
@@ -512,6 +586,10 @@ export class ConversationsService {
         },
       )
       .exec();
+
+    if ((result.modifiedCount ?? 0) > 0) {
+      this.emitMessagesRead(conversation, currentObjectId);
+    }
 
     return { unreadCount: 0 };
   }
@@ -1017,6 +1095,81 @@ export class ConversationsService {
       attachments: message.attachments ?? [],
       sentAt: message.sent_at,
     };
+  }
+
+  private async emitMessageCreated(
+    conversation: Record<string, any>,
+    message: Record<string, any>,
+    senderObjectId: Types.ObjectId,
+  ) {
+    const participantIds = (conversation.participant_ids ?? []).map(
+      (id: Types.ObjectId) => new Types.ObjectId(id),
+    );
+    const recipientIds = participantIds.filter(
+      (participantId: Types.ObjectId) => !participantId.equals(senderObjectId),
+    );
+
+    if (recipientIds.length === 0) {
+      return;
+    }
+
+    const context = await this.getUserContextForConversations([conversation]);
+
+    await Promise.all(
+      recipientIds.map(async (recipientId) => {
+        const unreadCount = await this.messageModel
+          .countDocuments({
+            conversation_id: conversation._id,
+            sender_id: { $ne: recipientId },
+            read_by: { $ne: recipientId },
+          })
+          .exec();
+
+        this.realtimeEvents$.next({
+          userId: recipientId.toString(),
+          type: 'message.created',
+          data: {
+            conversationId: conversation._id.toString(),
+            message: this.messageResponse(
+              message,
+              recipientId,
+              participantIds.length,
+            ),
+            conversation: this.conversationSummary(
+              conversation,
+              recipientId,
+              message,
+              unreadCount,
+              context,
+            ),
+          },
+        });
+      }),
+    );
+  }
+
+  private emitMessagesRead(
+    conversation: Record<string, any>,
+    readerObjectId: Types.ObjectId,
+  ) {
+    const readAt = new Date().toISOString();
+
+    for (const participantId of conversation.participant_ids ?? []) {
+      const recipientId = new Types.ObjectId(participantId);
+      if (recipientId.equals(readerObjectId)) {
+        continue;
+      }
+
+      this.realtimeEvents$.next({
+        userId: recipientId.toString(),
+        type: 'messages.read',
+        data: {
+          conversationId: conversation._id.toString(),
+          readerUserId: readerObjectId.toString(),
+          readAt,
+        },
+      });
+    }
   }
 
   private avatarUrl(user: Record<string, any>, profile?: Record<string, any>) {
