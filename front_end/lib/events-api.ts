@@ -55,6 +55,41 @@ function requireUserId() {
   throw new Error("Login is required before using events.");
 }
 
+function parseApiErrorMessage(path: string, status: number, rawBody: string) {
+  const fallback = `Request failed with status ${status}`;
+  const trimmed = rawBody.trim();
+
+  if (!trimmed) {
+    return fallback;
+  }
+
+  try {
+    const errorBody = JSON.parse(trimmed) as { message?: unknown };
+    const message = errorBody.message;
+
+    if (Array.isArray(message)) {
+      return message.map(String).join(", ");
+    }
+
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  } catch {
+    // Non-JSON responses are handled below.
+  }
+
+  const plainText = trimmed
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (/Cannot\s+GET\s+\/events/i.test(plainText)) {
+    return `Backend API at ${API_BASE_URL} does not expose ${path}. Check Render deployment and NEXT_PUBLIC_API_BASE_URL.`;
+  }
+
+  return plainText.slice(0, 300) || fallback;
+}
+
 async function requestEventsApi<T>(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
 
@@ -81,16 +116,15 @@ async function requestEventsApi<T>(path: string, init: RequestInit = {}) {
   }
 
   if (!response.ok) {
-    let message = `Request failed with status ${response.status}`;
+    let rawBody = "";
 
     try {
-      const errorBody = await response.json();
-      message = errorBody.message ?? message;
+      rawBody = await response.text();
     } catch {
-      // Keep the status-based message when the response is not JSON.
+      // Keep an empty body and use the status fallback below.
     }
 
-    throw new Error(Array.isArray(message) ? message.join(", ") : message);
+    throw new Error(parseApiErrorMessage(path, response.status, rawBody));
   }
 
   return response.json() as Promise<T>;

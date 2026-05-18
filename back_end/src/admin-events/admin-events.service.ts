@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { UploadApiResponse, v2 as cloudinary } from 'cloudinary';
 import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
@@ -38,13 +40,29 @@ const COVER_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 @Injectable()
 export class AdminEventsService {
+  private readonly cloudinaryEnabled: boolean;
+
   constructor(
     @InjectModel(Event.name) private readonly eventModel: Model<EventDocument>,
     @InjectModel(EventParticipant.name)
     private readonly eventParticipantModel: Model<EventParticipantDocument>,
     @InjectModel(EventBookmark.name)
     private readonly eventBookmarkModel: Model<EventBookmarkDocument>,
-  ) {}
+  ) {
+    this.cloudinaryEnabled = Boolean(
+      process.env.CLOUDINARY_CLOUD_NAME &&
+        process.env.CLOUDINARY_API_KEY &&
+        process.env.CLOUDINARY_API_SECRET,
+    );
+
+    if (this.cloudinaryEnabled) {
+      cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+      });
+    }
+  }
 
   async listEvents() {
     const events = await this.eventModel
@@ -151,6 +169,16 @@ export class AdminEventsService {
       throw new BadRequestException('cover image must be at most 5MB');
     }
 
+    if (this.cloudinaryEnabled) {
+      return this.uploadCoverImageToCloudinary(file);
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      throw new ServiceUnavailableException(
+        'Cloudinary is not configured for event cover uploads',
+      );
+    }
+
     const uploadDir = join(process.cwd(), 'uploads', 'admin-events');
     const filename = `${randomUUID()}${COVER_IMAGE_MIME_TYPES[file.mimetype]}`;
 
@@ -158,6 +186,34 @@ export class AdminEventsService {
     await writeFile(join(uploadDir, filename), file.buffer);
 
     return { url: `/uploads/admin-events/${filename}` };
+  }
+
+  private uploadCoverImageToCloudinary(file: UploadedFileLike) {
+    return new Promise<{ url: string }>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'vn-jp-connect/admin-events',
+          public_id: `event-cover-${randomUUID()}`,
+          resource_type: 'image',
+          filename_override: file.originalname,
+        },
+        (error, result?: UploadApiResponse) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          if (!result?.secure_url) {
+            reject(new Error('Cloudinary upload did not return a secure URL'));
+            return;
+          }
+
+          resolve({ url: result.secure_url });
+        },
+      );
+
+      stream.end(file.buffer);
+    });
   }
 
   private normalizePayload(payload: AdminEventPayload, fallback?: Record<string, any>) {
