@@ -1,8 +1,18 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import {
+  bookmarkUserEvent,
+  getUserEvents,
+  joinUserEvent,
+  leaveUserEvent,
+  resolveEventMediaUrl,
+  unbookmarkUserEvent,
+  type UserEventData,
+  type UserEventParticipantPreview,
+} from "@/lib/events-api";
 
-type EventCategory = "文化交流" | "料理" | "言語学習";
+type EventCategory = string;
 
 interface EventItem {
   id: string;
@@ -22,12 +32,15 @@ interface EventItem {
   expectations: string[];
   gradient: string;
   imageUrl?: string;
+  participantsPreview: UserEventParticipantPreview[];
+  shareUrl: string;
 }
 
 const CATEGORY_BG: Record<string, string> = {
   "文化交流": "#1B4332",
   "料理": "#92400e",
   "言語学習": "#1e3a5f",
+  "ワークショップ": "#6d28d9",
 };
 
 const INITIAL_EVENTS: EventItem[] = [
@@ -55,6 +68,8 @@ const INITIAL_EVENTS: EventItem[] = [
     ],
     gradient: "from-emerald-900 via-green-700 to-emerald-500",
     imageUrl: "https://picsum.photos/seed/aodai-culture/800/300",
+    participantsPreview: [],
+    shareUrl: "/events?eventId=e1",
   },
   {
     id: "e2",
@@ -79,6 +94,8 @@ const INITIAL_EVENTS: EventItem[] = [
     ],
     gradient: "from-amber-800 via-orange-600 to-amber-400",
     imageUrl: "https://picsum.photos/seed/cooking-vn/800/300",
+    participantsPreview: [],
+    shareUrl: "/events?eventId=e2",
   },
   {
     id: "e3",
@@ -103,6 +120,8 @@ const INITIAL_EVENTS: EventItem[] = [
     ],
     gradient: "from-blue-900 via-indigo-700 to-blue-500",
     imageUrl: "https://picsum.photos/seed/language-study/800/300",
+    participantsPreview: [],
+    shareUrl: "/events?eventId=e3",
   },
 ];
 
@@ -115,6 +134,95 @@ const SHARE_OPTIONS = [
   { label: "LinkedIn", bg: "#0A66C2", text: "in" },
   { label: "メール", bg: "#ef4444", text: "✉" },
 ];
+
+const CATEGORY_GRADIENTS: Record<string, string> = {
+  "文化交流": "from-emerald-900 via-green-700 to-emerald-500",
+  "料理": "from-amber-800 via-orange-600 to-amber-400",
+  "言語学習": "from-blue-900 via-indigo-700 to-blue-500",
+  "ワークショップ": "from-violet-900 via-purple-700 to-violet-500",
+};
+
+function formatDateLabel(date: string) {
+  if (!date) {
+    return "";
+  }
+
+  const value = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(value.getTime())) {
+    return date;
+  }
+
+  return value.toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function weekdayLabel(date: string) {
+  if (!date) {
+    return "";
+  }
+
+  const value = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(value.getTime())) {
+    return "";
+  }
+
+  return value.toLocaleDateString("ja-JP", { weekday: "short" });
+}
+
+function eventVenue(event: UserEventData) {
+  if (event.format === "online") {
+    return "オンライン";
+  }
+
+  if (event.format === "hybrid") {
+    return event.location || "ハイブリッド";
+  }
+
+  return event.location || "未定";
+}
+
+function eventAddress(event: UserEventData) {
+  if (event.format === "online") {
+    return event.onlineUrl || "オンライン";
+  }
+
+  if (event.format === "hybrid") {
+    return [event.location, event.onlineUrl].filter(Boolean).join(" / ");
+  }
+
+  return event.location || "未定";
+}
+
+function mapUserEvent(event: UserEventData): EventItem {
+  const capacity = event.capacity ?? Math.max(event.currentParticipants, 1);
+
+  return {
+    id: event.id,
+    title: event.title,
+    category: event.category || "その他",
+    date: formatDateLabel(event.startDate),
+    startTime: event.startTime,
+    endTime: event.endTime,
+    weekday: weekdayLabel(event.startDate),
+    venue: eventVenue(event),
+    address: eventAddress(event),
+    maxParticipants: Math.max(capacity, event.currentParticipants, 1),
+    currentParticipants: event.currentParticipants,
+    isJoined: event.isJoined,
+    isBookmarked: event.isBookmarked,
+    about: event.description,
+    expectations: [],
+    gradient:
+      CATEGORY_GRADIENTS[event.category] ??
+      "from-slate-800 via-emerald-700 to-teal-500",
+    imageUrl: resolveEventMediaUrl(event.coverImageUrl) || undefined,
+    participantsPreview: event.participantsPreview ?? [],
+    shareUrl: event.shareUrl,
+  };
+}
 
 function StarIcon({ filled }: { filled: boolean }) {
   return (
@@ -151,7 +259,15 @@ function PlusCircleIcon() {
   );
 }
 
-function ShareDropdown({ onClose }: { onClose: () => void }) {
+function ShareDropdown({
+  eventTitle,
+  shareUrl,
+  onClose,
+}: {
+  eventTitle: string;
+  shareUrl: string;
+  onClose: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -163,12 +279,50 @@ function ShareDropdown({ onClose }: { onClose: () => void }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
 
+  function absoluteShareUrl() {
+    if (shareUrl.startsWith("http://") || shareUrl.startsWith("https://")) {
+      return shareUrl;
+    }
+
+    if (typeof window === "undefined") {
+      return shareUrl;
+    }
+
+    return `${window.location.origin}${shareUrl}`;
+  }
+
   function handleCopy() {
+    const url = absoluteShareUrl();
     if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+      navigator.clipboard.writeText(url);
     }
     setCopied(true);
     setTimeout(() => onClose(), 1800);
+  }
+
+  function handleShare(label: string) {
+    const url = encodeURIComponent(absoluteShareUrl());
+    const title = encodeURIComponent(eventTitle);
+    const shareTargets: Record<string, string> = {
+      LINE: `https://social-plugins.line.me/lineit/share?url=${url}`,
+      Facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
+      "X (Twitter)": `https://twitter.com/intent/tweet?url=${url}&text=${title}`,
+      LinkedIn: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
+      メール: `mailto:?subject=${title}&body=${url}`,
+    };
+    const target = shareTargets[label];
+
+    if (!target) {
+      onClose();
+      return;
+    }
+
+    if (label === "メール") {
+      window.location.href = target;
+    } else {
+      window.open(target, "_blank", "noreferrer");
+    }
+    onClose();
   }
 
   return (
@@ -185,7 +339,7 @@ function ShareDropdown({ onClose }: { onClose: () => void }) {
           <button
             key={opt.label}
             className="flex items-center gap-4 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-left"
-            onClick={onClose}
+            onClick={() => handleShare(opt.label)}
           >
             <span
               className="rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
@@ -312,10 +466,20 @@ function EventDetail({
   onToggleBookmark: (id: string) => void;
 }) {
   const [showShare, setShowShare] = useState(false);
-  const spotsLeft = event.maxParticipants - event.currentParticipants;
-  const progressPct = Math.round((event.currentParticipants / event.maxParticipants) * 100);
-  const visibleAvatars = AVATAR_SEEDS.slice(0, Math.min(4, event.currentParticipants));
-  const extraCount = event.currentParticipants - visibleAvatars.length;
+  const spotsLeft = Math.max(event.maxParticipants - event.currentParticipants, 0);
+  const progressPct =
+    event.maxParticipants > 0
+      ? Math.min(100, Math.round((event.currentParticipants / event.maxParticipants) * 100))
+      : 0;
+  const visibleAvatars =
+    event.participantsPreview.length > 0
+      ? event.participantsPreview
+      : AVATAR_SEEDS.slice(0, Math.min(4, event.currentParticipants)).map((seed) => ({
+          id: seed,
+          fullName: seed,
+          avatarUrl: `https://api.dicebear.com/7.x/personas/svg?seed=${seed}`,
+        }));
+  const extraCount = Math.max(event.currentParticipants - visibleAvatars.length, 0);
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
@@ -375,7 +539,13 @@ function EventDetail({
               </svg>
               共有
             </button>
-            {showShare && <ShareDropdown onClose={() => setShowShare(false)} />}
+            {showShare && (
+              <ShareDropdown
+                eventTitle={event.title}
+                shareUrl={event.shareUrl}
+                onClose={() => setShowShare(false)}
+              />
+            )}
           </div>
         </div>
 
@@ -428,11 +598,11 @@ function EventDetail({
           </div>
           <div className="flex items-center gap-3 mb-3">
             <div className="flex items-center">
-              {visibleAvatars.map((seed, i) => (
+              {visibleAvatars.map((participant, i) => (
                 <img
-                  key={seed}
-                  src={`https://api.dicebear.com/7.x/personas/svg?seed=${seed}`}
-                  alt=""
+                  key={participant.id}
+                  src={resolveEventMediaUrl(participant.avatarUrl)}
+                  alt={participant.fullName}
                   className="rounded-full border-2 border-white object-cover"
                   style={{ width: 32, height: 32, marginLeft: i === 0 ? 0 : -10, zIndex: visibleAvatars.length - i }}
                 />
@@ -497,35 +667,147 @@ export default function EventsPage() {
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("すべて");
   const [showFilterChips, setShowFilterChips] = useState(false);
   const [showDetail, setShowDetail] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [eventError, setEventError] = useState("");
+  const [pendingEventIds, setPendingEventIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const selectedEvent = events.find((e) => e.id === selectedId) ?? events[0];
-  const filteredEvents = events.filter((e) => {
-    const matchSearch =
-      e.title.toLowerCase().includes(search.toLowerCase()) ||
-      e.venue.toLowerCase().includes(search.toLowerCase()) ||
-      e.category.includes(search);
-    const matchCategory = activeCategory === "すべて" || e.category === activeCategory;
-    return matchSearch && matchCategory;
-  });
+  const filteredEvents = events;
 
-  function handleToggleJoin(id: string) {
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setIsLoading(true);
+      setEventError("");
+
+      try {
+        const response = await getUserEvents({ search, category: activeCategory });
+        if (cancelled) return;
+
+        const nextEvents = response.events.map(mapUserEvent);
+        const requestedId =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("eventId")
+            : "";
+
+        setEvents(nextEvents);
+        setSelectedId((currentId) => {
+          if (requestedId && nextEvents.some((event) => event.id === requestedId)) {
+            return requestedId;
+          }
+          if (nextEvents.some((event) => event.id === currentId)) {
+            return currentId;
+          }
+          return nextEvents[0]?.id ?? "";
+        });
+        setShowDetail((current) => {
+          if (nextEvents.length === 0) {
+            return false;
+          }
+          return requestedId ? true : current;
+        });
+      } catch (error) {
+        if (cancelled) return;
+        setEventError(error instanceof Error ? error.message : "イベントを読み込めませんでした");
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [search, activeCategory]);
+
+  function replaceEventInState(updated: UserEventData) {
+    const mapped = mapUserEvent(updated);
+
     setEvents((prev) =>
-      prev.map((e) =>
-        e.id === id
-          ? {
-              ...e,
-              isJoined: !e.isJoined,
-              currentParticipants: e.currentParticipants + (e.isJoined ? -1 : 1),
-            }
-          : e
-      )
+      prev.map((event) => (event.id === mapped.id ? mapped : event)),
     );
+    setSelectedId(mapped.id);
   }
 
-  function handleToggleBookmark(id: string) {
-    setEvents((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, isBookmarked: !e.isBookmarked } : e))
-    );
+  function updateSelectedEventInUrl(id: string) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("eventId", id);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }
+
+  async function handleToggleJoin(id: string) {
+    if (pendingEventIds.has(id)) {
+      return;
+    }
+
+    const target = events.find((event) => event.id === id);
+    if (!target) {
+      return;
+    }
+
+    setPendingEventIds((prev) => new Set(prev).add(id));
+
+    try {
+      const updated = target.isJoined
+        ? await leaveUserEvent(id)
+        : await joinUserEvent(id);
+      replaceEventInState(updated);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "イベント参加処理に失敗しました");
+    } finally {
+      setPendingEventIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  async function handleToggleBookmark(id: string) {
+    if (pendingEventIds.has(id)) {
+      return;
+    }
+
+    const target = events.find((event) => event.id === id);
+    if (!target) {
+      return;
+    }
+
+    setPendingEventIds((prev) => new Set(prev).add(id));
+
+    try {
+      const updated = target.isBookmarked
+        ? await unbookmarkUserEvent(id)
+        : await bookmarkUserEvent(id);
+      replaceEventInState(updated);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "お気に入り処理に失敗しました");
+    } finally {
+      setPendingEventIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  function handleSelectEvent(event: EventItem) {
+    updateSelectedEventInUrl(event.id);
+
+    if (event.id === selectedId) {
+      setShowDetail((v) => !v);
+    } else {
+      setSelectedId(event.id);
+      setShowDetail(true);
+    }
   }
 
   return (
@@ -607,7 +889,16 @@ export default function EventsPage() {
 
         {/* List */}
         <div className={`flex-1 overflow-y-auto px-5 pb-5 gap-4 ${showDetail ? "flex flex-col" : "grid grid-cols-2 xl:grid-cols-3 auto-rows-min"}`}>
-          {filteredEvents.length === 0 ? (
+          {eventError && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">
+              {eventError}
+            </div>
+          )}
+          {isLoading && filteredEvents.length === 0 ? (
+            <div className="py-16 text-center text-gray-400 text-sm">
+              読み込み中...
+            </div>
+          ) : filteredEvents.length === 0 ? (
             <div className="py-16 text-center text-gray-400 text-sm">
               イベントが見つかりません
             </div>
@@ -617,14 +908,7 @@ export default function EventsPage() {
                 key={event.id}
                 event={event}
                 isSelected={event.id === selectedId && showDetail}
-                onSelect={() => {
-                  if (event.id === selectedId) {
-                    setShowDetail((v) => !v);
-                  } else {
-                    setSelectedId(event.id);
-                    setShowDetail(true);
-                  }
-                }}
+                onSelect={() => handleSelectEvent(event)}
                 onToggleBookmark={handleToggleBookmark}
               />
             ))

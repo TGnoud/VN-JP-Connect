@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { DevModule } from './dev/dev.module';
 import { AdminEventsModule } from './admin-events/admin-events.module';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AdminEventsModule } from './admin-events/admin-events.module';
     ConversationsModule,
     DevModule,
     AdminEventsModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

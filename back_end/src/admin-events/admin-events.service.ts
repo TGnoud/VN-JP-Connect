@@ -10,6 +10,8 @@ import { join } from 'path';
 import { Model, Types } from 'mongoose';
 import {
   Event,
+  EventBookmark,
+  EventBookmarkDocument,
   EventDocument,
   EventFormat,
   EventParticipant,
@@ -40,6 +42,8 @@ export class AdminEventsService {
     @InjectModel(Event.name) private readonly eventModel: Model<EventDocument>,
     @InjectModel(EventParticipant.name)
     private readonly eventParticipantModel: Model<EventParticipantDocument>,
+    @InjectModel(EventBookmark.name)
+    private readonly eventBookmarkModel: Model<EventBookmarkDocument>,
   ) {}
 
   async listEvents() {
@@ -126,7 +130,10 @@ export class AdminEventsService {
       throw new NotFoundException('event was not found');
     }
 
-    await this.eventParticipantModel.deleteMany({ event_id: eventObjectId }).exec();
+    await Promise.all([
+      this.eventParticipantModel.deleteMany({ event_id: eventObjectId }).exec(),
+      this.eventBookmarkModel.deleteMany({ event_id: eventObjectId }).exec(),
+    ]);
 
     return { id: eventObjectId.toString(), deleted: true };
   }

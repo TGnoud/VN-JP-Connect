@@ -57,6 +57,7 @@ export type ConversationFeedbackDocument =
   HydratedDocument<ConversationFeedback>;
 export type EventDocument = HydratedDocument<Event>;
 export type EventParticipantDocument = HydratedDocument<EventParticipant>;
+export type EventBookmarkDocument = HydratedDocument<EventBookmark>;
 export type ProfileDocument = HydratedDocument<Profile>;
 export type UserReportDocument = HydratedDocument<UserReport>;
 
@@ -590,4 +591,27 @@ EventParticipantSchema.index(
 EventParticipantSchema.index(
   { user_id: 1 },
   { name: 'event_participants_user_id_idx' },
+);
+
+@Schema({ collection: 'event_bookmarks', versionKey: false })
+export class EventBookmark {
+  @Prop({ required: true, type: Types.ObjectId, ref: Event.name })
+  event_id: Types.ObjectId;
+
+  @Prop({ required: true, type: Types.ObjectId, ref: User.name })
+  user_id: Types.ObjectId;
+
+  @Prop({ required: true, default: Date.now })
+  created_at: Date;
+}
+
+export const EventBookmarkSchema =
+  SchemaFactory.createForClass(EventBookmark);
+EventBookmarkSchema.index(
+  { event_id: 1, user_id: 1 },
+  { unique: true, name: 'event_bookmarks_event_user_unique' },
+);
+EventBookmarkSchema.index(
+  { user_id: 1 },
+  { name: 'event_bookmarks_user_id_idx' },
 );
