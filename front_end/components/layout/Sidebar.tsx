@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { clearStoredUserId } from "@/lib/auth-api";
-import { getHomeNavSummary } from "@/lib/profile-api";
+import { getHomeNavSummary, subscribeConversationEvents } from "@/lib/profile-api";
 
 const NAV_ITEMS = [
   {
@@ -53,28 +53,97 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const mountedRef = useRef(false);
+  const pathnameRef = useRef(pathname);
   const [navSummary, setNavSummary] = useState({
     unreadMessagesCount: 0,
     unreadEventsCount: 0,
   });
 
-  useEffect(() => {
-    let active = true;
-
+  function refreshNavSummary() {
     getHomeNavSummary()
       .then((summary) => {
-        if (active) {
+        if (mountedRef.current) {
           setNavSummary(summary);
         }
       })
       .catch(() => {
-        if (active) {
+        if (mountedRef.current) {
           setNavSummary({ unreadMessagesCount: 0, unreadEventsCount: 0 });
         }
       });
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    refreshNavSummary();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+    const timer = window.setTimeout(
+      refreshNavSummary,
+      pathname.startsWith("/chat") ? 350 : 0,
+    );
+
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
+
+  useEffect(() => {
+    let refreshTimer: number | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+      }
+
+      refreshTimer = window.setTimeout(
+        refreshNavSummary,
+        pathnameRef.current.startsWith("/chat") ? 350 : 150,
+      );
+    };
+
+    try {
+      const unsubscribe = subscribeConversationEvents({
+        onMessageCreated: () => {
+          if (!pathnameRef.current.startsWith("/chat")) {
+            setNavSummary((current) => ({
+              ...current,
+              unreadMessagesCount: current.unreadMessagesCount + 1,
+            }));
+          }
+          scheduleRefresh();
+        },
+      });
+
+      return () => {
+        if (refreshTimer) {
+          window.clearTimeout(refreshTimer);
+        }
+        unsubscribe();
+      };
+    } catch (error) {
+      console.error(error);
+      return () => {
+        if (refreshTimer) {
+          window.clearTimeout(refreshTimer);
+        }
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleConversationRead = () => {
+      window.setTimeout(refreshNavSummary, 150);
+    };
+
+    window.addEventListener("conversation:read", handleConversationRead);
 
     return () => {
-      active = false;
+      window.removeEventListener("conversation:read", handleConversationRead);
     };
   }, []);
 

@@ -492,10 +492,18 @@ export function sendConversationAttachment(
   });
 }
 
-export function markConversationRead(conversationId: string) {
-  return requestApi<{ unreadCount: number }>(`/conversations/${conversationId}/read`, {
+export async function markConversationRead(conversationId: string) {
+  const result = await requestApi<{ unreadCount: number }>(`/conversations/${conversationId}/read`, {
     method: "POST",
   });
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("conversation:read", { detail: { conversationId } }),
+    );
+  }
+
+  return result;
 }
 
 export function translateConversationText(payload: {
