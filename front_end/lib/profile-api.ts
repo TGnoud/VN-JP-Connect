@@ -460,6 +460,16 @@ export function createGroupConversation(payload: { name: string; memberIds: stri
   });
 }
 
+export function leaveGroupConversation(conversationId: string) {
+  return requestApi<{
+    conversationId: string;
+    left: boolean;
+    remainingParticipantCount: number;
+  }>(`/conversations/${conversationId}/leave`, {
+    method: "POST",
+  });
+}
+
 export function submitConversationFavoriteFeedback(
   conversationId: string,
   value: "liked" | "skipped",

@@ -9,6 +9,7 @@ import {
   getConversationMessages,
   getConversations,
   getMatchedConversationUsers,
+  leaveGroupConversation,
   markConversationRead,
   resolveMediaUrl,
   sendConversationAttachment,
@@ -17,6 +18,7 @@ import {
   type ChatAttachment,
   type ChatConversation,
   type ChatMessage,
+  type ChatParticipant,
   type MatchedConversationUser,
 } from "@/lib/profile-api";
 
@@ -34,6 +36,7 @@ interface MockRoom {
   time: string;
   lastMessageAt?: string;
   unread: number;
+  participants?: ChatParticipant[];
 }
 
 interface Msg {
@@ -199,6 +202,7 @@ function mapConversation(conversation: ChatConversation): MockRoom {
     time: formatChatTime(conversation.lastMessageAt),
     lastMessageAt: conversation.lastMessageAt,
     unread: conversation.unreadCount,
+    participants: conversation.participants,
   };
 }
 
@@ -587,6 +591,8 @@ export default function ChatPage() {
     selectedIds: new Set(),
     submitting: false,
   });
+  const [groupDetailsOpen, setGroupDetailsOpen] = useState(false);
+  const [isLeavingGroup, setIsLeavingGroup] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
@@ -599,6 +605,8 @@ export default function ChatPage() {
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId) ?? rooms[0] ?? EMPTY_ROOM;
   const roomMessages = messages[activeRoomId] ?? [];
+  const isActiveGroup = activeRoom.type === "group";
+  const activeParticipants = activeRoom.participants ?? [];
   const filteredRooms = search
     ? rooms.filter((r) => r.name.includes(search) || r.lastMsg.includes(search))
     : rooms;
@@ -1051,7 +1059,44 @@ export default function ChatPage() {
   function handleRoomClick(roomId: string) {
     setActiveRoomId(roomId);
     setOpenTool(null);
+    setGroupDetailsOpen(false);
     setRooms((prev) => prev.map((room) => (room.id === roomId ? { ...room, unread: 0 } : room)));
+  }
+
+  function handleHeaderProfileClick() {
+    if (isActiveGroup) {
+      setGroupDetailsOpen(true);
+      return;
+    }
+
+    if (activeRoom.partnerId) {
+      router.push(`/users/${activeRoom.partnerId}`);
+    }
+  }
+
+  async function handleLeaveGroup() {
+    if (!activeRoomId || !isActiveGroup || isLeavingGroup) return;
+    if (!window.confirm("このグループを退出しますか？")) return;
+
+    const leavingRoomId = activeRoomId;
+    setIsLeavingGroup(true);
+    try {
+      await leaveGroupConversation(leavingRoomId);
+      const nextRooms = rooms.filter((room) => room.id !== leavingRoomId);
+      setRooms(nextRooms);
+      setMessages((prev) => {
+        const next = { ...prev };
+        delete next[leavingRoomId];
+        return next;
+      });
+      setGroupDetailsOpen(false);
+      setActiveRoomId(nextRooms[0]?.id ?? "");
+    } catch (error) {
+      console.error(error);
+      window.alert(error instanceof Error ? error.message : "Could not leave group.");
+    } finally {
+      setIsLeavingGroup(false);
+    }
   }
 
   async function handleCreateGroupClick() {
@@ -1196,11 +1241,17 @@ export default function ChatPage() {
             </div>
           </div>
           <button
-            onClick={() => activeRoom.partnerId && router.push(`/users/${activeRoom.partnerId}`)}
-            disabled={!activeRoom.partnerId}
-            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            onClick={handleHeaderProfileClick}
+            disabled={!isActiveGroup && !activeRoom.partnerId}
+            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-40"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+            {isActiveGroup ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.941 3.199l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0A5.971 5.971 0 006 18.719m0 0a9.094 9.094 0 01-3.741-.478 3 3 0 014.682-2.72M15 7.5a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+            )}
           </button>
         </div>
 
@@ -1358,6 +1409,67 @@ export default function ChatPage() {
       </div>
 
       {/* ── Attachment modals ─────────────────────────────────────────────────── */}
+      {groupDetailsOpen && isActiveGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">{activeRoom.name}</h3>
+                <p className="text-xs text-gray-400">{activeParticipants.length} members</p>
+              </div>
+              <button
+                onClick={() => setGroupDetailsOpen(false)}
+                disabled={isLeavingGroup}
+                className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 rounded-xl border border-gray-100">
+              {activeParticipants.length === 0 ? (
+                <div className="px-4 py-6 text-center text-sm text-gray-400">メンバーがいません</div>
+              ) : (
+                activeParticipants.map((member) => (
+                  <button
+                    key={member.id}
+                    onClick={() => router.push(`/users/${member.id}`)}
+                    className="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-200">
+                      <Image
+                        src={resolveMediaUrl(member.avatarUrl, 160) || EMPTY_ROOM.avatar}
+                        alt={member.fullName}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-gray-900">{member.fullName}</span>
+                      <span className="block truncate text-xs text-gray-400">
+                        {[member.location, member.level].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                    </svg>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => void handleLeaveGroup()}
+              disabled={isLeavingGroup}
+              className="mt-5 w-full rounded-xl border border-red-100 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+            >
+              {isLeavingGroup ? "Leaving..." : "グループを退出"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {attachModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">

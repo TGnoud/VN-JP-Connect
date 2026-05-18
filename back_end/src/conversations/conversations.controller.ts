@@ -42,6 +42,14 @@ export class ConversationsController {
     return this.conversationsService.createGroup(currentUserId, body ?? {});
   }
 
+  @Post(':conversationId/leave')
+  leaveGroup(
+    @CurrentUserId() currentUserId: string,
+    @Param('conversationId') conversationId: string,
+  ) {
+    return this.conversationsService.leaveGroup(currentUserId, conversationId);
+  }
+
   @Post('translate')
   translate(@Body() body?: Record<string, unknown>) {
     return this.conversationsService.translate(body ?? {});

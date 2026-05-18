@@ -611,6 +611,41 @@ export class ConversationsService {
     );
   }
 
+  async leaveGroup(currentUserId: string, conversationId: string) {
+    const currentObjectId = this.objectIdFromParam(
+      currentUserId,
+      'currentUserId',
+    );
+    const conversation = await this.requireConversationAccess(
+      currentObjectId,
+      conversationId,
+    );
+
+    if (conversation.type !== 'group') {
+      throw new BadRequestException('only group conversations can be left');
+    }
+
+    const remainingParticipantCount = conversation.participant_ids.filter(
+      (participantId: Types.ObjectId) => !participantId.equals(currentObjectId),
+    ).length;
+
+    await this.conversationModel
+      .updateOne(
+        { _id: conversation._id },
+        {
+          $pull: { participant_ids: currentObjectId },
+          $set: { updated_at: new Date() },
+        },
+      )
+      .exec();
+
+    return {
+      conversationId: conversation._id.toString(),
+      left: true,
+      remainingParticipantCount,
+    };
+  }
+
   translate(payload: TranslatePayload) {
     const text = this.requiredTrimmedString(
       payload.text,
