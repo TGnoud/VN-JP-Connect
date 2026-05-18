@@ -14,6 +14,7 @@ import {
   resolveMediaUrl,
   sendConversationAttachment,
   sendConversationMessage,
+  submitConversationFavoriteFeedback,
   translateConversationText,
   type ChatAttachment,
   type ChatConversation,
@@ -156,6 +157,7 @@ const DOCUMENT_MIME_TYPES = new Set([
   "text/plain",
 ]);
 const DOCUMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"];
+const FAVORITE_PROMPT_MESSAGE_COUNT = 50;
 const EMPTY_ROOM: MockRoom = {
   id: "",
   name: "-",
@@ -563,41 +565,45 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
 
 // ─── Conversation Feedback Card ───────────────────────────────────────────────
 
-function ConversationFeedbackCard({
+function ConversationFeedbackDialog({
   partnerName,
   onLike,
   onLater,
+  isSubmitting,
 }: {
   partnerName: string;
   onLike: () => void;
   onLater: () => void;
+  isSubmitting: boolean;
 }) {
   return (
-    <div className="flex justify-center my-2">
-      <div className="bg-white rounded-2xl shadow-md border border-gray-100 px-6 py-5 w-full max-w-sm text-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 px-7 py-6 w-full max-w-sm text-center">
         <div className="flex justify-center mb-3">
-          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
             </svg>
           </div>
         </div>
-        <p className="text-sm font-semibold text-gray-800 mb-1">この会話を楽しんでいますか？</p>
-        <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+        <p className="text-base font-bold text-gray-900 mb-2">この会話を楽しんでいますか？</p>
+        <p className="text-sm text-gray-400 mb-6 leading-relaxed">
           {partnerName}さんとの会話はいかがですか？<br />フィードバックをお聞かせください。
         </p>
         <button
           onClick={onLike}
-          className="flex items-center justify-center gap-2 w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm hover:bg-gray-50 transition-colors mb-3"
+          disabled={isSubmitting}
+          className="mx-auto flex h-32 w-32 flex-col items-center justify-center gap-2 bg-white border border-gray-200 rounded-2xl px-4 py-4 shadow-sm hover:bg-gray-50 transition-colors mb-5 disabled:opacity-50"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-9 h-9 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V2.75a.75.75 0 01.75-.75 2.25 2.25 0 012.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 01-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 00-1.302 4.665c0 1.194.232 2.333.654 3.375z" />
           </svg>
-          <span className="text-sm font-medium text-gray-700">楽しい！</span>
+          <span className="text-sm font-bold text-gray-800">{isSubmitting ? "送信中..." : "楽しい！"}</span>
         </button>
         <button
           onClick={onLater}
-          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          disabled={isSubmitting}
+          className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
         >
           後で回答する
         </button>
@@ -638,6 +644,10 @@ export default function ChatPage() {
   });
   const [groupDetailsOpen, setGroupDetailsOpen] = useState(false);
   const [isLeavingGroup, setIsLeavingGroup] = useState(false);
+  const [messageCounts, setMessageCounts] = useState<Record<string, number>>({});
+  const [favoritePromptRequired, setFavoritePromptRequired] = useState<Record<string, boolean>>({});
+  const [activeFeedbackConversationId, setActiveFeedbackConversationId] = useState<string | null>(null);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [feedbackDismissed, setFeedbackDismissed] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -653,6 +663,9 @@ export default function ChatPage() {
   const roomMessages = messages[activeRoomId] ?? [];
   const isActiveGroup = activeRoom.type === "group";
   const activeParticipants = activeRoom.participants ?? [];
+  const activeFeedbackRoom = activeFeedbackConversationId
+    ? rooms.find((room) => room.id === activeFeedbackConversationId)
+    : undefined;
   const filteredRooms = search
     ? rooms.filter((r) => r.name.includes(search) || r.lastMsg.includes(search))
     : rooms;
@@ -736,6 +749,11 @@ export default function ChatPage() {
           ...prev,
           [activeRoomId]: response.messages.map(mapMessage),
         }));
+        setMessageCounts((prev) => ({ ...prev, [activeRoomId]: response.totalCount }));
+        setFavoritePromptRequired((prev) => ({
+          ...prev,
+          [activeRoomId]: response.requiresFavoritePrompt,
+        }));
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
 
         return markConversationRead(activeRoomId);
@@ -755,6 +773,25 @@ export default function ChatPage() {
       active = false;
     };
   }, [activeRoomId]);
+
+  useEffect(() => {
+    if (!activeRoomId) return;
+
+    const currentRoom = rooms.find((room) => room.id === activeRoomId);
+    const shouldOpenPrompt =
+      currentRoom?.type === "direct" &&
+      (messageCounts[activeRoomId] ?? 0) >= FAVORITE_PROMPT_MESSAGE_COUNT &&
+      favoritePromptRequired[activeRoomId] === true &&
+      !feedbackDismissed.has(activeRoomId);
+
+    if (!shouldOpenPrompt) return;
+
+    const timer = window.setTimeout(() => {
+      setActiveFeedbackConversationId(activeRoomId);
+    }, 50);
+
+    return () => window.clearTimeout(timer);
+  }, [activeRoomId, rooms, messageCounts, favoritePromptRequired, feedbackDismissed]);
 
   function updateRoomLastMessage(conversationId: string, content: string, sentAt: string) {
     setRooms((prev) =>
@@ -797,10 +834,33 @@ export default function ChatPage() {
     }));
   }
 
+  function registerSavedMessageCount(conversationId: string, replacedExistingMessage: boolean) {
+    const currentUiCount = messages[conversationId]?.length ?? 0;
+    const previousCount =
+      messageCounts[conversationId] ??
+      (replacedExistingMessage ? Math.max(currentUiCount - 1, 0) : currentUiCount);
+    const nextCount = previousCount + 1;
+    const room = rooms.find((item) => item.id === conversationId);
+
+    setMessageCounts((prev) => ({ ...prev, [conversationId]: nextCount }));
+
+    if (
+      room?.type === "direct" &&
+      previousCount < FAVORITE_PROMPT_MESSAGE_COUNT &&
+      nextCount >= FAVORITE_PROMPT_MESSAGE_COUNT &&
+      !feedbackDismissed.has(conversationId)
+    ) {
+      setFavoritePromptRequired((prev) => ({ ...prev, [conversationId]: true }));
+    }
+  }
+
   function applySavedMessage(savedMessage: ChatMessage, conversationId = activeRoomId, replaceMessageId?: string) {
     if (!conversationId) return;
 
     const newMsg = mapMessage(savedMessage);
+    const replacedExistingMessage = Boolean(
+      replaceMessageId && (messages[conversationId] ?? []).some((message) => message.id === replaceMessageId),
+    );
 
     setMessages((prev) => ({
       ...prev,
@@ -809,6 +869,7 @@ export default function ChatPage() {
           ? (prev[conversationId] ?? []).map((message) => (message.id === replaceMessageId ? newMsg : message))
           : [...(prev[conversationId] ?? []), newMsg],
     }));
+    registerSavedMessageCount(conversationId, replacedExistingMessage);
     updateRoomLastMessage(conversationId, savedMessage.content, savedMessage.sentAt);
     if (conversationId === activeRoomId) {
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
@@ -1106,6 +1167,7 @@ export default function ChatPage() {
     setActiveRoomId(roomId);
     setOpenTool(null);
     setGroupDetailsOpen(false);
+    setActiveFeedbackConversationId(null);
     setRooms((prev) => prev.map((room) => (room.id === roomId ? { ...room, unread: 0 } : room)));
   }
 
@@ -1143,6 +1205,32 @@ export default function ChatPage() {
     } finally {
       setIsLeavingGroup(false);
     }
+  }
+
+  async function handleFavoriteFeedbackLike() {
+    if (!activeFeedbackConversationId || isSubmittingFeedback) return;
+
+    const conversationId = activeFeedbackConversationId;
+    setIsSubmittingFeedback(true);
+    try {
+      await submitConversationFavoriteFeedback(conversationId, "liked");
+      setFavoritePromptRequired((prev) => ({ ...prev, [conversationId]: false }));
+      setFeedbackDismissed((prev) => new Set(prev).add(conversationId));
+      setActiveFeedbackConversationId(null);
+    } catch (error) {
+      console.error(error);
+      window.alert(error instanceof Error ? error.message : "Could not submit feedback.");
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  }
+
+  function handleFavoriteFeedbackLater() {
+    if (!activeFeedbackConversationId || isSubmittingFeedback) return;
+
+    const conversationId = activeFeedbackConversationId;
+    setFeedbackDismissed((prev) => new Set(prev).add(conversationId));
+    setActiveFeedbackConversationId(null);
   }
 
   async function handleCreateGroupClick() {
@@ -1317,13 +1405,6 @@ export default function ChatPage() {
               <p className="text-sm text-gray-400">まだメッセージがありません</p>
             </div>
           )}
-          {roomMessages.length >= 50 && !feedbackDismissed.has(activeRoomId) && (
-            <ConversationFeedbackCard
-              partnerName={activeRoom.name}
-              onLike={() => setFeedbackDismissed((prev) => new Set(prev).add(activeRoomId))}
-              onLater={() => setFeedbackDismissed((prev) => new Set(prev).add(activeRoomId))}
-            />
-          )}
           <div ref={messagesEndRef} />
         </div>
 
@@ -1462,6 +1543,15 @@ export default function ChatPage() {
       </div>
 
       {/* ── Attachment modals ─────────────────────────────────────────────────── */}
+      {activeFeedbackConversationId && activeFeedbackRoom?.type === "direct" && (
+        <ConversationFeedbackDialog
+          partnerName={activeFeedbackRoom.name}
+          onLike={() => void handleFavoriteFeedbackLike()}
+          onLater={handleFavoriteFeedbackLater}
+          isSubmitting={isSubmittingFeedback}
+        />
+      )}
+
       {groupDetailsOpen && isActiveGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
