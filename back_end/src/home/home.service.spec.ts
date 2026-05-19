@@ -380,6 +380,61 @@ describe('HomeService', () => {
     });
   });
 
+  it('defaults discover limit to the maximum batch size', async () => {
+    const currentUserId = new Types.ObjectId().toString();
+    const users = Array.from({ length: 201 }, (_, index) => ({
+      _id: new Types.ObjectId(),
+      full_name: `User ${index + 1}`,
+      nationality: 'VN',
+      created_at: new Date('2026-05-11T00:00:00.000Z'),
+    }));
+    const userModel = {
+      find: jest.fn().mockReturnValue(queryMock(users)),
+    };
+    const profileModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const userInterestModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const tagModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const matchModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+      aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+    };
+    const service = new HomeService(
+      userModel as any,
+      profileModel as any,
+      userInterestModel as any,
+      tagModel as any,
+      matchModel as any,
+      {} as any,
+    );
+
+    const result = await service.discover(currentUserId, {});
+
+    expect(result).toHaveLength(200);
+    expect(result[0]).toMatchObject({ fullName: 'User 1' });
+    expect(result[199]).toMatchObject({ fullName: 'User 200' });
+  });
+
+  it('rejects discover limits above the maximum batch size', async () => {
+    const service = new HomeService(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    await expect(
+      service.discover(new Types.ObjectId().toString(), { limit: 201 }),
+    ).rejects.toThrow('limit must be between 1 and 200');
+  });
+
   it('creates a pending match when showing interest for the first time', async () => {
     const currentUserId = new Types.ObjectId();
     const targetUserId = new Types.ObjectId();

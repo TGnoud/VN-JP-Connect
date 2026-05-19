@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
@@ -599,6 +599,7 @@ function FilterPanel({
 /* ─── Page ─── */
 export default function DiscoverPage() {
   const router = useRouter();
+  const discoverRequestSeq = useRef(0);
   const [users, setUsers] = useState<User[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filter, setFilter] = useState<FilterState>({ ...DEFAULT_FILTER });
@@ -625,6 +626,15 @@ export default function DiscoverPage() {
     writeStoredDiscoverUserId(nextUsers[nextIndex]?.id ?? "");
   }
 
+  function nextDiscoverRequestId() {
+    discoverRequestSeq.current += 1;
+    return discoverRequestSeq.current;
+  }
+
+  function isLatestDiscoverRequest(requestId: number) {
+    return requestId === discoverRequestSeq.current;
+  }
+
   function nationalityToApi(value: FilterState["nationality"]) {
     if (value === "Japanese") return "JP";
     if (value === "Vietnamese") return "VN";
@@ -642,6 +652,7 @@ export default function DiscoverPage() {
     nextExcludedUserIds = excludedUserIds,
     nextFilterOptions = filterOptions,
   ) {
+    const requestId = nextDiscoverRequestId();
     setLoading(true);
     setDiscoverError("");
 
@@ -662,18 +673,23 @@ export default function DiscoverPage() {
         excludeUserIds: nextExcludedUserIds,
         limit: DISCOVER_PROFILE_LIMIT,
       });
+      if (!isLatestDiscoverRequest(requestId)) return;
       applyDiscoverProfiles(profiles);
     } catch (error) {
+      if (!isLatestDiscoverRequest(requestId)) return;
       setDiscoverError(error instanceof Error ? error.message : "ユーザーを読み込めませんでした。");
       setUsers([]);
       setCurrentIndex(0);
     } finally {
-      setLoading(false);
+      if (isLatestDiscoverRequest(requestId)) {
+        setLoading(false);
+      }
     }
   }
 
   useEffect(() => {
     let active = true;
+    const requestId = nextDiscoverRequestId();
 
     async function loadDiscoverProfiles() {
       setLoading(true);
@@ -682,14 +698,14 @@ export default function DiscoverPage() {
       try {
         const options = await getHomeFilters();
         const profiles = await getDiscoverProfiles({ limit: DISCOVER_PROFILE_LIMIT });
-        if (!active) return;
+        if (!active || !isLatestDiscoverRequest(requestId)) return;
         setFilterOptions(options);
         applyDiscoverProfiles(profiles);
       } catch (error) {
-        if (!active) return;
+        if (!active || !isLatestDiscoverRequest(requestId)) return;
         setDiscoverError(error instanceof Error ? error.message : "ユーザーを読み込めませんでした。");
       } finally {
-        if (active) {
+        if (active && isLatestDiscoverRequest(requestId)) {
           setLoading(false);
         }
       }
@@ -703,6 +719,9 @@ export default function DiscoverPage() {
   }, []);
 
   const current = users[currentIndex];
+  const profileCounterText = users.length > 0
+    ? `${Math.min(currentIndex + 1, users.length)} / ${users.length}`
+    : `0 / 0`;
 
   function removeInterestedUser(userId: string) {
     const nextExcludedUserIds = Array.from(new Set([...excludedUserIds, userId]));
@@ -799,23 +818,28 @@ export default function DiscoverPage() {
           <h1 className="text-base font-bold text-gray-900">ディスカバー</h1>
           <p className="text-xs text-gray-400">新しい出会いを探す</p>
         </div>
-        <button
-          onClick={() => setShowFilter((v) => !v)}
-          className={clsx(
-            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-            showFilter
-              ? "text-white"
-              : "border border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
-          )}
-          style={showFilter ? { backgroundColor: "#1B4332" } : undefined}
-        >
-          {/* ≡ lines icon */}
-          <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h7" />
-          </svg>
-          フィルター
-          {hasActiveFilter && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />}
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm">
+            {profileCounterText}
+          </span>
+          <button
+            onClick={() => setShowFilter((v) => !v)}
+            className={clsx(
+              "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+              showFilter
+                ? "text-white"
+                : "border border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
+            )}
+            style={showFilter ? { backgroundColor: "#1B4332" } : undefined}
+          >
+            {/* ≡ lines icon */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h7" />
+            </svg>
+            フィルター
+            {hasActiveFilter && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />}
+          </button>
+        </div>
       </div>
 
       {/* Body */}
