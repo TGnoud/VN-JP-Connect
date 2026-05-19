@@ -28,6 +28,7 @@ const DEFAULT_FILTER: FilterState = {
   nationality: "all",
   interests: [],
 };
+const DISCOVER_PROFILE_LIMIT = 200;
 const DISCOVER_CURRENT_USER_STORAGE_KEY = "vn_jp_discover_current_user_id";
 
 function readStoredDiscoverUserId() {
@@ -654,6 +655,7 @@ export default function DiscoverPage() {
         japaneseLevels: nextFilter.japaneseLevel,
         interestTagIds: selectedInterestTagIds(nextFilter, nextFilterOptions?.interests ?? []),
         excludeUserIds: nextExcludedUserIds,
+        limit: DISCOVER_PROFILE_LIMIT,
       });
       applyDiscoverProfiles(profiles);
     } catch (error) {
@@ -674,7 +676,7 @@ export default function DiscoverPage() {
 
       try {
         const options = await getHomeFilters();
-        const profiles = await getDiscoverProfiles();
+        const profiles = await getDiscoverProfiles({ limit: DISCOVER_PROFILE_LIMIT });
         if (!active) return;
         setFilterOptions(options);
         applyDiscoverProfiles(profiles);

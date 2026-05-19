@@ -39,6 +39,7 @@ type DiscoverQuery = {
 const HOME_AGE_MIN = 18;
 const HOME_AGE_MAX = 65;
 const HOME_DISTANCE_MAX = 200;
+const HOME_DISCOVER_LIMIT_MAX = 200;
 const HOME_JAPANESE_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1', 'Basic', 'Native'];
 
 @Injectable()
@@ -86,8 +87,8 @@ export class HomeService {
 
   async discover(currentUserId: string, query: DiscoverQuery) {
     const limit = query.limit ?? 20;
-    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
-      throw new BadRequestException('limit must be between 1 and 50');
+    if (!Number.isInteger(limit) || limit < 1 || limit > HOME_DISCOVER_LIMIT_MAX) {
+      throw new BadRequestException(`limit must be between 1 and ${HOME_DISCOVER_LIMIT_MAX}`);
     }
 
     const currentUserObjectId = this.objectIdFromParam(
