@@ -436,10 +436,10 @@ export class HomeService {
   ) {
     const relationships = await this.matchModel
       .find({
-        status: { $in: ['pending', 'accepted'] },
         $or: [
-          { requester_id: currentObjectId },
-          { receiver_id: currentObjectId },
+          { status: 'accepted', requester_id: currentObjectId },
+          { status: 'accepted', receiver_id: currentObjectId },
+          { status: 'pending', requester_id: currentObjectId },
         ],
       })
       .lean()

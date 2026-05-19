@@ -211,23 +211,39 @@ describe('HomeService', () => {
     });
   });
 
-  it('excludes pending and accepted discover relationships but keeps rejected users discoverable', async () => {
+  it('excludes accepted relationships and outgoing pending but keeps incoming pending discoverable', async () => {
     const currentUserId = new Types.ObjectId();
-    const acceptedUserId = new Types.ObjectId();
-    const pendingUserId = new Types.ObjectId();
+    const acceptedOutgoingUserId = new Types.ObjectId();
+    const acceptedIncomingUserId = new Types.ObjectId();
+    const outgoingPendingUserId = new Types.ObjectId();
+    const incomingPendingUserId = new Types.ObjectId();
     const rejectedUserId = new Types.ObjectId();
     const newUserId = new Types.ObjectId();
     const users = [
       {
-        _id: acceptedUserId,
-        full_name: 'Accepted User',
+        _id: acceptedOutgoingUserId,
+        full_name: 'Accepted Outgoing User',
         nationality: 'JP',
         birth_date: new Date('2000-01-01T00:00:00.000Z'),
         created_at: new Date('2026-05-11T00:00:00.000Z'),
       },
       {
-        _id: pendingUserId,
-        full_name: 'Pending User',
+        _id: acceptedIncomingUserId,
+        full_name: 'Accepted Incoming User',
+        nationality: 'JP',
+        birth_date: new Date('2000-01-01T00:00:00.000Z'),
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+      {
+        _id: outgoingPendingUserId,
+        full_name: 'Outgoing Pending User',
+        nationality: 'VN',
+        birth_date: new Date('2000-01-01T00:00:00.000Z'),
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+      {
+        _id: incomingPendingUserId,
+        full_name: 'Incoming Pending User',
         nationality: 'VN',
         birth_date: new Date('2000-01-01T00:00:00.000Z'),
         created_at: new Date('2026-05-11T00:00:00.000Z'),
@@ -270,12 +286,17 @@ describe('HomeService', () => {
       find: jest.fn().mockReturnValue(queryMock([
         {
           requester_id: currentUserId,
-          receiver_id: acceptedUserId,
+          receiver_id: acceptedOutgoingUserId,
           status: 'accepted',
         },
         {
-          requester_id: pendingUserId,
+          requester_id: acceptedIncomingUserId,
           receiver_id: currentUserId,
+          status: 'accepted',
+        },
+        {
+          requester_id: currentUserId,
+          receiver_id: outgoingPendingUserId,
           status: 'pending',
         },
       ])),
@@ -293,14 +314,15 @@ describe('HomeService', () => {
     const result = await service.discover(currentUserId.toString(), {});
 
     expect(result.map((user) => user.id)).toEqual([
+      incomingPendingUserId.toString(),
       rejectedUserId.toString(),
       newUserId.toString(),
     ]);
     expect(matchModel.find).toHaveBeenCalledWith({
-      status: { $in: ['pending', 'accepted'] },
       $or: [
-        { requester_id: currentUserId },
-        { receiver_id: currentUserId },
+        { status: 'accepted', requester_id: currentUserId },
+        { status: 'accepted', receiver_id: currentUserId },
+        { status: 'pending', requester_id: currentUserId },
       ],
     });
   });
