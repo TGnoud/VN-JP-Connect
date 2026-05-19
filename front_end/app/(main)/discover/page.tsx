@@ -94,6 +94,12 @@ function normalizeVietnameseLevel(level?: string): User["vietnameseLevel"] {
     : "Basic";
 }
 
+function normalizeGender(gender: DiscoverProfileData["gender"]): User["gender"] {
+  return gender === "male" || gender === "female" || gender === "other"
+    ? gender
+    : "other";
+}
+
 function userFromDiscoverProfile(profile: DiscoverProfileData): User {
   const japaneseLanguage = profile.languages.find((item) => item.language === "Japanese");
   const vietnameseLanguage = profile.languages.find((item) => item.language === "Vietnamese");
@@ -104,7 +110,7 @@ function userFromDiscoverProfile(profile: DiscoverProfileData): User {
     email: "",
     phone: "",
     nationality: profile.nationality === "JP" ? "Japanese" : "Vietnamese",
-    gender: profile.gender === "female" ? "female" : "male",
+    gender: normalizeGender(profile.gender),
     birthDate: birthDateFromAge(profile.age),
     occupation: profile.occupation,
     city: profile.location,
@@ -418,6 +424,18 @@ function FilterPanel({
   const interestOptions = filterOptions?.interests?.length
     ? filterOptions.interests.map((interest) => interest.name)
     : FILTER_INTERESTS;
+  const genderOptions = [
+    "all",
+    ...(filterOptions?.genders?.length
+      ? filterOptions.genders
+      : ["male", "female", "other"]),
+  ].filter((value, index, values) => values.indexOf(value) === index) as FilterState["gender"][];
+  const genderLabels: Record<FilterState["gender"], string> = {
+    all: "すべて",
+    male: "男性",
+    female: "女性",
+    other: "その他",
+  };
 
   return (
     <div className="w-80 xl:w-96 shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-hidden">
@@ -439,14 +457,14 @@ function FilterPanel({
           <SectionHeader label="性別" open={open.gender} onToggle={() => toggleSection("gender")} />
           {open.gender && (
             <div className="flex gap-1.5 pt-2 pb-3">
-              {[{ v: "all", l: "すべて" }, { v: "male", l: "男性" }, { v: "female", l: "女性" }].map((o) => (
+              {genderOptions.map((value) => (
                 <button
-                  key={o.v}
-                  onClick={() => update("gender", o.v as FilterState["gender"])}
-                  className={clsx(pillBase, "flex-1", local.gender === o.v ? pillActive : pillInactive)}
-                  style={local.gender === o.v ? { backgroundColor: "#1B4332" } : undefined}
+                  key={value}
+                  onClick={() => update("gender", value)}
+                  className={clsx(pillBase, "flex-1", local.gender === value ? pillActive : pillInactive)}
+                  style={local.gender === value ? { backgroundColor: "#1B4332" } : undefined}
                 >
-                  {o.l}
+                  {genderLabels[value]}
                 </button>
               ))}
             </div>

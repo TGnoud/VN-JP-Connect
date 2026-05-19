@@ -9,8 +9,23 @@ function queryMock<T>(value: T) {
   };
 }
 
+function limitingQueryMock<T>(value: T[]) {
+  let limit: number | undefined;
+  const query = {
+    limit: jest.fn((nextLimit: number) => {
+      limit = nextLimit;
+      return query;
+    }),
+    lean: jest.fn().mockReturnThis(),
+    exec: jest.fn().mockImplementation(() =>
+      Promise.resolve(limit === undefined ? value : value.slice(0, limit)),
+    ),
+  };
+  return query;
+}
+
 describe('HomeService', () => {
-  it('returns discover users even when a profile document is missing', async () => {
+  it('omits discover users when a profile document is missing', async () => {
     const currentUserId = new Types.ObjectId().toString();
     const targetUserId = new Types.ObjectId();
     const userModel = {
@@ -33,6 +48,7 @@ describe('HomeService', () => {
       find: jest.fn().mockReturnValue(queryMock([])),
     };
     const matchModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
       aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
     };
     const conversationModel = {};
@@ -47,16 +63,7 @@ describe('HomeService', () => {
 
     const result = await service.discover(currentUserId, {});
 
-    expect(result).toEqual([
-      expect.objectContaining({
-        id: targetUserId.toString(),
-        fullName: 'New User',
-        likeRate: 100,
-        connectionsCount: 0,
-        bio: '',
-        photos: [],
-      }),
-    ]);
+    expect(result).toEqual([]);
   });
 
   it('filters discover users by age and Japanese level', async () => {
@@ -104,6 +111,7 @@ describe('HomeService', () => {
       find: jest.fn().mockReturnValue(queryMock([])),
     };
     const matchModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
       aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
     };
     const service = new HomeService(
@@ -126,6 +134,173 @@ describe('HomeService', () => {
       id: matchedUserId.toString(),
       fullName: 'Matched User',
       languages: [{ language: 'Japanese', level: 'N3' }],
+    });
+  });
+
+  it('excludes pending and accepted discover relationships but keeps rejected users discoverable', async () => {
+    const currentUserId = new Types.ObjectId();
+    const acceptedUserId = new Types.ObjectId();
+    const pendingUserId = new Types.ObjectId();
+    const rejectedUserId = new Types.ObjectId();
+    const newUserId = new Types.ObjectId();
+    const users = [
+      {
+        _id: acceptedUserId,
+        full_name: 'Accepted User',
+        nationality: 'JP',
+        birth_date: new Date('2000-01-01T00:00:00.000Z'),
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+      {
+        _id: pendingUserId,
+        full_name: 'Pending User',
+        nationality: 'VN',
+        birth_date: new Date('2000-01-01T00:00:00.000Z'),
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+      {
+        _id: rejectedUserId,
+        full_name: 'Rejected User',
+        nationality: 'JP',
+        birth_date: new Date('2000-01-01T00:00:00.000Z'),
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+      {
+        _id: newUserId,
+        full_name: 'New User',
+        nationality: 'VN',
+        birth_date: new Date('2000-01-01T00:00:00.000Z'),
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+    ];
+    const userModel = {
+      find: jest.fn().mockReturnValue(queryMock(users)),
+    };
+    const profileModel = {
+      find: jest.fn().mockReturnValue(queryMock(
+        users.map((user) => ({
+          user_id: user._id,
+          languages: [],
+          photos: [],
+          bio: '',
+        })),
+      )),
+    };
+    const userInterestModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const tagModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const matchModel = {
+      find: jest.fn().mockReturnValue(queryMock([
+        {
+          requester_id: currentUserId,
+          receiver_id: acceptedUserId,
+          status: 'accepted',
+        },
+        {
+          requester_id: pendingUserId,
+          receiver_id: currentUserId,
+          status: 'pending',
+        },
+      ])),
+      aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+    };
+    const service = new HomeService(
+      userModel as any,
+      profileModel as any,
+      userInterestModel as any,
+      tagModel as any,
+      matchModel as any,
+      {} as any,
+    );
+
+    const result = await service.discover(currentUserId.toString(), {});
+
+    expect(result.map((user) => user.id)).toEqual([
+      rejectedUserId.toString(),
+      newUserId.toString(),
+    ]);
+    expect(matchModel.find).toHaveBeenCalledWith({
+      status: { $in: ['pending', 'accepted'] },
+      $or: [
+        { requester_id: currentUserId },
+        { receiver_id: currentUserId },
+      ],
+    });
+  });
+
+  it('applies discover limit after filtering users without profiles', async () => {
+    const currentUserId = new Types.ObjectId().toString();
+    const missingProfileUserId = new Types.ObjectId();
+    const firstProfileUserId = new Types.ObjectId();
+    const secondProfileUserId = new Types.ObjectId();
+    const userQuery = limitingQueryMock([
+      {
+        _id: missingProfileUserId,
+        full_name: 'Missing Profile User',
+        nationality: 'VN',
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+      {
+        _id: firstProfileUserId,
+        full_name: 'First Profile User',
+        nationality: 'JP',
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+      {
+        _id: secondProfileUserId,
+        full_name: 'Second Profile User',
+        nationality: 'VN',
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+    ]);
+    const userModel = {
+      find: jest.fn().mockReturnValue(userQuery),
+    };
+    const profileModel = {
+      find: jest.fn().mockReturnValue(queryMock([
+        {
+          user_id: firstProfileUserId,
+          languages: [],
+          photos: [],
+          bio: '',
+        },
+        {
+          user_id: secondProfileUserId,
+          languages: [],
+          photos: [],
+          bio: '',
+        },
+      ])),
+    };
+    const userInterestModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const tagModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const matchModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+      aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+    };
+    const service = new HomeService(
+      userModel as any,
+      profileModel as any,
+      userInterestModel as any,
+      tagModel as any,
+      matchModel as any,
+      {} as any,
+    );
+
+    const result = await service.discover(currentUserId, { limit: 1 });
+
+    expect(userQuery.limit).not.toHaveBeenCalled();
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: firstProfileUserId.toString(),
+      fullName: 'First Profile User',
     });
   });
 

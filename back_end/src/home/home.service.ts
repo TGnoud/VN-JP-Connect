@@ -98,8 +98,17 @@ export class HomeService {
     const excludeObjectIds = (query.excludeUserIds ?? []).map((id) =>
       this.objectIdFromParam(id, 'excludeUserIds'),
     );
+    const relatedUserIds =
+      await this.existingDiscoverRelationshipUserIds(currentUserObjectId);
 
-    const excludedUserIds = [currentUserObjectId, ...excludeObjectIds];
+    const excludedUserIds = this.uniqueObjectIds([
+      currentUserObjectId,
+      ...excludeObjectIds,
+      ...relatedUserIds,
+    ]);
+    const excludedUserIdSet = new Set(
+      excludedUserIds.map((id) => id.toString()),
+    );
     const userFilter: Record<string, unknown> = {
       _id: { $nin: excludedUserIds },
     };
@@ -139,20 +148,27 @@ export class HomeService {
       userFilter._id = { $nin: excludedUserIds, $in: allowedUserIds };
     }
 
-    const users = await this.userModel
-      .find(userFilter)
-      .limit(limit)
-      .lean()
-      .exec();
-    const userIds = users.map((u) => u._id);
+    const candidateUsers = await this.userModel.find(userFilter).lean().exec();
+    const users = candidateUsers.filter(
+      (user) => !excludedUserIdSet.has(user._id.toString()),
+    );
+    const candidateUserIds = users.map((u) => u._id);
     const profiles = await this.profileModel
-      .find({ user_id: { $in: userIds }, ...profileFilter })
+      .find({ user_id: { $in: candidateUserIds }, ...profileFilter })
       .lean()
       .exec();
 
     const profileByUserId = new Map<string, any>(
       profiles.map((p) => [p.user_id.toString(), p]),
     );
+    const usersWithProfiles = users.filter((user) =>
+      profileByUserId.has(user._id.toString()),
+    );
+    const userIds = usersWithProfiles.map((u) => u._id);
+
+    if (userIds.length === 0) {
+      return [];
+    }
 
     const interestLinks = await this.userInterestModel
       .find({ user_id: { $in: userIds } })
@@ -172,12 +188,9 @@ export class HomeService {
     const connectionsCountByUserId =
       await this.countConnectionsForUsers(userIds);
 
-    return users
+    return usersWithProfiles
       .map((user) => {
         const profile = profileByUserId.get(user._id.toString());
-        if (query.gender && !profile) {
-          return null;
-        }
         const userInterestTagIds = interestLinks
           .filter((l) => l.user_id.toString() === user._id.toString())
           .map((l) => l.tag_id.toString());
@@ -242,7 +255,8 @@ export class HomeService {
           updatedAt: profile?.updated_at ?? user.created_at,
         };
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, limit);
   }
 
   async showInterest(currentUserId: string, targetUserId: string) {
@@ -413,6 +427,40 @@ export class HomeService {
     const normalizedLevel =
       profileLevel === 'Beginner' ? 'Basic' : profileLevel;
     return filterLevels.includes(normalizedLevel);
+  }
+
+  private async existingDiscoverRelationshipUserIds(
+    currentObjectId: Types.ObjectId,
+  ) {
+    const relationships = await this.matchModel
+      .find({
+        status: { $in: ['pending', 'accepted'] },
+        $or: [
+          { requester_id: currentObjectId },
+          { receiver_id: currentObjectId },
+        ],
+      })
+      .lean()
+      .exec();
+
+    return relationships.map((match) => {
+      const requesterId = new Types.ObjectId(String(match.requester_id));
+      const receiverId = new Types.ObjectId(String(match.receiver_id));
+      return requesterId.equals(currentObjectId) ? receiverId : requesterId;
+    });
+  }
+
+  private uniqueObjectIds(ids: Types.ObjectId[]) {
+    const seen = new Set<string>();
+    return ids.filter((id) => {
+      const key = id.toString();
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
   }
 
   private async matchedInterestResponse(

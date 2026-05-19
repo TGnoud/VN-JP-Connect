@@ -1,5 +1,5 @@
 export type Nationality = "Vietnamese" | "Japanese";
-export type Gender = "male" | "female";
+export type Gender = "male" | "female" | "other";
 export type JapaneseLevel = "N5" | "N4" | "N3" | "N2" | "N1" | "Basic" | "Native";
 export type VietnameseLevel = "Basic" | "Native" | "A1" | "A2" | "B1" | "B2" | "C1";
 export type Purpose = "language_exchange" | "friendship" | "networking" | "event";
@@ -57,7 +57,7 @@ export interface Event {
 }
 
 export interface FilterState {
-  gender: "male" | "female" | "all";
+  gender: Gender | "all";
   ageMin: number;
   ageMax: number;
   distanceMax: number;
