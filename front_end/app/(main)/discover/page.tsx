@@ -646,12 +646,17 @@ export default function DiscoverPage() {
     setDiscoverError("");
 
     try {
+      const hasCustomAgeRange =
+        nextFilter.ageMin !== DEFAULT_FILTER.ageMin ||
+        nextFilter.ageMax !== DEFAULT_FILTER.ageMax;
+      const hasCustomDistance =
+        nextFilter.distanceMax !== DEFAULT_FILTER.distanceMax;
       const profiles = await getDiscoverProfiles({
         gender: nextFilter.gender === "all" ? undefined : nextFilter.gender,
         nationality: nationalityToApi(nextFilter.nationality),
-        ageMin: nextFilter.ageMin,
-        ageMax: nextFilter.ageMax,
-        distanceMax: nextFilter.distanceMax,
+        ageMin: hasCustomAgeRange ? nextFilter.ageMin : undefined,
+        ageMax: hasCustomAgeRange ? nextFilter.ageMax : undefined,
+        distanceMax: hasCustomDistance ? nextFilter.distanceMax : undefined,
         japaneseLevels: nextFilter.japaneseLevel,
         interestTagIds: selectedInterestTagIds(nextFilter, nextFilterOptions?.interests ?? []),
         excludeUserIds: nextExcludedUserIds,

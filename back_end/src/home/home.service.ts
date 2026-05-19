@@ -162,10 +162,10 @@ export class HomeService {
     const profileByUserId = new Map<string, any>(
       profiles.map((p) => [p.user_id.toString(), p]),
     );
-    const usersWithProfiles = users.filter((user) =>
-      profileByUserId.has(user._id.toString()),
-    );
-    const userIds = usersWithProfiles.map((u) => u._id);
+    const discoverUsers = query.gender
+      ? users.filter((user) => profileByUserId.has(user._id.toString()))
+      : users;
+    const userIds = discoverUsers.map((u) => u._id);
 
     if (userIds.length === 0) {
       return [];
@@ -189,7 +189,7 @@ export class HomeService {
     const connectionsCountByUserId =
       await this.countConnectionsForUsers(userIds);
 
-    return usersWithProfiles
+    return discoverUsers
       .map((user) => {
         const profile = profileByUserId.get(user._id.toString());
         const userInterestTagIds = interestLinks

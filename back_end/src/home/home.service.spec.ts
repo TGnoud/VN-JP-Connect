@@ -25,7 +25,7 @@ function limitingQueryMock<T>(value: T[]) {
 }
 
 describe('HomeService', () => {
-  it('omits discover users when a profile document is missing', async () => {
+  it('returns discover users with fallback fields when a profile document is missing', async () => {
     const currentUserId = new Types.ObjectId().toString();
     const targetUserId = new Types.ObjectId();
     const userModel = {
@@ -63,7 +63,81 @@ describe('HomeService', () => {
 
     const result = await service.discover(currentUserId, {});
 
-    expect(result).toEqual([]);
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: targetUserId.toString(),
+        fullName: 'New User',
+        age: 21,
+        gender: null,
+        location: '',
+        occupation: '',
+        likeRate: 100,
+        connectionsCount: 0,
+        bio: '',
+        languages: [],
+        photos: [],
+      }),
+    ]);
+  });
+
+  it('omits users without profile data when filtering by gender', async () => {
+    const currentUserId = new Types.ObjectId().toString();
+    const missingProfileUserId = new Types.ObjectId();
+    const matchedUserId = new Types.ObjectId();
+    const userModel = {
+      find: jest.fn().mockReturnValue(queryMock([
+        {
+          _id: missingProfileUserId,
+          full_name: 'Missing Profile User',
+          nationality: 'VN',
+          created_at: new Date('2026-05-11T00:00:00.000Z'),
+        },
+        {
+          _id: matchedUserId,
+          full_name: 'Matched User',
+          nationality: 'JP',
+          created_at: new Date('2026-05-11T00:00:00.000Z'),
+        },
+      ])),
+    };
+    const profileModel = {
+      find: jest.fn().mockReturnValue(queryMock([
+        {
+          user_id: matchedUserId,
+          gender: 'female',
+          languages: [],
+          photos: [],
+          bio: '',
+        },
+      ])),
+    };
+    const userInterestModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const tagModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const matchModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+      aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+    };
+    const service = new HomeService(
+      userModel as any,
+      profileModel as any,
+      userInterestModel as any,
+      tagModel as any,
+      matchModel as any,
+      {} as any,
+    );
+
+    const result = await service.discover(currentUserId, { gender: 'female' });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: matchedUserId.toString(),
+      fullName: 'Matched User',
+      gender: 'female',
+    });
   });
 
   it('filters discover users by age and Japanese level', async () => {
@@ -231,7 +305,7 @@ describe('HomeService', () => {
     });
   });
 
-  it('applies discover limit after filtering users without profiles', async () => {
+  it('applies discover limit after building fallback profile responses', async () => {
     const currentUserId = new Types.ObjectId().toString();
     const missingProfileUserId = new Types.ObjectId();
     const firstProfileUserId = new Types.ObjectId();
@@ -299,8 +373,10 @@ describe('HomeService', () => {
     expect(userQuery.limit).not.toHaveBeenCalled();
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
-      id: firstProfileUserId.toString(),
-      fullName: 'First Profile User',
+      id: missingProfileUserId.toString(),
+      fullName: 'Missing Profile User',
+      bio: '',
+      languages: [],
     });
   });
 
