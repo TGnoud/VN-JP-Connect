@@ -740,19 +740,12 @@ export default function DiscoverPage() {
   function handleSkip() {
     if (!current) return;
 
-    if (users.length <= 1) {
-      setCurrentIndex(0);
-      writeStoredDiscoverUserId(current.id);
-      return;
-    }
-
-    const remainingUsers = users.filter((user) => user.id !== current.id);
-    const cycledUsers = [...remainingUsers, current];
-    const nextIndex = currentIndex >= users.length - 1 ? 0 : currentIndex;
-
-    setUsers(cycledUsers);
+    const nextIndex =
+      users.length <= 1
+        ? 0
+        : (currentIndex + 1) % users.length;
     setCurrentIndex(nextIndex);
-    writeStoredDiscoverUserId(cycledUsers[nextIndex]?.id ?? "");
+    writeStoredDiscoverUserId(users[nextIndex]?.id ?? "");
   }
 
   async function handleLike() {
