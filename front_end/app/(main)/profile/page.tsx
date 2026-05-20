@@ -209,6 +209,60 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "保存に失敗しました。";
 }
 
+type LocalFilePreview = {
+  id: string;
+  file: File;
+  url: string;
+};
+
+function useObjectUrl(file: File | null) {
+  const [url, setUrl] = useState("");
+
+  useEffect(() => {
+    if (!file) {
+      setUrl("");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setUrl(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+
+  return url;
+}
+
+function useObjectUrlPreviews(files: File[]) {
+  const [previews, setPreviews] = useState<LocalFilePreview[]>([]);
+
+  useEffect(() => {
+    if (files.length === 0) {
+      setPreviews([]);
+      return;
+    }
+
+    const nextPreviews = files.map((file, index) => ({
+      id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
+      file,
+      url: URL.createObjectURL(file),
+    }));
+    setPreviews(nextPreviews);
+
+    return () => {
+      nextPreviews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    };
+  }, [files]);
+
+  return previews;
+}
+
+function formatLocalFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function ModalFooter({ onCancel, onSave, saveLabel, saveDisabled = false }: { onCancel: () => void; onSave: () => void | Promise<void>; saveLabel: string; saveDisabled?: boolean }) {
   const [saving, setSaving] = useState(false);
 
@@ -555,11 +609,25 @@ function AddPhotoModal({ currentCount, onClose, onSave }: { currentCount: number
   const [files, setFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const remaining = 9 - currentCount;
+  const selectedTotal = selected.length + files.length;
+  const filePreviews = useObjectUrlPreviews(files);
 
   function toggle(p: string) {
     setSelected((arr) =>
-      arr.includes(p) ? arr.filter((x) => x !== p) : arr.length < remaining ? [...arr, p] : arr
+      arr.includes(p) ? arr.filter((x) => x !== p) : arr.length + files.length < remaining ? [...arr, p] : arr
     );
+  }
+
+  function addFiles(fileList: FileList | null) {
+    const availableSlots = Math.max(0, remaining - selected.length - files.length);
+    if (!fileList || availableSlots === 0) return;
+
+    const pickedFiles = Array.from(fileList).slice(0, availableSlots);
+    setFiles((current) => [...current, ...pickedFiles].slice(0, remaining - selected.length));
+  }
+
+  function removeFile(index: number) {
+    setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
   }
 
   return (
@@ -567,7 +635,7 @@ function AddPhotoModal({ currentCount, onClose, onSave }: { currentCount: number
       <div className="px-5 py-4">
         <p className="text-sm text-gray-600 mb-1">ギャラリーから写真を選択するか、ファイルをアップロードしてください。</p>
         <p className="text-xs font-semibold mb-4" style={{ color: "#1B4332" }}>
-          あと{remaining}枚追加できます（{selected.length}枚選択中）
+          あと{Math.max(0, remaining - selectedTotal)}枚追加できます（{selectedTotal}枚選択中）
         </p>
 
         {/* Upload area */}
@@ -578,16 +646,51 @@ function AddPhotoModal({ currentCount, onClose, onSave }: { currentCount: number
           multiple
           className="hidden"
           onChange={(e) => {
-            const pickedFiles = Array.from(e.target.files ?? []).slice(0, remaining);
-            setFiles(pickedFiles);
+            addFiles(e.target.files);
+            e.target.value = "";
           }}
         />
-        <div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-8 mb-5 cursor-pointer hover:bg-gray-50 transition-colors">
+        <div
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            addFiles(event.dataTransfer.files);
+          }}
+          className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-8 mb-5 cursor-pointer hover:bg-gray-50 transition-colors"
+        >
           <UploadIcon className="size-8 text-green-200" />
           <p className="text-sm font-semibold text-gray-700 mt-2">クリックしてアップロード</p>
           <p className="text-xs text-gray-400">またはドラッグ&amp;ドロップ</p>
           <p className="text-xs text-gray-300 mt-1">JPG, PNG, WEBP（最大5MB）</p>
         </div>
+
+        {filePreviews.length > 0 && (
+          <div className="mb-5">
+            <p className="text-sm font-semibold text-gray-700 mb-2">アップロード選択済み</p>
+            <div className="grid grid-cols-3 gap-2">
+              {filePreviews.map((preview, index) => (
+                <div key={preview.id} className="relative overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+                  <div className="relative aspect-square">
+                    <Image src={preview.url} alt={preview.file.name} fill className="object-cover" unoptimized />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(index)}
+                    className="absolute right-1 top-1 rounded-full bg-white/90 p-1 text-gray-600 shadow hover:bg-white"
+                    aria-label="選択した写真を削除"
+                  >
+                    <XIcon />
+                  </button>
+                  <div className="px-2 py-1.5">
+                    <p className="truncate text-xs font-medium text-gray-700">{preview.file.name}</p>
+                    <p className="text-xs text-gray-400">{formatLocalFileSize(preview.file.size)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Gallery */}
         <p className="text-sm font-semibold text-gray-700 mb-2">ギャラリーから選択</p>
@@ -674,7 +777,8 @@ function ChangeAvatarModal({ current, onClose, onSave }: { current: string; onCl
   const [selected, setSelected] = useState(current || AVATAR_OPTIONS[0]);
   const [file, setFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const preview = file ? URL.createObjectURL(file) : selected;
+  const filePreview = useObjectUrl(file);
+  const preview = filePreview || selected;
 
   return (
     <Modal title="プロフィール写真を変更" onClose={onClose}>
@@ -711,13 +815,23 @@ function ChangeAvatarModal({ current, onClose, onSave }: { current: string; onCl
           onChange={(e) => {
             const nextFile = e.target.files?.[0] ?? null;
             setFile(nextFile);
+            e.target.value = "";
           }}
         />
         <div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-5 cursor-pointer hover:bg-gray-50 transition-colors">
           <CameraIcon className="size-6 text-gray-300" />
-          <p className="text-sm font-medium text-gray-600 mt-1">ファイルをアップロード</p>
+          <p className="text-sm font-medium text-gray-600 mt-1">{file ? "選択済みの画像を変更" : "ファイルをアップロード"}</p>
           <p className="text-xs text-gray-400">JPG, PNG（最大2MB）</p>
         </div>
+        {file && (
+          <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-gray-700">選択済み: {file.name}</p>
+              <p className="text-xs text-gray-400">{formatLocalFileSize(file.size)}</p>
+            </div>
+            <button type="button" onClick={() => setFile(null)} className="text-xs font-semibold text-red-500 hover:text-red-600">削除</button>
+          </div>
+        )}
       </div>
       <ModalFooter onCancel={onClose} onSave={() => Promise.resolve(onSave(selected, file)).then(onClose)} saveLabel="保存する" />
     </Modal>
@@ -729,11 +843,29 @@ function ChangeCoverModal({ current, onClose, onSave }: { current: string; onClo
   const [selected, setSelected] = useState(current || COVER_PHOTOS[0]);
   const [file, setFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const filePreview = useObjectUrl(file);
 
   return (
     <Modal title="カバー写真を変更" onClose={onClose} wide>
       <div className="px-5 py-4">
         <p className="text-sm text-gray-600 mb-4">カバー画像を選択してください。プロフィールの上部に表示されます。</p>
+
+        {filePreview && (
+          <div className="mb-4 rounded-xl border border-green-100 bg-green-50/40 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-800">アップロード選択済み</p>
+              <button type="button" onClick={() => setFile(null)} className="text-xs font-semibold text-red-500 hover:text-red-600">削除</button>
+            </div>
+            <div className="relative aspect-video overflow-hidden rounded-lg bg-gray-100">
+              <Image src={filePreview} alt={file?.name ?? "selected cover"} fill className="object-cover" unoptimized />
+            </div>
+            {file && (
+              <p className="mt-2 truncate text-xs text-gray-500">
+                {file.name} · {formatLocalFileSize(file.size)}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Photo grid */}
         <div className="grid grid-cols-3 gap-2 mb-3">
@@ -758,11 +890,12 @@ function ChangeCoverModal({ current, onClose, onSave }: { current: string; onClo
           onChange={(e) => {
             const nextFile = e.target.files?.[0] ?? null;
             setFile(nextFile);
+            e.target.value = "";
           }}
         />
         <div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center py-5 cursor-pointer hover:bg-gray-50 transition-colors">
           <UploadIcon className="size-6 text-gray-300" />
-          <p className="text-xs text-gray-500 mt-1">またはファイルをアップロード</p>
+          <p className="text-xs text-gray-500 mt-1">{file ? "別のファイルをアップロード" : "またはファイルをアップロード"}</p>
           <p className="text-xs text-gray-400">JPG, PNG（最大5MB）</p>
         </div>
       </div>

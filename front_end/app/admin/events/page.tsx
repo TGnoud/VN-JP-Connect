@@ -416,6 +416,7 @@ export default function AdminEventsPage() {
   const [submitted, setSubmitted] = useState(false);
   const [createCoverUploading, setCreateCoverUploading] = useState(false);
   const [createCoverError, setCreateCoverError] = useState<string | null>(null);
+  const [editCoverUploading, setEditCoverUploading] = useState(false);
   const createCoverInputRef = useRef<HTMLInputElement>(null);
   const editCoverInputRef = useRef<HTMLInputElement>(null);
 
@@ -533,6 +534,7 @@ export default function AdminEventsPage() {
 
   function openEdit(event: AdminEvent) {
     setEditModal(event);
+    setEditCoverUploading(false);
     setEditForm({
       title: event.title,
       description: event.description,
@@ -561,17 +563,25 @@ export default function AdminEventsPage() {
       return;
     }
 
+    setEditCoverUploading(true);
+
     try {
       const uploaded = await uploadAdminEventCover(file);
       setEditField("coverImageUrl", uploaded.url);
       showToast("画像をアップロードしました");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "画像をアップロードできませんでした", false);
+    } finally {
+      setEditCoverUploading(false);
     }
   }
 
   async function saveEdit() {
     if (!editModal || !editForm) return;
+    if (editCoverUploading) {
+      showToast("画像のアップロード完了後に保存してください", false);
+      return;
+    }
 
     try {
       const updated = await updateAdminEvent(
@@ -1028,7 +1038,7 @@ export default function AdminEventsPage() {
                 </div>
                 <h2 className="text-base font-bold text-gray-900">イベントを編集</h2>
               </div>
-              <button onClick={() => { setEditModal(null); setEditForm(null); }} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button onClick={() => { setEditModal(null); setEditForm(null); setEditCoverUploading(false); }} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -1104,37 +1114,83 @@ export default function AdminEventsPage() {
               {/* サムネイル画像 */}
               <div>
                 <FormLabel>サムネイル画像</FormLabel>
-                <div
-                  onClick={() => editCoverInputRef.current?.click()}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    void handleEditCoverFile(event.dataTransfer.files?.[0]);
-                  }}
-                  className="border-2 border-dashed border-gray-200 rounded-xl py-8 flex flex-col items-center gap-2 cursor-pointer hover:border-gray-300 transition-colors bg-gray-50/50"
-                >
-                  <input
-                    ref={editCoverInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png"
-                    className="hidden"
-                    onChange={(event) => {
-                      void handleEditCoverFile(event.target.files?.[0]);
-                      event.target.value = "";
+                <div className="flex flex-col gap-3">
+                  <div
+                    onClick={() => {
+                      if (!editCoverUploading) editCoverInputRef.current?.click();
                     }}
-                  />
-                  <svg xmlns="http://www.w3.org/2000/svg" className="size-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                  </svg>
-                  <p className="text-sm text-gray-400">クリックまたはドラッグして画像をアップロード</p>
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (!editCoverUploading) void handleEditCoverFile(event.dataTransfer.files?.[0]);
+                    }}
+                    className={clsx(
+                      "border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center gap-3 bg-gray-50/50 transition-colors",
+                      editCoverUploading ? "cursor-wait opacity-70" : "cursor-pointer hover:border-gray-300",
+                    )}
+                  >
+                    <input
+                      ref={editCoverInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      className="hidden"
+                      disabled={editCoverUploading}
+                      onChange={(event) => {
+                        void handleEditCoverFile(event.target.files?.[0]);
+                        event.target.value = "";
+                      }}
+                    />
+                    {editForm.coverImageUrl ? (
+                      <div className="relative h-40 w-full overflow-hidden rounded-lg bg-gray-100">
+                        <Image src={resolveAdminEventMediaUrl(editForm.coverImageUrl)} alt="cover" fill className="object-cover" unoptimized />
+                      </div>
+                    ) : (
+                      <div className="flex h-32 w-full flex-col items-center justify-center rounded-lg border border-gray-100 bg-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="size-8 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                        </svg>
+                        <p className="text-sm text-gray-400">画像未設定</p>
+                      </div>
+                    )}
+                    <div className="text-center">
+                      <p className="text-sm text-gray-500">
+                        {editCoverUploading
+                          ? "アップロード中..."
+                          : editForm.coverImageUrl
+                            ? "クリックまたはドラッグして画像を変更"
+                            : "クリックまたはドラッグして画像をアップロード"}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">JPG/PNG、5MB以下</p>
+                    </div>
+                  </div>
+                  {editForm.coverImageUrl && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => editCoverInputRef.current?.click()}
+                        disabled={editCoverUploading}
+                        className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        画像を変更
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditField("coverImageUrl", "")}
+                        disabled={editCoverUploading}
+                        className="px-3 py-2 rounded-lg border border-red-100 text-xs font-semibold text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        削除
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Modal footer */}
             <div className="flex gap-3 justify-end px-6 py-4 border-t border-gray-100 shrink-0">
-              <button onClick={() => { setEditModal(null); setEditForm(null); }} className="px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">キャンセル</button>
-              <button onClick={saveEdit} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: "#1B4332" }}>
+              <button onClick={() => { setEditModal(null); setEditForm(null); setEditCoverUploading(false); }} className="px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">キャンセル</button>
+              <button onClick={saveEdit} disabled={editCoverUploading} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "#1B4332" }}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 変更を保存
               </button>

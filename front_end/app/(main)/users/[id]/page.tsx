@@ -174,6 +174,49 @@ function XIcon() {
 }
 
 /* ── ReportModal ── */
+type LocalFilePreview = {
+  id: string;
+  file: File;
+  url: string;
+};
+
+function useLocalFilePreviews(files: File[]) {
+  const [previews, setPreviews] = useState<LocalFilePreview[]>([]);
+
+  useEffect(() => {
+    if (files.length === 0) {
+      setPreviews([]);
+      return;
+    }
+
+    const nextPreviews = files.map((file, index) => ({
+      id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
+      file,
+      url: file.type.startsWith("image/") ? URL.createObjectURL(file) : "",
+    }));
+    setPreviews(nextPreviews);
+
+    return () => {
+      nextPreviews.forEach((preview) => {
+        if (preview.url) URL.revokeObjectURL(preview.url);
+      });
+    };
+  }, [files]);
+
+  return previews;
+}
+
+function formatLocalFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileExtensionLabel(fileName: string) {
+  const extension = fileName.split(".").pop();
+  return extension && extension !== fileName ? extension.slice(0, 5).toUpperCase() : "FILE";
+}
+
 function ReportModal({
   onClose,
   onSubmit,
@@ -187,6 +230,17 @@ function ReportModal({
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const evidencePreviews = useLocalFilePreviews(files);
+
+  function addEvidenceFiles(fileList: FileList | null) {
+    if (!fileList) return;
+
+    setFiles((current) => [...current, ...Array.from(fileList)].slice(0, 5));
+  }
+
+  function removeEvidenceFile(index: number) {
+    setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
+  }
 
   async function handleSubmit() {
     if (!reason) return;
@@ -278,9 +332,44 @@ function ReportModal({
               <span className="text-xs text-gray-400 mt-0.5">画像・スクリーンショット（PNG, JPG, PDF）最大5MB・各10MBまで</span>
               <input
                 type="file" accept="image/png,image/jpeg,application/pdf" multiple className="hidden"
-                onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 5))}
+                onChange={(e) => {
+                  addEvidenceFiles(e.target.files);
+                  e.target.value = "";
+                }}
               />
             </label>
+            {evidencePreviews.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {evidencePreviews.map((preview, index) => (
+                  <div key={preview.id} className="relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                    {preview.url ? (
+                      <div className="relative aspect-video bg-gray-100">
+                        <Image src={preview.url} alt={preview.file.name} fill className="object-cover" unoptimized />
+                      </div>
+                    ) : (
+                      <div className="flex aspect-video items-center justify-center bg-white">
+                        <div className="flex size-12 items-center justify-center rounded-lg bg-gray-100 text-xs font-bold text-gray-500">
+                          {fileExtensionLabel(preview.file.name)}
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeEvidenceFile(index)}
+                      disabled={submitting}
+                      className="absolute right-1 top-1 rounded-full bg-white/90 p-1 text-gray-500 shadow hover:text-red-500 disabled:opacity-40"
+                      aria-label="選択した証拠ファイルを削除"
+                    >
+                      <XIcon />
+                    </button>
+                    <div className="px-2 py-1.5">
+                      <p className="truncate text-xs font-semibold text-gray-700">{preview.file.name}</p>
+                      <p className="text-xs text-gray-400">{formatLocalFileSize(preview.file.size)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           {submitError && (
             <p className="text-xs text-red-500">{submitError}</p>

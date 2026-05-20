@@ -254,6 +254,11 @@ function formatAttachmentSize(size?: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function fileExtensionLabel(fileName: string) {
+  const extension = fileName.split(".").pop();
+  return extension && extension !== fileName ? extension.slice(0, 5).toUpperCase() : "FILE";
+}
+
 function isImageAttachment(attachment: ChatAttachment) {
   return (attachment.mime_type ?? "").startsWith("image/");
 }
@@ -1265,6 +1270,12 @@ export default function ChatPage() {
     setAttachModal(null);
   }
 
+  function clearSelectedAttachment() {
+    setSelectedAttachmentFile(null);
+    setSelectedAttachmentPreviewUrl("");
+    setAttachmentError("");
+  }
+
   async function handleTranslateMessage(msgId: string, content: string) {
     const direction = detectTranslationDirection(content);
     setTranslations((prev) => ({ ...prev, [msgId]: { direction } }));
@@ -1802,12 +1813,23 @@ export default function ChatPage() {
               <div className={clsx("w-10 h-10 rounded-xl flex items-center justify-center mb-1", attachModal === "photo" ? "bg-emerald-100" : "bg-gray-100")}>
                 <svg xmlns="http://www.w3.org/2000/svg" className={clsx("size-5", attachModal === "photo" ? "text-emerald-600" : "text-gray-500")} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
               </div>
-              <p className="text-sm font-medium text-gray-700">クリックしてファイルを選択</p>
+              <p className="text-sm font-medium text-gray-700">{selectedAttachmentFile ? "クリックして別のファイルを選択" : "クリックしてファイルを選択"}</p>
               <p className="text-xs text-gray-400">{attachModal === "photo" ? "JPG, PNG, GIF, MP4 — 最大 25MB" : "PDF, DOC, XLSX, PPT — 最大 25MB"}</p>
             </div>
             {selectedAttachmentFile && (
-              <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                {selectedAttachmentPreviewUrl && selectedAttachmentFile.type.startsWith("image/") && (
+              <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-emerald-700">選択済み</p>
+                  <button
+                    type="button"
+                    onClick={clearSelectedAttachment}
+                    disabled={isUploadingAttachment}
+                    className="text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-40"
+                  >
+                    削除
+                  </button>
+                </div>
+                {selectedAttachmentPreviewUrl && selectedAttachmentFile.type.startsWith("image/") ? (
                   <Image
                     src={selectedAttachmentPreviewUrl}
                     alt={selectedAttachmentFile.name}
@@ -1816,19 +1838,43 @@ export default function ChatPage() {
                     className="mb-2 max-h-40 w-full rounded-lg object-cover"
                     unoptimized
                   />
-                )}
-                {selectedAttachmentPreviewUrl && selectedAttachmentFile.type.startsWith("video/") && (
+                ) : selectedAttachmentPreviewUrl && selectedAttachmentFile.type.startsWith("video/") ? (
                   <video
                     src={selectedAttachmentPreviewUrl}
                     controls
                     className="mb-2 max-h-40 w-full rounded-lg bg-black"
                   />
+                ) : (
+                  <div className="mb-2 flex items-center gap-3 rounded-lg border border-gray-100 bg-white px-3 py-3">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-bold text-gray-500">
+                      {fileExtensionLabel(selectedAttachmentFile.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-800">{selectedAttachmentFile.name}</p>
+                      <p className="text-xs text-gray-400">
+                        {formatAttachmentSize(selectedAttachmentFile.size)}
+                        {selectedAttachmentFile.type ? ` · ${selectedAttachmentFile.type}` : ""}
+                      </p>
+                    </div>
+                  </div>
                 )}
-                <p className="truncate text-sm font-semibold text-gray-800">{selectedAttachmentFile.name}</p>
-                <p className="text-xs text-gray-400">
-                  {formatAttachmentSize(selectedAttachmentFile.size)}
-                  {selectedAttachmentFile.type ? ` · ${selectedAttachmentFile.type}` : ""}
-                </p>
+                {(selectedAttachmentPreviewUrl && (selectedAttachmentFile.type.startsWith("image/") || selectedAttachmentFile.type.startsWith("video/"))) && (
+                  <>
+                    <p className="truncate text-sm font-semibold text-gray-800">{selectedAttachmentFile.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {formatAttachmentSize(selectedAttachmentFile.size)}
+                      {selectedAttachmentFile.type ? ` · ${selectedAttachmentFile.type}` : ""}
+                    </p>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => attachModal === "photo" ? fileInputRef.current?.click() : docInputRef.current?.click()}
+                  disabled={isUploadingAttachment}
+                  className="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  変更
+                </button>
               </div>
             )}
             {attachmentError && (
