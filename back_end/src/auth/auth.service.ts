@@ -100,7 +100,7 @@ export class AuthService {
       .findByIdAndUpdate(
         userObjectId,
         { $set: { last_seen_at: lastSeenAt } },
-        { new: true },
+        { returnDocument: 'after' },
       )
       .lean()
       .exec();

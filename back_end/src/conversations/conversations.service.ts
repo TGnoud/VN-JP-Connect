@@ -326,7 +326,7 @@ export class ConversationsService {
             updated_at: now,
           },
         },
-        { new: true, upsert: true },
+        { returnDocument: 'after', upsert: true },
       )
       .lean()
       .exec();
@@ -903,7 +903,7 @@ export class ConversationsService {
                 updated_at: now,
               },
             },
-            { new: true, upsert: true },
+            { returnDocument: 'after', upsert: true },
           )
           .lean()
           .exec();
@@ -949,7 +949,7 @@ export class ConversationsService {
                 updated_at: new Date(),
               },
             },
-            { new: true },
+            { returnDocument: 'after' },
           )
           .lean()
           .exec();

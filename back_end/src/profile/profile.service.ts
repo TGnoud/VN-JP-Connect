@@ -145,7 +145,7 @@ export class ProfileService {
       .findOneAndUpdate(
         { user_id: userObjectId },
         { $set: profileSet, $setOnInsert: { user_id: userObjectId } },
-        { new: true, upsert: true },
+        { returnDocument: 'after', upsert: true },
       )
       .exec();
 
@@ -165,7 +165,7 @@ export class ProfileService {
           $set: { bio, updated_at: new Date() },
           $setOnInsert: { user_id: userObjectId },
         },
-        { new: true, upsert: true, runValidators: true },
+        { returnDocument: 'after', upsert: true, runValidators: true },
       )
       .exec();
 
@@ -181,7 +181,7 @@ export class ProfileService {
           $set: { languages, updated_at: new Date() },
           $setOnInsert: { user_id: userObjectId },
         },
-        { new: true, upsert: true },
+        { returnDocument: 'after', upsert: true },
       )
       .exec();
 
@@ -332,7 +332,7 @@ export class ProfileService {
           $set: { avatar_url: url, updated_at: new Date() },
           $setOnInsert: { user_id: userObjectId },
         },
-        { new: true, upsert: true },
+        { returnDocument: 'after', upsert: true },
       )
       .exec();
 
@@ -353,7 +353,7 @@ export class ProfileService {
           $set: { cover_url: url, updated_at: new Date() },
           $setOnInsert: { user_id: userObjectId },
         },
-        { new: true, upsert: true },
+        { returnDocument: 'after', upsert: true },
       )
       .exec();
 

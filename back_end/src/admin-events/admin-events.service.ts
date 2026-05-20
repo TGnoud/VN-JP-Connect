@@ -121,7 +121,7 @@ export class AdminEventsService {
             updated_at: new Date(),
           },
         },
-        { new: true },
+        { returnDocument: 'after' },
       )
       .lean()
       .exec();
