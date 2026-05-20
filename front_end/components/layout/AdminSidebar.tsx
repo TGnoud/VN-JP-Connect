@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { clearStoredUserId } from "@/lib/auth-api";
+import { clearStoredUserId, logout } from "@/lib/auth-api";
 
 const NAV_ITEMS = [
   {
@@ -40,6 +40,17 @@ const NAV_ITEMS = [
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      clearStoredUserId();
+      router.push("/login");
+    }
+  }
 
   return (
     <aside className="flex flex-col w-56 min-h-screen shrink-0 bg-white border-r border-gray-100">
@@ -99,10 +110,7 @@ export default function AdminSidebar() {
       {/* Logout */}
       <div className="px-3 py-4 border-t border-gray-100">
         <button
-          onClick={() => {
-            clearStoredUserId();
-            router.push("/login");
-          }}
+          onClick={() => { void handleLogout(); }}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all w-full"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

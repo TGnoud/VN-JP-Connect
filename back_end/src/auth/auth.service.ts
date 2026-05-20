@@ -93,6 +93,41 @@ export class AuthService {
     };
   }
 
+  async updatePresence(currentUserId: string) {
+    const userObjectId = this.objectIdFromParam(currentUserId, 'currentUserId');
+    const lastSeenAt = new Date();
+    const user = await this.userModel
+      .findByIdAndUpdate(
+        userObjectId,
+        { $set: { last_seen_at: lastSeenAt } },
+        { new: true },
+      )
+      .lean()
+      .exec();
+
+    if (!user) {
+      throw new BadRequestException('user was not found');
+    }
+
+    return {
+      ok: true,
+      lastSeenAt,
+    };
+  }
+
+  async logout(currentUserId: string) {
+    const userObjectId = this.objectIdFromParam(currentUserId, 'currentUserId');
+    const result = await this.userModel
+      .updateOne({ _id: userObjectId }, { $unset: { last_seen_at: '' } })
+      .exec();
+
+    if ((result.matchedCount ?? 0) === 0) {
+      throw new BadRequestException('user was not found');
+    }
+
+    return { ok: true };
+  }
+
   private async findUserByIdentifier(input: LoginInput) {
     if (input.identifier.type === 'email') {
       return this.userModel.findOne({ email: input.identifier.value }).exec();
@@ -115,6 +150,14 @@ export class AuthService {
     return this.userModel
       .findOne({ phone_number: { $regex: flexiblePattern } })
       .exec();
+  }
+
+  private objectIdFromParam(value: string, name: string) {
+    if (!Types.ObjectId.isValid(value)) {
+      throw new BadRequestException(`${name} must be a valid ObjectId`);
+    }
+
+    return new Types.ObjectId(value);
   }
 }
 

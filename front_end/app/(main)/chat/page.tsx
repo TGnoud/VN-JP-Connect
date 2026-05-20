@@ -36,6 +36,7 @@ interface MockRoom {
   location: string;
   level: string;
   avatar: string;
+  isOnline?: boolean;
   lastMsg: string;
   time: string;
   lastMessageAt?: string;
@@ -162,16 +163,40 @@ const DOCUMENT_MIME_TYPES = new Set([
 ]);
 const DOCUMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"];
 const FAVORITE_PROMPT_MESSAGE_COUNT = 50;
+const CHAT_LANGUAGE_LABELS: Record<string, string> = {
+  Japanese: "日本語",
+  Vietnamese: "ベトナム語",
+  English: "英語",
+  Chinese: "中国語",
+  Korean: "韓国語",
+  French: "フランス語",
+  Spanish: "スペイン語",
+};
 const EMPTY_ROOM: MockRoom = {
   id: "",
   name: "-",
   location: "",
   level: "",
   avatar: "https://api.dicebear.com/7.x/personas/svg?seed=empty-chat",
+  isOnline: false,
   lastMsg: "",
   time: "",
   unread: 0,
 };
+
+function formatLanguageLevel(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  return Object.entries(CHAT_LANGUAGE_LABELS).reduce(
+    (result, [rawLanguage, label]) =>
+      result.replace(new RegExp(`^${rawLanguage}\\b`), label),
+    trimmed,
+  );
+}
 
 function formatChatTime(value?: string) {
   if (!value) return "";
@@ -189,7 +214,7 @@ function formatChatTime(value?: string) {
   }
 
   if (diffDays === 1) {
-    return "Yesterday";
+    return "昨日";
   }
 
   return date.toLocaleDateString("ja-JP", { month: "2-digit", day: "2-digit" });
@@ -202,8 +227,9 @@ function mapConversation(conversation: ChatConversation): MockRoom {
     partnerId: conversation.partnerId,
     name: conversation.name,
     location: conversation.location,
-    level: conversation.level,
+    level: formatLanguageLevel(conversation.level),
     avatar: resolveMediaUrl(conversation.avatar, 160) || EMPTY_ROOM.avatar,
+    isOnline: conversation.isOnline,
     lastMsg: conversation.lastMessage,
     time: formatChatTime(conversation.lastMessageAt),
     lastMessageAt: conversation.lastMessageAt,
@@ -284,9 +310,9 @@ function createTempId(prefix: string) {
 }
 
 function attachmentContent(messageType: AttachmentMessageType, fileName: string) {
-  if (messageType === "media") return `[Media] ${fileName}`;
-  if (messageType === "voice") return `[Voice] ${fileName}`;
-  return `[File] ${fileName}`;
+  if (messageType === "media") return `[メディア] ${fileName}`;
+  if (messageType === "voice") return `[ボイス] ${fileName}`;
+  return `[ファイル] ${fileName}`;
 }
 
 function isSupportedDocumentFile(file: File) {
@@ -367,7 +393,9 @@ function RoomItem({ room, isActive, onClick }: { room: MockRoom; isActive: boole
         <div className="relative w-full h-full rounded-full overflow-hidden bg-gray-200">
           <Image src={room.avatar} alt={room.name} fill className="object-cover" unoptimized />
         </div>
-        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white" />
+        {room.isOnline === true && (
+          <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white" />
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
@@ -1021,7 +1049,7 @@ export default function ChatPage() {
     } catch (error) {
       console.error(error);
       removeLocalMessage(conversationId, tempId);
-      window.alert(error instanceof Error ? error.message : "Could not send message.");
+      window.alert(error instanceof Error ? error.message : "メッセージを送信できませんでした。");
       if (messageType === "text") {
         setInputText(cleanContent);
       }
@@ -1078,7 +1106,7 @@ export default function ChatPage() {
     if (!conversationId || blob.size === 0) return;
 
     if (blob.size > MAX_ATTACHMENT_SIZE) {
-      window.alert("File too large. Max size is 25MB.");
+      window.alert("ファイルサイズは25MB以下にしてください。");
       return;
     }
 
@@ -1095,7 +1123,7 @@ export default function ChatPage() {
       setOpenTool(null);
     } catch (error) {
       console.error(error);
-      window.alert(error instanceof Error ? error.message : "Could not send voice message.");
+      window.alert(error instanceof Error ? error.message : "ボイスメッセージを送信できませんでした。");
     } finally {
       setIsVoiceSending(false);
     }
@@ -1109,7 +1137,7 @@ export default function ChatPage() {
       !navigator.mediaDevices?.getUserMedia ||
       typeof MediaRecorder === "undefined"
     ) {
-      window.alert("Voice recording is not supported in this browser.");
+      window.alert("このブラウザはボイス録音に対応していません。");
       return;
     }
 
@@ -1139,7 +1167,7 @@ export default function ChatPage() {
         audioChunksRef.current = [];
         setIsRecording(false);
         setRecordingSeconds(0);
-        window.alert("Could not record voice message.");
+        window.alert("ボイスメッセージを録音できませんでした。");
       };
 
       recorder.onstop = () => {
@@ -1174,7 +1202,7 @@ export default function ChatPage() {
       mediaRecorderRef.current = null;
       setIsRecording(false);
       setRecordingSeconds(0);
-      window.alert("Could not access microphone.");
+      window.alert("マイクにアクセスできませんでした。");
     }
   }
 
@@ -1313,7 +1341,7 @@ export default function ChatPage() {
       setActiveRoomId(nextRooms[0]?.id ?? "");
     } catch (error) {
       console.error(error);
-      window.alert(error instanceof Error ? error.message : "Could not leave group.");
+      window.alert(error instanceof Error ? error.message : "グループから退出できませんでした。");
     } finally {
       setIsLeavingGroup(false);
     }
@@ -1331,7 +1359,7 @@ export default function ChatPage() {
       setActiveFeedbackConversationId(null);
     } catch (error) {
       console.error(error);
-      window.alert(error instanceof Error ? error.message : "Could not submit feedback.");
+      window.alert(error instanceof Error ? error.message : "フィードバックを送信できませんでした。");
     } finally {
       setIsSubmittingFeedback(false);
     }
@@ -1375,7 +1403,7 @@ export default function ChatPage() {
     } catch (error) {
       console.error(error);
       setGroupModal((prev) => ({ ...prev, submitting: false }));
-      window.alert(error instanceof Error ? error.message : "Could not create group.");
+      window.alert(error instanceof Error ? error.message : "グループを作成できませんでした。");
     }
   }
 
@@ -1388,17 +1416,17 @@ export default function ChatPage() {
     if (!file) return;
 
     if (file.size > MAX_ATTACHMENT_SIZE) {
-      setAttachmentError("File too large. Max size is 25MB.");
+      setAttachmentError("ファイルサイズは25MB以下にしてください。");
       return;
     }
 
     if (messageType === "media" && !file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-      setAttachmentError("Please choose an image or video file.");
+      setAttachmentError("画像または動画ファイルを選択してください。");
       return;
     }
 
     if (messageType === "file" && !isSupportedDocumentFile(file)) {
-      setAttachmentError("Unsupported document type.");
+      setAttachmentError("対応していないドキュメント形式です。");
       return;
     }
 
@@ -1424,7 +1452,7 @@ export default function ChatPage() {
       closeAttachmentModal();
     } catch (error) {
       console.error(error);
-      window.alert(error instanceof Error ? error.message : "Could not upload file.");
+      window.alert(error instanceof Error ? error.message : "ファイルをアップロードできませんでした。");
     } finally {
       setIsUploadingAttachment(false);
     }
@@ -1471,7 +1499,9 @@ export default function ChatPage() {
               <div className="relative w-full h-full rounded-full overflow-hidden bg-gray-200">
                 <Image src={activeRoom.avatar} alt={activeRoom.name} fill className="object-cover" unoptimized />
               </div>
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white" />
+              {activeRoom.isOnline === true && (
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white" />
+              )}
             </div>
             <div>
               <p className="text-sm font-bold text-gray-900">{activeRoom.name}</p>
@@ -1572,10 +1602,10 @@ export default function ChatPage() {
                 </button>
                 <span className={clsx("text-sm", isRecording ? "text-red-500 font-medium" : "text-gray-500")}>
                   {isVoiceSending
-                    ? "Sending..."
+                    ? "送信中..."
                     : isRecording
-                      ? `Recording... ${formatVoiceDuration(recordingSeconds)}`
-                      : "Tap to record"}
+                      ? `録音中... ${formatVoiceDuration(recordingSeconds)}`
+                      : "タップして録音"}
                 </span>
               </div>
             </div>
@@ -1670,7 +1700,7 @@ export default function ChatPage() {
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h3 className="text-sm font-bold text-gray-900">{activeRoom.name}</h3>
-                <p className="text-xs text-gray-400">{activeParticipants.length} members</p>
+                <p className="text-xs text-gray-400">{activeParticipants.length}人のメンバー</p>
               </div>
               <button
                 onClick={() => setGroupDetailsOpen(false)}
@@ -1808,7 +1838,7 @@ export default function ChatPage() {
                 style={{ backgroundColor: "#1B4332" }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z" /></svg>
-                {isUploadingAttachment ? "Sending..." : "送信する"}
+                {isUploadingAttachment ? "送信中..." : "送信する"}
               </button>
             </div>
           </div>

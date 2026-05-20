@@ -1,4 +1,5 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import { CurrentUserId } from '../profile/current-user-id.decorator';
 import { AuthService } from './auth.service';
 import {
   validateLoginBody,
@@ -17,6 +18,16 @@ export class AuthController {
   @Post('login')
   login(@Body() body: unknown) {
     return this.authService.login(validateLoginBody(body));
+  }
+
+  @Post('presence')
+  updatePresence(@CurrentUserId() currentUserId: string) {
+    return this.authService.updatePresence(currentUserId);
+  }
+
+  @Post('logout')
+  logout(@CurrentUserId() currentUserId: string) {
+    return this.authService.logout(currentUserId);
   }
 }
 

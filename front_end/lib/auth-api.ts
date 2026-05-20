@@ -16,6 +16,11 @@ export interface AuthResponse {
   createdAt?: string;
 }
 
+export interface PresenceResponse {
+  ok: true;
+  lastSeenAt: string;
+}
+
 async function fetchPostThrowingMessage(path: string, payload: unknown) {
   let response: Response;
 
@@ -93,6 +98,48 @@ async function requestJson<T>(path: string, payload: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function requestAuthenticatedPost<T>(path: string): Promise<T> {
+  const userId = getStoredUserId();
+  if (!userId) {
+    throw new Error("Login is required before using authenticated requests.");
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+      },
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw new Error(
+      `Cannot reach backend API at ${API_BASE_URL}. ${
+        error instanceof Error ? error.message : "network error"
+      }`,
+    );
+  }
+
+  if (!response.ok) {
+    const fallback = `Request failed with status ${response.status}`;
+    let message = fallback;
+
+    try {
+      const errorBody: unknown = await response.json();
+      message = parseNestErrorMessage(errorBody, fallback);
+    } catch {
+      message = fallback;
+    }
+
+    throw new Error(Array.isArray(message) ? message.join(", ") : message);
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export function login(payload: { identifier: string; password: string }) {
   return requestAuth("/auth/login", payload);
 }
@@ -142,6 +189,22 @@ export function completePasswordReset(payload: {
   newPassword: string;
 }) {
   return requestJson<{ ok: true }>("/auth/password-reset/complete", payload);
+}
+
+export function updatePresence() {
+  if (!getStoredUserId()) {
+    return Promise.resolve(null);
+  }
+
+  return requestAuthenticatedPost<PresenceResponse>("/auth/presence");
+}
+
+export function logout() {
+  if (!getStoredUserId()) {
+    return Promise.resolve(null);
+  }
+
+  return requestAuthenticatedPost<{ ok: true }>("/auth/logout");
 }
 
 export function setStoredUserId(userId: string) {

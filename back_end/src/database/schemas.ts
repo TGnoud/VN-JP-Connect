@@ -87,6 +87,9 @@ export class User {
   @Prop({ required: true, default: Date.now })
   created_at: Date;
 
+  @Prop()
+  last_seen_at?: Date;
+
   @Prop({ trim: true })
   reset_code?: string;
 

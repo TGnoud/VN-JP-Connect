@@ -70,6 +70,7 @@ export interface PublicProfileData {
   joinedAt: string;
   updatedAt: string;
   isMe: boolean;
+  isOnline: boolean;
 }
 
 export interface DiscoverProfileData {
@@ -109,6 +110,7 @@ export interface ChatParticipant {
   avatarUrl: string;
   location: string;
   level: string;
+  isOnline: boolean;
 }
 
 export interface ChatConversation {
@@ -120,6 +122,7 @@ export interface ChatConversation {
   location: string;
   level: string;
   avatar: string;
+  isOnline: boolean;
   lastMessage: string;
   lastMessageAt: string;
   unreadCount: number;

@@ -27,6 +27,7 @@ import {
   User,
   UserDocument,
 } from '../database/schemas';
+import { isOnlineFromLastSeen } from '../auth/presence';
 
 type SendMessagePayload = {
   content?: unknown;
@@ -127,6 +128,15 @@ const MESSAGE_TYPES: MessageType[] = [
   'voice',
   'system',
 ];
+const LANGUAGE_LABELS: Record<string, string> = {
+  Japanese: '日本語',
+  Vietnamese: 'ベトナム語',
+  English: '英語',
+  Chinese: '中国語',
+  Korean: '韓国語',
+  French: 'フランス語',
+  Spanish: 'スペイン語',
+};
 
 @Injectable()
 export class ConversationsService {
@@ -507,10 +517,10 @@ export class ConversationsService {
 
     const content = `${
       messageType === 'media'
-        ? '[Media]'
+        ? '[メディア]'
         : messageType === 'voice'
-          ? '[Voice]'
-          : '[File]'
+          ? '[ボイス]'
+          : '[ファイル]'
     } ${safeOriginalName}`;
     const attachment = {
       url: storedAttachment.url,
@@ -1026,6 +1036,7 @@ export class ConversationsService {
           avatarUrl: this.avatarUrl(user, profile),
           location: profile?.location ?? '',
           level: this.languageLevel(profile),
+          isOnline: isOnlineFromLastSeen(user.last_seen_at),
         };
       })
       .filter(Boolean);
@@ -1054,6 +1065,7 @@ export class ConversationsService {
       avatar: isGroup
         ? `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(conversation._id.toString())}`
         : (primaryPartner?.avatarUrl ?? ''),
+      isOnline: isGroup ? false : Boolean(primaryPartner?.isOnline),
       lastMessage: lastMessage?.content ?? '',
       lastMessageAt:
         lastMessage?.sent_at ??
@@ -1192,7 +1204,8 @@ export class ConversationsService {
       return '';
     }
 
-    return `${first.language} ${first.level}`;
+    const languageLabel = LANGUAGE_LABELS[first.language] ?? first.language;
+    return `${languageLabel} ${first.level}`;
   }
 
   private parseLimit(rawLimit?: string) {

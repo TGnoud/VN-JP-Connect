@@ -27,6 +27,7 @@ import {
   UploadedFileLike,
 } from '../profile/profile-image-storage.service';
 import { MAX_BIO_LENGTH } from '../profile/profile.constants';
+import { isOnlineFromLastSeen } from '../auth/presence';
 
 export const REPORT_EVIDENCE_MAX_FILES = 5;
 export const REPORT_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
@@ -95,6 +96,7 @@ export class UsersService {
       joinedAt: targetUser.created_at,
       updatedAt: profile?.updated_at ?? targetUser.created_at,
       isMe: currentUserId === targetUser._id.toString(),
+      isOnline: isOnlineFromLastSeen(targetUser.last_seen_at),
     };
   }
 
