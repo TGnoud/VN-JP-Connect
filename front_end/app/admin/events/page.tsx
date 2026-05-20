@@ -385,6 +385,20 @@ function FormLabel({ children, required }: { children: React.ReactNode; required
 
 const inputCls  = "w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:border-transparent placeholder:text-gray-400 bg-white";
 const selectCls = "w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-white appearance-none";
+const COVER_IMAGE_TYPES = ["image/jpeg", "image/png"];
+const COVER_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
+
+function getCoverImageError(file: File) {
+  if (!COVER_IMAGE_TYPES.includes(file.type)) {
+    return "JPGまたはPNG画像を選択してください";
+  }
+
+  if (file.size > COVER_IMAGE_MAX_SIZE) {
+    return "画像は5MB以下にしてください";
+  }
+
+  return null;
+}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -400,6 +414,9 @@ export default function AdminEventsPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [toast, setToast]         = useState<{ msg: string; ok: boolean } | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [createCoverUploading, setCreateCoverUploading] = useState(false);
+  const [createCoverError, setCreateCoverError] = useState<string | null>(null);
+  const createCoverInputRef = useRef<HTMLInputElement>(null);
   const editCoverInputRef = useRef<HTMLInputElement>(null);
 
   function showToast(msg: string, ok = true) {
@@ -452,6 +469,8 @@ export default function AdminEventsPage() {
   function openCreate() {
     setCreateForm(EMPTY_CREATE);
     setSubmitted(false);
+    setCreateCoverError(null);
+    setCreateCoverUploading(false);
     setView("create");
   }
 
@@ -460,6 +479,11 @@ export default function AdminEventsPage() {
   }
 
   async function saveCreate(status: EventStatus) {
+    if (createCoverUploading) {
+      showToast("画像のアップロード完了後に保存してください", false);
+      return;
+    }
+
     setSubmitted(true);
     const errs = getCreateErrors(createForm);
     if (Object.keys(errs).length > 0) {
@@ -476,6 +500,32 @@ export default function AdminEventsPage() {
       showToast(status === "draft" ? "下書きとして保存しました" : "イベントを公開しました");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "イベントを保存できませんでした", false);
+    }
+  }
+
+  async function handleCreateCoverFile(file?: File) {
+    if (!file) return;
+
+    const validationError = getCoverImageError(file);
+    if (validationError) {
+      setCreateCoverError(validationError);
+      showToast(validationError, false);
+      return;
+    }
+
+    setCreateCoverError(null);
+    setCreateCoverUploading(true);
+
+    try {
+      const uploaded = await uploadAdminEventCover(file);
+      setCreateField("coverImageUrl", uploaded.url);
+      showToast("画像をアップロードしました");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "画像をアップロードできませんでした";
+      setCreateCoverError(message);
+      showToast(message, false);
+    } finally {
+      setCreateCoverUploading(false);
     }
   }
 
@@ -505,13 +555,9 @@ export default function AdminEventsPage() {
   async function handleEditCoverFile(file?: File) {
     if (!file || !editForm) return;
 
-    if (!["image/jpeg", "image/png"].includes(file.type)) {
-      showToast("JPGまたはPNG画像を選択してください", false);
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("画像は5MB以下にしてください", false);
+    const validationError = getCoverImageError(file);
+    if (validationError) {
+      showToast(validationError, false);
       return;
     }
 
@@ -596,13 +642,28 @@ export default function AdminEventsPage() {
                 プレビュー
               </button>
               <button onClick={() => setView("list")} className="px-3.5 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors">キャンセル</button>
-              <button onClick={() => saveCreate("draft")} className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors">
+              <button
+                onClick={() => saveCreate("draft")}
+                disabled={createCoverUploading}
+                className={clsx(
+                  "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors",
+                  createCoverUploading && "opacity-50 cursor-not-allowed",
+                )}
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
                 下書き保存
               </button>
-              <button onClick={() => saveCreate("published")} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: "#1B4332" }}>
+              <button
+                onClick={() => saveCreate("published")}
+                disabled={createCoverUploading}
+                className={clsx(
+                  "flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity",
+                  createCoverUploading && "opacity-50 cursor-not-allowed",
+                )}
+                style={{ backgroundColor: "#1B4332" }}
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -734,12 +795,90 @@ export default function AdminEventsPage() {
                 <p className="text-xs text-gray-400 mt-1.5">イベントに登録できる人数を設定します</p>
               </div>
               <div>
-                <FormLabel>カバー画像URL</FormLabel>
-                <div className="relative">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="size-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
-                  <input type="url" value={f.coverImageUrl} onChange={(e) => set("coverImageUrl", e.target.value)} placeholder="https://example.com/image.jpg" className={`${inputCls} pl-11`} />
+                <FormLabel>カバー画像</FormLabel>
+                <div className="flex flex-col gap-3">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (!createCoverUploading) createCoverInputRef.current?.click();
+                    }}
+                    onKeyDown={(event) => {
+                      if ((event.key === "Enter" || event.key === " ") && !createCoverUploading) {
+                        event.preventDefault();
+                        createCoverInputRef.current?.click();
+                      }
+                    }}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (!createCoverUploading) void handleCreateCoverFile(event.dataTransfer.files?.[0]);
+                    }}
+                    className={clsx(
+                      "border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center gap-3 bg-gray-50/50 transition-colors",
+                      createCoverUploading ? "cursor-wait opacity-70" : "cursor-pointer hover:border-gray-300",
+                    )}
+                    aria-disabled={createCoverUploading}
+                  >
+                    <input
+                      ref={createCoverInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      className="hidden"
+                      disabled={createCoverUploading}
+                      onChange={(event) => {
+                        void handleCreateCoverFile(event.target.files?.[0]);
+                        event.target.value = "";
+                      }}
+                    />
+                    {f.coverImageUrl ? (
+                      <div className="relative w-full h-44 overflow-hidden rounded-lg bg-gray-100">
+                        <Image src={resolveAdminEventMediaUrl(f.coverImageUrl)} alt="cover" fill className="object-cover" unoptimized />
+                      </div>
+                    ) : (
+                      <div className="w-full h-36 rounded-lg bg-white border border-gray-100 flex flex-col items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="size-9 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                        </svg>
+                        <p className="text-sm font-medium text-gray-500">画像を選択</p>
+                      </div>
+                    )}
+                    <div className="text-center">
+                      <p className="text-sm text-gray-500">
+                        {createCoverUploading
+                          ? "アップロード中..."
+                          : f.coverImageUrl
+                            ? "クリックまたはドラッグして画像を変更"
+                            : "クリックまたはドラッグして画像をアップロード"}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">JPG/PNG、5MB以下（推奨：1920x1080）</p>
+                    </div>
+                  </div>
+                  {createCoverError && <p className="text-xs text-red-500">{createCoverError}</p>}
+                  {f.coverImageUrl && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => createCoverInputRef.current?.click()}
+                        disabled={createCoverUploading}
+                        className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        画像を変更
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          set("coverImageUrl", "");
+                          setCreateCoverError(null);
+                        }}
+                        disabled={createCoverUploading}
+                        className="px-3 py-2 rounded-lg border border-red-100 text-xs font-semibold text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        削除
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-gray-400 mt-1.5">カバー画像のURLを入力してください（推奨：1920x1080）</p>
               </div>
             </div>
           </SectionCard>
