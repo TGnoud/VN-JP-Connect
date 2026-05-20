@@ -59,6 +59,13 @@ interface Msg {
 type ToolPanel = "attachment" | "emoji" | "voice" | "suggestions" | "translate" | null;
 type AttachModal = "photo" | "document" | null;
 type AttachmentMessageType = "file" | "media" | "voice";
+type TranslationDirection = "ja-vi" | "vi-ja";
+
+interface TranslationState {
+  direction: TranslationDirection;
+  text?: string;
+  error?: string;
+}
 
 interface GroupModalState {
   open: boolean;
@@ -107,35 +114,6 @@ const MOCK_MESSAGES: Record<string, Msg[]> = {
     { id: "m4b", senderId: "partner", content: "来月日本に行く予定です！",              time: "先週", status: "read" },
   ],
 };
-
-const MOCK_TRANSLATIONS: Record<string, string> = {
-  "こんにちは！元気ですか？": "Xin chào! Bạn có khỏe không?",
-  "先週のベトナム料理イベント、すごく楽しかったです！": "Sự kiện ẩm thực Việt Nam tuần trước vui lắm!",
-  "次回は一緒に行きましょう！来月また開催されるみたいです。": "Lần sau cùng đi nhé! Hình như tháng tới sẽ tổ chức lại.",
-  "こんにちは！昨日のイベントはいかがでしたか？": "Xin chào! Sự kiện hôm qua thế nào?",
-  "週末に一緒に勉強しませんか？": "Cuối tuần cùng học nhé?",
-  "カフェで会いましょう！": "Hẹn gặp ở quán cà phê nhé!",
-  "来月日本に行く予定です！": "Tháng tới tôi dự định đi Nhật!",
-  "元気ですよ！ありがとう。最近どうですか？": "Tôi khỏe! Cảm ơn bạn. Dạo này bạn thế nào?",
-  "本当ですか？私も行きたかったです！": "Thật sao? Tôi cũng muốn đi!",
-  "ぜひ次回も参加したいですね。": "Tôi nhất định muốn tham gia lần sau.",
-  "はい、とても楽しかったです！": "Vâng, vui lắm!",
-  "来月日本に来るんですね！楽しみですね。": "Tháng tới bạn đến Nhật à! Mong lắm đấy.",
-};
-
-function mockTranslate(text: string, direction: "ja-vi" | "vi-ja"): Promise<string> {
-  return new Promise((resolve) =>
-    setTimeout(() => {
-      if (MOCK_TRANSLATIONS[text]) {
-        resolve(MOCK_TRANSLATIONS[text]);
-      } else if (direction === "ja-vi") {
-        resolve(`[Bản dịch] ${text}`);
-      } else {
-        resolve(`[翻訳] ${text}`);
-      }
-    }, 600),
-  );
-}
 
 const EMOJIS = ["😀","😂","❤️","👍","🎉","🙏","🥰","🔥","✨","🌸","🍜","🇻🇳","🇯🇵","☕","📚","⭐","💪","🤝","😁","🥹"];
 
@@ -196,6 +174,18 @@ function formatLanguageLevel(value: string) {
       result.replace(new RegExp(`^${rawLanguage}\\b`), label),
     trimmed,
   );
+}
+
+function detectTranslationDirection(text: string): TranslationDirection {
+  return /[\u3040-\u30ff\u3400-\u9fff]/u.test(text) ? "ja-vi" : "vi-ja";
+}
+
+function translationLabel(direction: TranslationDirection) {
+  return direction === "ja-vi" ? "VN ベトナム語訳:" : "JP 日本語訳:";
+}
+
+function translationErrorMessage(_error: unknown) {
+  return "翻訳できませんでした。";
 }
 
 function formatChatTime(value?: string) {
@@ -522,7 +512,7 @@ function MsgBubble({
 }: {
   msg: Msg;
   onTranslate: (msgId: string, content: string) => void;
-  translation?: string;
+  translation?: TranslationState;
   isTranslating?: boolean;
 }) {
   const isMe = msg.senderId === "me";
@@ -530,6 +520,7 @@ function MsgBubble({
   const hasAttachments = attachments.length > 0;
   const showText = Boolean(msg.content.trim()) && !hasAttachments;
   const canTranslate = showText;
+  const shownDirection = translation?.direction ?? detectTranslationDirection(msg.content);
 
   return (
     <div className={clsx("flex", isMe ? "justify-end" : "justify-start")}>
@@ -554,12 +545,14 @@ function MsgBubble({
             <>
               <div className={clsx("border-t my-2", isMe ? "border-white/20" : "border-gray-100")} />
               <p className={clsx("text-xs font-medium mb-0.5", isMe ? "text-white/60" : "text-gray-400")}>
-                vn Bản dịch:
+                {translationLabel(shownDirection)}
               </p>
               {isTranslating ? (
                 <p className={clsx("text-xs italic", isMe ? "text-white/50" : "text-gray-400")}>翻訳中...</p>
+              ) : translation?.error ? (
+                <p className={clsx("text-xs", isMe ? "text-red-100" : "text-red-500")}>{translation.error}</p>
               ) : (
-                <p className={clsx("text-xs", isMe ? "text-white/90" : "text-gray-600")}>{translation}</p>
+                <p className={clsx("text-xs", isMe ? "text-white/90" : "text-gray-600")}>{translation?.text}</p>
               )}
             </>
           )}
@@ -661,12 +654,14 @@ export default function ChatPage() {
   const [attachmentError, setAttachmentError] = useState("");
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [translateInput, setTranslateInput] = useState("");
-  const [translateDir, setTranslateDir] = useState<"ja-vi" | "vi-ja">("ja-vi");
+  const [translateDir, setTranslateDir] = useState<TranslationDirection>("ja-vi");
+  const [translateError, setTranslateError] = useState("");
+  const [isTranslateSubmitting, setIsTranslateSubmitting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isVoiceSending, setIsVoiceSending] = useState(false);
   const [search, setSearch] = useState("");
-  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [translations, setTranslations] = useState<Record<string, TranslationState>>({});
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
   const [groupModal, setGroupModal] = useState<GroupModalState>({
     open: false,
@@ -1271,13 +1266,21 @@ export default function ChatPage() {
   }
 
   async function handleTranslateMessage(msgId: string, content: string) {
+    const direction = detectTranslationDirection(content);
+    setTranslations((prev) => ({ ...prev, [msgId]: { direction } }));
     setTranslatingIds((prev) => new Set(prev).add(msgId));
     try {
-      const result = await translateConversationText({ text: content, direction: translateDir });
-      setTranslations((prev) => ({ ...prev, [msgId]: result.translatedText }));
-    } catch {
-      const fallback = await mockTranslate(content, translateDir);
-      setTranslations((prev) => ({ ...prev, [msgId]: fallback }));
+      const result = await translateConversationText({ text: content, direction });
+      setTranslations((prev) => ({
+        ...prev,
+        [msgId]: { direction: result.direction, text: result.translatedText },
+      }));
+    } catch (error) {
+      console.error(error);
+      setTranslations((prev) => ({
+        ...prev,
+        [msgId]: { direction, error: translationErrorMessage(error) },
+      }));
     } finally {
       setTranslatingIds((prev) => {
         const next = new Set(prev);
@@ -1290,6 +1293,8 @@ export default function ChatPage() {
   async function handleTranslateSubmit() {
     if (!translateInput.trim()) return;
 
+    setIsTranslateSubmitting(true);
+    setTranslateError("");
     try {
       const result = await translateConversationText({
         text: translateInput,
@@ -1300,6 +1305,9 @@ export default function ChatPage() {
       setOpenTool(null);
     } catch (error) {
       console.error(error);
+      setTranslateError(translationErrorMessage(error));
+    } finally {
+      setIsTranslateSubmitting(false);
     }
   }
 
@@ -1629,7 +1637,14 @@ export default function ChatPage() {
             <div className="absolute bottom-full left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-10 px-5 py-4">
               <PanelHeader title="翻訳サポート" onClose={() => setOpenTool(null)} />
               <div className="flex items-center gap-2 mb-3">
-                <button onClick={() => { setTranslateDir((d) => (d === "ja-vi" ? "vi-ja" : "ja-vi")); setTranslateInput(""); }} className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setTranslateDir((d) => (d === "ja-vi" ? "vi-ja" : "ja-vi"));
+                    setTranslateInput("");
+                    setTranslateError("");
+                  }}
+                  className="flex items-center gap-2"
+                >
                   <span className={clsx("px-2.5 py-1 rounded-full text-xs font-semibold", translateDir === "ja-vi" ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-500")}>JP 日本語</span>
                   <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
                   <span className={clsx("px-2.5 py-1 rounded-full text-xs font-semibold", translateDir === "vi-ja" ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-500")}>VN ベトナム語</span>
@@ -1637,20 +1652,21 @@ export default function ChatPage() {
               </div>
               <div className="flex gap-2">
                 <input
-                  type="text" value={translateInput} onChange={(e) => setTranslateInput(e.target.value)} maxLength={500}
+                  type="text" value={translateInput} onChange={(e) => { setTranslateInput(e.target.value); setTranslateError(""); }} maxLength={500}
                   placeholder={translateDir === "ja-vi" ? "日本語のテキストを入力..." : "ベトナム語のテキストを入力..."}
                   className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:border-transparent placeholder:text-gray-400 bg-gray-50"
                 />
                 <button
                   onClick={handleTranslateSubmit}
-                  disabled={!translateInput.trim()}
-                  className={clsx("flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shrink-0", translateInput.trim() ? "opacity-100" : "opacity-40")}
+                  disabled={!translateInput.trim() || isTranslateSubmitting}
+                  className={clsx("flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shrink-0", translateInput.trim() && !isTranslateSubmitting ? "opacity-100" : "opacity-40")}
                   style={{ backgroundColor: "#1B4332" }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" /></svg>
-                  翻訳
+                  {isTranslateSubmitting ? "翻訳中..." : "翻訳"}
                 </button>
               </div>
+              {translateError && <p className="mt-2 text-xs text-red-500">{translateError}</p>}
             </div>
           )}
 

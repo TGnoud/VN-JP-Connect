@@ -1,8 +1,10 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { UploadApiResponse, v2 as cloudinary } from 'cloudinary';
@@ -45,6 +47,8 @@ type TranslatePayload = {
   text?: unknown;
   direction?: unknown;
 };
+
+type TranslationDirection = 'ja-vi' | 'vi-ja';
 
 type FavoriteFeedbackPayload = {
   value?: unknown;
@@ -121,6 +125,7 @@ const ALLOWED_AUDIO_EXTENSIONS = new Set([
   '.webm',
 ]);
 const FAVORITE_PROMPT_MESSAGE_COUNT = 50;
+const DEFAULT_GEMINI_TRANSLATE_MODEL = 'gemini-3.5-flash';
 const MESSAGE_TYPES: MessageType[] = [
   'text',
   'file',
@@ -734,17 +739,19 @@ export class ConversationsService {
     };
   }
 
-  translate(payload: TranslatePayload) {
+  async translate(currentUserId: string, payload: TranslatePayload) {
+    this.objectIdFromParam(currentUserId, 'currentUserId');
     const text = this.requiredTrimmedString(
       payload.text,
       'text',
       MAX_TRANSLATE_LENGTH,
     );
-    const direction = payload.direction === 'vi-ja' ? 'vi-ja' : 'ja-vi';
+    const direction: TranslationDirection =
+      payload.direction === 'vi-ja' ? 'vi-ja' : 'ja-vi';
 
     return {
       direction,
-      translatedText: this.localTranslate(text, direction),
+      translatedText: await this.translateWithGemini(text, direction),
     };
   }
 
@@ -1432,37 +1439,126 @@ export class ConversationsService {
     return uniqueIds;
   }
 
-  private localTranslate(text: string, direction: 'ja-vi' | 'vi-ja') {
-    const dictionary: Record<string, Record<string, string>> = {
-      'ja-vi': {
-        こんにちは: 'Xin chào',
-        ありがとう: 'Cảm ơn',
-        '週末に一緒に勉強しませんか？': 'Cuối tuần mình học cùng nhau nhé?',
-        '来月日本に行く予定です！': 'Tháng sau mình dự định đi Nhật!',
-      },
-      'vi-ja': {
-        'Xin chao': 'こんにちは',
-        'Xin chào': 'こんにちは',
-        'Cam on': 'ありがとうございます',
-        'Cảm ơn': 'ありがとうございます',
-        'minh muon luyen tieng Nhat': '日本語を練習したいです',
-      },
-    };
-    const exact = dictionary[direction][text];
-
-    if (exact) {
-      return exact;
+  private async translateWithGemini(
+    text: string,
+    direction: TranslationDirection,
+  ) {
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!apiKey) {
+      throw new ServiceUnavailableException(
+        'GEMINI_API_KEY is not configured',
+      );
     }
 
-    const entry = Object.entries(dictionary[direction]).find(([source]) =>
-      text.toLowerCase().includes(source.toLowerCase()),
+    const modelName =
+      process.env.GEMINI_TRANSLATE_MODEL?.trim() ||
+      DEFAULT_GEMINI_TRANSLATE_MODEL;
+    const modelPath = modelName.startsWith('models/')
+      ? modelName
+      : `models/${modelName}`;
+    const sourceLanguage =
+      direction === 'ja-vi' ? 'Japanese' : 'Vietnamese';
+    const targetLanguage =
+      direction === 'ja-vi' ? 'Vietnamese' : 'Japanese';
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [
+              {
+                text:
+                  'You are a precise Japanese-Vietnamese translation engine. ' +
+                  'Return only the translated text. Do not add explanations, labels, markdown, quotes, romanization, alternatives, or notes.',
+              },
+            ],
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text:
+                    `Translate from ${sourceLanguage} to ${targetLanguage}.\n` +
+                    `Source language: ${sourceLanguage}\n` +
+                    `Target language: ${targetLanguage}\n` +
+                    'Text:\n' +
+                    text,
+                },
+              ],
+            },
+          ],
+        }),
+      },
     );
 
-    if (entry) {
-      return entry[1];
+    const body = (await response.json().catch(() => null)) as
+      | Record<string, any>
+      | null;
+
+    if (!response.ok) {
+      const message =
+        body?.error?.message ??
+        body?.message ??
+        `HTTP ${response.status}`;
+      throw new BadGatewayException(`Gemini translation failed: ${message}`);
     }
 
-    return direction === 'ja-vi' ? `[VI] ${text}` : `[JP] ${text}`;
+    const rawText = this.extractGeminiText(body);
+    const translatedText = this.normalizeGeminiTranslation(rawText);
+
+    if (!translatedText) {
+      throw new BadGatewayException('Gemini translation returned empty text');
+    }
+
+    return translatedText;
+  }
+
+  private extractGeminiText(body: Record<string, any> | null) {
+    const parts = body?.candidates?.[0]?.content?.parts;
+
+    if (!Array.isArray(parts)) {
+      return '';
+    }
+
+    return parts
+      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+      .join('')
+      .trim();
+  }
+
+  private normalizeGeminiTranslation(value: string) {
+    let text = value.trim();
+
+    text = text
+      .replace(/^```[\w-]*\s*/u, '')
+      .replace(/\s*```$/u, '')
+      .trim();
+
+    const labelPatterns = [
+      /^translation\s*[:：]\s*/iu,
+      /^translated text\s*[:：]\s*/iu,
+      /^翻訳\s*[:：]\s*/iu,
+      /^日本語訳?\s*[:：]\s*/iu,
+      /^ベトナム語訳?\s*[:：]\s*/iu,
+      /^japanese\s*[:：]\s*/iu,
+      /^vietnamese\s*[:：]\s*/iu,
+      /^\[(?:JP|VI)\]\s*/iu,
+    ];
+
+    for (const pattern of labelPatterns) {
+      text = text.replace(pattern, '').trim();
+    }
+
+    return text
+      .replace(/^["'“”「『]+/u, '')
+      .replace(/["'“”」』]+$/u, '')
+      .trim();
   }
 
   private objectIdFromParam(value: string, name: string) {

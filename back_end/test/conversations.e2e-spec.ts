@@ -22,6 +22,10 @@ describe('Conversations API (e2e)', () => {
   beforeEach(async () => {
     conversationsService = {
       openWithUser: jest.fn().mockResolvedValue(conversationResponse),
+      translate: jest.fn().mockResolvedValue({
+        direction: 'vi-ja',
+        translatedText: 'こんにちは',
+      }),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -62,5 +66,29 @@ describe('Conversations API (e2e)', () => {
       .post(`/conversations/with/${targetUserId}`)
       .set('x-user-id', currentUserId)
       .expect(403);
+  });
+
+  it('requires x-user-id for translation', () => {
+    return request(app.getHttpServer())
+      .post('/conversations/translate')
+      .send({ text: 'chào', direction: 'vi-ja' })
+      .expect(401);
+  });
+
+  it('translates text for an authenticated user', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/conversations/translate')
+      .set('x-user-id', currentUserId)
+      .send({ text: 'chào', direction: 'vi-ja' })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      direction: 'vi-ja',
+      translatedText: 'こんにちは',
+    });
+    expect(conversationsService.translate).toHaveBeenCalledWith(
+      currentUserId,
+      { text: 'chào', direction: 'vi-ja' },
+    );
   });
 });

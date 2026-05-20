@@ -52,8 +52,11 @@ export class ConversationsController {
   }
 
   @Post('translate')
-  translate(@Body() body?: Record<string, unknown>) {
-    return this.conversationsService.translate(body ?? {});
+  translate(
+    @CurrentUserId() currentUserId: string,
+    @Body() body?: Record<string, unknown>,
+  ) {
+    return this.conversationsService.translate(currentUserId, body ?? {});
   }
 
   @Post('with/:userId')
