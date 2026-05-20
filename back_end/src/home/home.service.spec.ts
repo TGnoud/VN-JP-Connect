@@ -4,6 +4,7 @@ import { HomeService } from './home.service';
 function queryMock<T>(value: T) {
   return {
     limit: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
     lean: jest.fn().mockReturnThis(),
     exec: jest.fn().mockResolvedValue(value),
   };
@@ -22,6 +23,27 @@ function limitingQueryMock<T>(value: T[]) {
     ),
   };
   return query;
+}
+
+function emptyUserReportModel() {
+  return {
+    find: jest.fn().mockReturnValue(queryMock([])),
+    exists: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(null) }),
+  };
+}
+
+function userReportModelWithReports(reports: Array<Record<string, unknown>>) {
+  return {
+    find: jest.fn().mockReturnValue(queryMock(reports)),
+    exists: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(null) }),
+  };
+}
+
+function blockedUserReportModel() {
+  return {
+    find: jest.fn().mockReturnValue(queryMock([])),
+    exists: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }) }),
+  };
 }
 
 describe('HomeService', () => {
@@ -59,6 +81,8 @@ describe('HomeService', () => {
       tagModel as any,
       matchModel as any,
       conversationModel as any,
+      {} as any,
+      emptyUserReportModel() as any,
     );
 
     const result = await service.discover(currentUserId, {});
@@ -128,6 +152,8 @@ describe('HomeService', () => {
       tagModel as any,
       matchModel as any,
       {} as any,
+      {} as any,
+      emptyUserReportModel() as any,
     );
 
     const result = await service.discover(currentUserId, { gender: 'female' });
@@ -195,6 +221,8 @@ describe('HomeService', () => {
       tagModel as any,
       matchModel as any,
       {} as any,
+      {} as any,
+      emptyUserReportModel() as any,
     );
 
     const result = await service.discover(currentUserId, {
@@ -309,6 +337,8 @@ describe('HomeService', () => {
       tagModel as any,
       matchModel as any,
       {} as any,
+      {} as any,
+      emptyUserReportModel() as any,
     );
 
     const result = await service.discover(currentUserId.toString(), {});
@@ -323,6 +353,76 @@ describe('HomeService', () => {
         { status: 'accepted', requester_id: currentUserId },
         { status: 'accepted', receiver_id: currentUserId },
         { status: 'pending', requester_id: currentUserId },
+      ],
+    });
+  });
+
+  it('excludes users with a report relationship from discover in either direction', async () => {
+    const currentUserId = new Types.ObjectId();
+    const reportedUserId = new Types.ObjectId();
+    const reporterUserId = new Types.ObjectId();
+    const visibleUserId = new Types.ObjectId();
+    const users = [
+      {
+        _id: reportedUserId,
+        full_name: 'Reported User',
+        nationality: 'JP',
+        birth_date: new Date('2000-01-01T00:00:00.000Z'),
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+      {
+        _id: reporterUserId,
+        full_name: 'Reporter User',
+        nationality: 'VN',
+        birth_date: new Date('2000-01-01T00:00:00.000Z'),
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+      {
+        _id: visibleUserId,
+        full_name: 'Visible User',
+        nationality: 'JP',
+        birth_date: new Date('2000-01-01T00:00:00.000Z'),
+        created_at: new Date('2026-05-11T00:00:00.000Z'),
+      },
+    ];
+    const userModel = {
+      find: jest.fn().mockReturnValue(queryMock(users)),
+    };
+    const profileModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const userInterestModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const tagModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const matchModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+      aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+    };
+    const userReportModel = userReportModelWithReports([
+      { reporter_id: currentUserId, reported_user_id: reportedUserId },
+      { reporter_id: reporterUserId, reported_user_id: currentUserId },
+    ]);
+    const service = new HomeService(
+      userModel as any,
+      profileModel as any,
+      userInterestModel as any,
+      tagModel as any,
+      matchModel as any,
+      {} as any,
+      {} as any,
+      userReportModel as any,
+    );
+
+    const result = await service.discover(currentUserId.toString(), {});
+
+    expect(result.map((user) => user.id)).toEqual([visibleUserId.toString()]);
+    expect(userReportModel.find).toHaveBeenCalledWith({
+      $or: [
+        { reporter_id: currentUserId },
+        { reported_user_id: currentUserId },
       ],
     });
   });
@@ -388,6 +488,8 @@ describe('HomeService', () => {
       tagModel as any,
       matchModel as any,
       {} as any,
+      {} as any,
+      emptyUserReportModel() as any,
     );
 
     const result = await service.discover(currentUserId, { limit: 1 });
@@ -433,6 +535,8 @@ describe('HomeService', () => {
       tagModel as any,
       matchModel as any,
       {} as any,
+      {} as any,
+      emptyUserReportModel() as any,
     );
 
     const result = await service.discover(currentUserId, {});
@@ -450,6 +554,8 @@ describe('HomeService', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
+      emptyUserReportModel() as any,
     );
 
     await expect(
@@ -479,6 +585,8 @@ describe('HomeService', () => {
       {} as any,
       matchModel as any,
       {} as any,
+      {} as any,
+      emptyUserReportModel() as any,
     );
 
     const result = await service.showInterest(currentUserId.toString(), targetUserId.toString());
@@ -491,6 +599,35 @@ describe('HomeService', () => {
       }),
     );
     expect(result).toEqual({ status: 'pending', matchId: matchId.toString() });
+  });
+
+  it('rejects interest actions when a report relationship blocks the pair', async () => {
+    const currentUserId = new Types.ObjectId();
+    const targetUserId = new Types.ObjectId();
+    const userModel = {
+      findById: jest.fn(),
+    };
+    const matchModel = {
+      findOne: jest.fn(),
+      create: jest.fn(),
+      aggregate: jest.fn(),
+    };
+    const service = new HomeService(
+      userModel as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      matchModel as any,
+      {} as any,
+      {} as any,
+      blockedUserReportModel() as any,
+    );
+
+    await expect(
+      service.showInterest(currentUserId.toString(), targetUserId.toString()),
+    ).rejects.toThrow('このユーザーとは連絡できません。');
+    expect(userModel.findById).not.toHaveBeenCalled();
+    expect(matchModel.create).not.toHaveBeenCalled();
   });
 
   it('accepts a reverse pending match and creates a conversation', async () => {
@@ -531,6 +668,8 @@ describe('HomeService', () => {
       {} as any,
       matchModel as any,
       conversationModel as any,
+      {} as any,
+      emptyUserReportModel() as any,
     );
 
     const result = await service.showInterest(currentUserId.toString(), targetUserId.toString());

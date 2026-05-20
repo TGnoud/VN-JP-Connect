@@ -20,9 +20,16 @@ import {
   UserDocument,
   UserInterest,
   UserInterestDocument,
+  UserReport,
+  UserReportDocument,
 } from '../database/schemas';
 import { calculateAge, DEFAULT_LEGACY_AGE } from '../common/age';
 import { MAX_BIO_LENGTH } from '../profile/profile.constants';
+import {
+  assertNoUserReportBlock,
+  blockedUserIdSetFor,
+  blockedUserIdsFor,
+} from '../users/report-blocking';
 
 type DiscoverQuery = {
   gender?: string;
@@ -57,6 +64,8 @@ export class HomeService {
     private readonly conversationModel: Model<ConversationDocument>,
     @InjectModel(Message.name)
     private readonly messageModel: Model<MessageDocument>,
+    @InjectModel(UserReport.name)
+    private readonly userReportModel: Model<UserReportDocument>,
   ) {}
 
   async getFilterOptions() {
@@ -102,11 +111,16 @@ export class HomeService {
     );
     const relatedUserIds =
       await this.existingDiscoverRelationshipUserIds(currentUserObjectId);
+    const blockedUserIds = await blockedUserIdsFor(
+      this.userReportModel,
+      currentUserObjectId,
+    );
 
     const excludedUserIds = this.uniqueObjectIds([
       currentUserObjectId,
       ...excludeObjectIds,
       ...relatedUserIds,
+      ...blockedUserIds,
     ]);
     const excludedUserIdSet = new Set(
       excludedUserIds.map((id) => id.toString()),
@@ -272,6 +286,12 @@ export class HomeService {
       throw new BadRequestException('cannot show interest in yourself');
     }
 
+    await assertNoUserReportBlock(
+      this.userReportModel,
+      currentObjectId,
+      targetObjectId,
+    );
+
     const [currentUser, targetUser] = await Promise.all([
       this.userModel.findById(currentObjectId).lean().exec(),
       this.userModel.findById(targetObjectId).lean().exec(),
@@ -346,11 +366,22 @@ export class HomeService {
   async getNavSummary(userId: string) {
     const currentObjectId = this.objectIdFromParam(userId, 'currentUserId');
     await this.ensureDirectConversationParticipants(currentObjectId);
-    const conversations = await this.conversationModel
+    const blockedUserIds = await blockedUserIdSetFor(
+      this.userReportModel,
+      currentObjectId,
+    );
+    const conversations = (
+      await this.conversationModel
       .find({ participant_ids: currentObjectId })
-      .select({ _id: 1 })
+      .select({ _id: 1, participant_ids: 1 })
       .lean()
-      .exec();
+      .exec()
+    ).filter((conversation) =>
+      !(conversation.participant_ids ?? []).some((participantId: Types.ObjectId) => {
+        const id = new Types.ObjectId(participantId);
+        return !id.equals(currentObjectId) && blockedUserIds.has(id.toString());
+      }),
+    );
     const conversationIds = conversations.map(
       (conversation) => conversation._id,
     );
@@ -556,6 +587,10 @@ export class HomeService {
   private async ensureDirectConversationParticipants(
     currentObjectId: Types.ObjectId,
   ) {
+    const blockedUserIds = await blockedUserIdSetFor(
+      this.userReportModel,
+      currentObjectId,
+    );
     const matches = await this.matchModel
       .find({
         status: 'accepted',
@@ -569,6 +604,13 @@ export class HomeService {
 
     await Promise.all(
       matches.map((match) => {
+        const partnerId = match.requester_id.equals(currentObjectId)
+          ? match.receiver_id
+          : match.requester_id;
+        if (blockedUserIds.has(partnerId.toString())) {
+          return Promise.resolve();
+        }
+
         const now = new Date();
         return this.conversationModel
           .findOneAndUpdate(

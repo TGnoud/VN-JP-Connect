@@ -130,6 +130,16 @@ function userFromDiscoverProfile(profile: DiscoverProfileData): User {
   };
 }
 
+function isBlockedContactError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+
+  return (
+    message.includes("このユーザーとは連絡できません") ||
+    message.includes("user was not found") ||
+    message.includes("not found")
+  );
+}
+
 /* ─── Profile Card ─── */
 function ProfileCard({
   user,
@@ -762,6 +772,13 @@ export default function DiscoverPage() {
       setTimeout(() => setMatchAlert(null), 3000);
       removeInterestedUser(current.id);
     } catch (error) {
+      if (isBlockedContactError(error)) {
+        removeInterestedUser(current.id);
+        setDiscoverError("このプロフィールは表示できません。");
+        alert("このユーザーとは連絡できません。");
+        return;
+      }
+
       alert(error instanceof Error ? error.message : "保存に失敗しました。");
     } finally {
       setLiking(false);

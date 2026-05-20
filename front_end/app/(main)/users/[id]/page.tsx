@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -58,6 +58,20 @@ function getLanguages(user: PublicProfileData): Lang[] {
 
     return { useFlag: false, flagSrc: "", dotColor: "#ef4444", name, level };
   });
+}
+
+function profileLoadErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+
+  if (
+    message.includes("user was not found") ||
+    message.includes("not found") ||
+    message.includes("このユーザーとは連絡できません")
+  ) {
+    return "このプロフィールは表示できません。";
+  }
+
+  return message || "プロフィールを読み込めませんでした。";
 }
 
 /* ── Icons ── */
@@ -180,6 +194,21 @@ type LocalFilePreview = {
   url: string;
 };
 
+const REPORT_EVIDENCE_MAX_FILES = 5;
+const REPORT_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
+const REPORT_EVIDENCE_ACCEPT = "image/png,image/jpeg,application/pdf";
+
+function isEvidenceImageFile(file: File) {
+  return file.type.startsWith("image/") || /\.(png|jpe?g)$/i.test(file.name);
+}
+
+function isSupportedEvidenceFile(file: File) {
+  return (
+    ["image/png", "image/jpeg", "application/pdf"].includes(file.type) ||
+    /\.(png|jpe?g|pdf)$/i.test(file.name)
+  );
+}
+
 function useLocalFilePreviews(files: File[]) {
   const [previews, setPreviews] = useState<LocalFilePreview[]>([]);
 
@@ -192,7 +221,7 @@ function useLocalFilePreviews(files: File[]) {
     const nextPreviews = files.map((file, index) => ({
       id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
       file,
-      url: file.type.startsWith("image/") ? URL.createObjectURL(file) : "",
+      url: isEvidenceImageFile(file) ? URL.createObjectURL(file) : "",
     }));
     setPreviews(nextPreviews);
 
@@ -230,15 +259,41 @@ function ReportModal({
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [uploadError, setUploadError] = useState("");
+  const evidenceInputRef = useRef<HTMLInputElement | null>(null);
   const evidencePreviews = useLocalFilePreviews(files);
 
   function addEvidenceFiles(fileList: FileList | null) {
     if (!fileList) return;
 
-    setFiles((current) => [...current, ...Array.from(fileList)].slice(0, 5));
+    const next = [...files];
+    let nextError = "";
+
+    for (const file of Array.from(fileList)) {
+      if (next.length >= REPORT_EVIDENCE_MAX_FILES) {
+        nextError = `証拠ファイルは${REPORT_EVIDENCE_MAX_FILES}件まで選択できます。`;
+        break;
+      }
+
+      if (!isSupportedEvidenceFile(file)) {
+        nextError = "PNG、JPG、PDFファイルを選択してください。";
+        continue;
+      }
+
+      if (file.size > REPORT_EVIDENCE_MAX_BYTES) {
+        nextError = "1ファイル10MB以下にしてください。";
+        continue;
+      }
+
+      next.push(file);
+    }
+
+    setUploadError(nextError);
+    setFiles(next);
   }
 
   function removeEvidenceFile(index: number) {
+    setUploadError("");
     setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
   }
 
@@ -320,24 +375,54 @@ function ReportModal({
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">証拠をアップロード（任意）</span>
-              <span className="text-xs text-gray-400">{files.length}/5 ファイル</span>
+              <span className="text-xs text-gray-400">{files.length}/{REPORT_EVIDENCE_MAX_FILES} ファイル</span>
             </div>
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl py-5 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all">
+            <input
+              ref={evidenceInputRef}
+              type="file"
+              accept={REPORT_EVIDENCE_ACCEPT}
+              multiple
+              className="hidden"
+              disabled={submitting}
+              onChange={(e) => {
+                addEvidenceFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                if (!submitting) evidenceInputRef.current?.click();
+              }}
+              onKeyDown={(event) => {
+                if ((event.key === "Enter" || event.key === " ") && !submitting) {
+                  event.preventDefault();
+                  evidenceInputRef.current?.click();
+                }
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (!submitting) addEvidenceFiles(event.dataTransfer.files);
+              }}
+              className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl py-5 cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all"
+            >
               <span className="inline-flex items-center justify-center size-10 rounded-full mb-2" style={{ backgroundColor: "#ecfdf5" }}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="size-5" style={{ color: "#1B4332" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                 </svg>
               </span>
-              <span className="text-sm font-medium text-gray-700">クリックしてファイルを選択</span>
-              <span className="text-xs text-gray-400 mt-0.5">画像・スクリーンショット（PNG, JPG, PDF）最大5MB・各10MBまで</span>
-              <input
-                type="file" accept="image/png,image/jpeg,application/pdf" multiple className="hidden"
-                onChange={(e) => {
-                  addEvidenceFiles(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-            </label>
+              <span className="text-sm font-medium text-gray-700">
+                {files.length > 0 ? "クリックしてファイルを追加" : "クリックしてファイルを選択"}
+              </span>
+              <span className="text-xs text-gray-400 mt-0.5">PNG, JPG, PDF / 1ファイル10MBまで</span>
+            </div>
+            {uploadError && (
+              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+                {uploadError}
+              </p>
+            )}
             {evidencePreviews.length > 0 && (
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {evidencePreviews.map((preview, index) => (
@@ -430,7 +515,8 @@ export default function UserDetailPage() {
         setUser(profile);
       } catch (error) {
         if (!active) return;
-        setPageError(error instanceof Error ? error.message : "プロフィールを読み込めませんでした。");
+        setUser(null);
+        setPageError(profileLoadErrorMessage(error));
       } finally {
         if (active) {
           setLoading(false);
@@ -532,6 +618,9 @@ export default function UserDetailPage() {
       detail: payload.detail,
       evidence: payload.files,
     });
+    setShowReport(false);
+    setUser(null);
+    router.replace("/discover");
   }
 
   return (

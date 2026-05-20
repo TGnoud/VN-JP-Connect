@@ -5,6 +5,7 @@ function queryMock<T>(value: T) {
   return {
     sort: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
     lean: jest.fn().mockReturnThis(),
     exec: jest.fn().mockResolvedValue(value),
   };
@@ -13,6 +14,27 @@ function queryMock<T>(value: T) {
 function countMock(value: number) {
   return {
     exec: jest.fn().mockResolvedValue(value),
+  };
+}
+
+function emptyUserReportModel() {
+  return {
+    find: jest.fn().mockReturnValue(queryMock([])),
+    exists: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(null) }),
+  };
+}
+
+function userReportModelWithReports(reports: Array<Record<string, unknown>>) {
+  return {
+    find: jest.fn().mockReturnValue(queryMock(reports)),
+    exists: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(null) }),
+  };
+}
+
+function blockedUserReportModel() {
+  return {
+    find: jest.fn().mockReturnValue(queryMock([])),
+    exists: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }) }),
   };
 }
 
@@ -42,6 +64,7 @@ describe('ConversationsService', () => {
       {} as any,
       {} as any,
       {} as any,
+      emptyUserReportModel() as any,
     );
   }
 
@@ -216,6 +239,7 @@ describe('ConversationsService', () => {
       conversationModel as any,
       messageModel as any,
       {} as any,
+      emptyUserReportModel() as any,
     );
 
     const result = await service.listConversations(currentUserId.toString());
@@ -233,5 +257,118 @@ describe('ConversationsService', () => {
         }),
       ]),
     });
+  });
+
+  it('hides conversations that contain a blocked participant', async () => {
+    const currentUserId = new Types.ObjectId();
+    const visiblePartnerId = new Types.ObjectId();
+    const blockedPartnerId = new Types.ObjectId();
+    const visibleConversationId = new Types.ObjectId();
+    const blockedConversationId = new Types.ObjectId();
+    const now = new Date();
+    const visibleConversation = {
+      _id: visibleConversationId,
+      match_id: new Types.ObjectId(),
+      type: 'direct',
+      title: '',
+      participant_ids: [currentUserId, visiblePartnerId],
+      created_at: now,
+      updated_at: now,
+      last_message_at: now,
+    };
+    const blockedConversation = {
+      _id: blockedConversationId,
+      match_id: new Types.ObjectId(),
+      type: 'direct',
+      title: '',
+      participant_ids: [currentUserId, blockedPartnerId],
+      created_at: now,
+      updated_at: now,
+      last_message_at: now,
+    };
+    const userReportModel = userReportModelWithReports([
+      { reporter_id: currentUserId, reported_user_id: blockedPartnerId },
+    ]);
+    const service = new ConversationsService(
+      {
+        find: jest.fn().mockReturnValue(queryMock([
+          {
+            _id: currentUserId,
+            full_name: 'Current User',
+            nationality: 'VN',
+            created_at: now,
+          },
+          {
+            _id: visiblePartnerId,
+            full_name: 'Visible Partner',
+            nationality: 'JP',
+            created_at: now,
+          },
+        ])),
+      } as any,
+      {
+        find: jest.fn().mockReturnValue(queryMock([])),
+      } as any,
+      {
+        find: jest.fn().mockReturnValue(queryMock([])),
+      } as any,
+      {
+        find: jest.fn().mockReturnValue(queryMock([
+          visibleConversation,
+          blockedConversation,
+        ])),
+      } as any,
+      {
+        findOne: jest.fn().mockReturnValue(queryMock(null)),
+        countDocuments: jest.fn().mockReturnValue(countMock(0)),
+      } as any,
+      {} as any,
+      userReportModel as any,
+    );
+
+    const result = await service.listConversations(currentUserId.toString());
+
+    expect(result.map((conversation) => conversation.id)).toEqual([
+      visibleConversationId.toString(),
+    ]);
+    expect(userReportModel.find).toHaveBeenCalledWith({
+      $or: [
+        { reporter_id: currentUserId },
+        { reported_user_id: currentUserId },
+      ],
+    });
+  });
+
+  it('rejects direct conversation access after either participant reports the other', async () => {
+    const currentUserId = new Types.ObjectId();
+    const blockedPartnerId = new Types.ObjectId();
+    const conversationId = new Types.ObjectId();
+    const messageModel = {
+      find: jest.fn(),
+      countDocuments: jest.fn(),
+    };
+    const service = new ConversationsService(
+      {} as any,
+      {} as any,
+      {} as any,
+      {
+        findById: jest.fn().mockReturnValue(queryMock({
+          _id: conversationId,
+          match_id: new Types.ObjectId(),
+          type: 'direct',
+          participant_ids: [currentUserId, blockedPartnerId],
+        })),
+      } as any,
+      messageModel as any,
+      {
+        findOne: jest.fn(),
+      } as any,
+      blockedUserReportModel() as any,
+    );
+
+    await expect(
+      service.getMessages(currentUserId.toString(), conversationId.toString()),
+    ).rejects.toThrow('このユーザーとは連絡できません。');
+    expect(messageModel.find).not.toHaveBeenCalled();
   });
 });

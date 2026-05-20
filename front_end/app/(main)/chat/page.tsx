@@ -188,6 +188,15 @@ function translationErrorMessage(_error: unknown) {
   return "翻訳できませんでした。";
 }
 
+function isBlockedConversationError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return (
+    message.includes("このユーザーとは連絡できません") ||
+    message.includes("conversation was not found") ||
+    message.includes("not found")
+  );
+}
+
 function formatChatTime(value?: string) {
   if (!value) return "";
 
@@ -810,6 +819,9 @@ export default function ChatPage() {
       })
       .catch((error) => {
         console.error(error);
+        if (active && isBlockedConversationError(error)) {
+          removeBlockedConversation(activeRoomId);
+        }
       });
 
     return () => {
@@ -1049,6 +1061,10 @@ export default function ChatPage() {
     } catch (error) {
       console.error(error);
       removeLocalMessage(conversationId, tempId);
+      if (isBlockedConversationError(error)) {
+        removeBlockedConversation(conversationId);
+        return;
+      }
       window.alert(error instanceof Error ? error.message : "メッセージを送信できませんでした。");
       if (messageType === "text") {
         setInputText(cleanContent);
@@ -1092,6 +1108,10 @@ export default function ChatPage() {
       applySavedMessage(savedMessage, conversationId, tempId);
     } catch (error) {
       removeLocalMessage(conversationId, tempId);
+      if (isBlockedConversationError(error)) {
+        removeBlockedConversation(conversationId);
+        return;
+      }
       throw error;
     } finally {
       URL.revokeObjectURL(objectUrl);
@@ -1328,6 +1348,18 @@ export default function ChatPage() {
     setGroupDetailsOpen(false);
     setActiveFeedbackConversationId(null);
     setRooms((prev) => prev.map((room) => (room.id === roomId ? { ...room, unread: 0 } : room)));
+  }
+
+  function removeBlockedConversation(conversationId: string) {
+    const fallbackRoomId = rooms.find((room) => room.id !== conversationId)?.id ?? "";
+    setRooms((prev) => prev.filter((room) => room.id !== conversationId));
+    setActiveRoomId((current) => (current === conversationId ? fallbackRoomId : current));
+    setMessages((prev) => {
+      const next = { ...prev };
+      delete next[conversationId];
+      return next;
+    });
+    window.alert("このユーザーとは連絡できません。");
   }
 
   function handleHeaderProfileClick() {

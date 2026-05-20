@@ -28,6 +28,7 @@ import {
 } from '../profile/profile-image-storage.service';
 import { MAX_BIO_LENGTH } from '../profile/profile.constants';
 import { isOnlineFromLastSeen } from '../auth/presence';
+import { hasUserReportBlock } from './report-blocking';
 
 export const REPORT_EVIDENCE_MAX_FILES = 5;
 export const REPORT_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
@@ -57,7 +58,19 @@ export class UsersService {
   ) {}
 
   async getPublicProfile(currentUserId: string, targetUserId: string) {
+    const currentObjectId = this.objectIdFromParam(currentUserId, 'currentUserId');
     const targetObjectId = this.objectIdFromParam(targetUserId, 'userId');
+
+    if (
+      await hasUserReportBlock(
+        this.userReportModel,
+        currentObjectId,
+        targetObjectId,
+      )
+    ) {
+      throw new NotFoundException('user was not found');
+    }
+
     const targetUser = await this.userModel.findById(targetObjectId).lean().exec();
 
     if (!targetUser) {

@@ -28,8 +28,15 @@ import {
   ProfileDocument,
   User,
   UserDocument,
+  UserReport,
+  UserReportDocument,
 } from '../database/schemas';
 import { isOnlineFromLastSeen } from '../auth/presence';
+import {
+  assertNoUserReportBlock,
+  blockedUserIdSetFor,
+  hasUserReportBlock,
+} from '../users/report-blocking';
 
 type SendMessagePayload = {
   content?: unknown;
@@ -159,6 +166,8 @@ export class ConversationsService {
     private readonly messageModel: Model<MessageDocument>,
     @InjectModel(ConversationFeedback.name)
     private readonly conversationFeedbackModel: Model<ConversationFeedbackDocument>,
+    @InjectModel(UserReport.name)
+    private readonly userReportModel: Model<UserReportDocument>,
   ) {
     this.cloudinaryEnabled = Boolean(
       process.env.CLOUDINARY_CLOUD_NAME &&
@@ -202,11 +211,24 @@ export class ConversationsService {
     );
     await this.ensureDirectConversationsForUser(currentObjectId);
 
-    const conversations = await this.conversationModel
+    const blockedUserIds = await blockedUserIdSetFor(
+      this.userReportModel,
+      currentObjectId,
+    );
+    const conversations = (
+      await this.conversationModel
       .find({ participant_ids: currentObjectId })
       .sort({ last_message_at: -1, created_at: -1 })
       .lean()
-      .exec();
+      .exec()
+    ).filter(
+      (conversation) =>
+        !this.conversationHasBlockedParticipant(
+          conversation,
+          currentObjectId,
+          blockedUserIds,
+        ),
+    );
 
     const latestMessages = await Promise.all(
       conversations.map((conversation) =>
@@ -264,6 +286,12 @@ export class ConversationsService {
     if (currentObjectId.equals(targetObjectId)) {
       throw new BadRequestException('cannot open a conversation with yourself');
     }
+
+    await assertNoUserReportBlock(
+      this.userReportModel,
+      currentObjectId,
+      targetObjectId,
+    );
 
     const targetUser = await this.userModel
       .findById(targetObjectId)
@@ -603,7 +631,7 @@ export class ConversationsService {
       .exec();
 
     if ((result.modifiedCount ?? 0) > 0) {
-      this.emitMessagesRead(conversation, currentObjectId);
+      void this.emitMessagesRead(conversation, currentObjectId);
     }
 
     return { unreadCount: 0 };
@@ -629,7 +657,13 @@ export class ConversationsService {
         ? match.receiver_id
         : match.requester_id,
     );
-    const uniquePartnerIds = this.uniqueObjectIds(partnerIds);
+    const blockedUserIds = await blockedUserIdSetFor(
+      this.userReportModel,
+      currentObjectId,
+    );
+    const uniquePartnerIds = this.uniqueObjectIds(partnerIds).filter(
+      (id) => !blockedUserIds.has(id.toString()),
+    );
     const { userById, profileByUserId } =
       await this.getUserContext(uniquePartnerIds);
 
@@ -678,6 +712,7 @@ export class ConversationsService {
       throw new BadRequestException('memberIds must reference existing users');
     }
 
+    await this.assertNoBlockedGroupParticipants([currentObjectId, ...memberIds]);
     await this.assertUsersAreMatched(currentObjectId, memberIds);
 
     const now = new Date();
@@ -827,6 +862,10 @@ export class ConversationsService {
   private async ensureDirectConversationsForUser(
     currentObjectId: Types.ObjectId,
   ) {
+    const blockedUserIds = await blockedUserIdSetFor(
+      this.userReportModel,
+      currentObjectId,
+    );
     const matches = await this.matchModel
       .find({
         status: 'accepted',
@@ -840,6 +879,13 @@ export class ConversationsService {
 
     await Promise.all(
       matches.map((match) => {
+        const partnerId = match.requester_id.equals(currentObjectId)
+          ? match.receiver_id
+          : match.requester_id;
+        if (blockedUserIds.has(partnerId.toString())) {
+          return Promise.resolve();
+        }
+
         const now = new Date();
         return this.conversationModel
           .findOneAndUpdate(
@@ -920,12 +966,89 @@ export class ConversationsService {
       );
     }
 
+    const normalizedParticipantIds = conversation.participant_ids.map(
+      (id: Types.ObjectId) => new Types.ObjectId(id),
+    );
+    await this.assertConversationNotBlockedForUser(
+      currentObjectId,
+      normalizedParticipantIds,
+    );
+
     return {
       ...conversation,
-      participant_ids: conversation.participant_ids.map(
-        (id: Types.ObjectId) => new Types.ObjectId(id),
-      ),
+      participant_ids: normalizedParticipantIds,
     };
+  }
+
+  private conversationHasBlockedParticipant(
+    conversation: Record<string, any>,
+    currentObjectId: Types.ObjectId,
+    blockedUserIds: Set<string>,
+  ) {
+    return (conversation.participant_ids ?? []).some(
+      (participantId: Types.ObjectId) => {
+        const id = new Types.ObjectId(participantId);
+        return !id.equals(currentObjectId) && blockedUserIds.has(id.toString());
+      },
+    );
+  }
+
+  private async assertConversationNotBlockedForUser(
+    currentObjectId: Types.ObjectId,
+    participantIds: Types.ObjectId[],
+  ) {
+    await Promise.all(
+      participantIds
+        .filter((participantId) => !participantId.equals(currentObjectId))
+        .map((participantId) =>
+          assertNoUserReportBlock(
+            this.userReportModel,
+            currentObjectId,
+            participantId,
+          ),
+        ),
+    );
+  }
+
+  private async assertNoBlockedGroupParticipants(
+    participantIds: Types.ObjectId[],
+  ) {
+    for (let i = 0; i < participantIds.length; i += 1) {
+      for (let j = i + 1; j < participantIds.length; j += 1) {
+        await assertNoUserReportBlock(
+          this.userReportModel,
+          participantIds[i],
+          participantIds[j],
+        );
+      }
+    }
+  }
+
+  private async conversationBlockedForUser(
+    conversation: Record<string, any>,
+    currentObjectId: Types.ObjectId,
+  ) {
+    const participantIds = (conversation.participant_ids ?? []).map(
+      (id: Types.ObjectId) => new Types.ObjectId(id),
+    );
+
+    for (const participantId of participantIds) {
+      if (participantId.equals(currentObjectId)) {
+        continue;
+      }
+
+      if (
+        await hasUserReportBlock(
+          this.userReportModel,
+          currentObjectId,
+          participantId,
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private async findAcceptedMatch(
@@ -1136,6 +1259,10 @@ export class ConversationsService {
 
     await Promise.all(
       recipientIds.map(async (recipientId) => {
+        if (await this.conversationBlockedForUser(conversation, recipientId)) {
+          return;
+        }
+
         const unreadCount = await this.messageModel
           .countDocuments({
             conversation_id: conversation._id,
@@ -1167,7 +1294,7 @@ export class ConversationsService {
     );
   }
 
-  private emitMessagesRead(
+  private async emitMessagesRead(
     conversation: Record<string, any>,
     readerObjectId: Types.ObjectId,
   ) {
@@ -1176,6 +1303,10 @@ export class ConversationsService {
     for (const participantId of conversation.participant_ids ?? []) {
       const recipientId = new Types.ObjectId(participantId);
       if (recipientId.equals(readerObjectId)) {
+        continue;
+      }
+
+      if (await this.conversationBlockedForUser(conversation, recipientId)) {
         continue;
       }
 

@@ -494,6 +494,10 @@ UserReportSchema.index(
   { reported_user_id: 1, status: 1 },
   { name: 'user_reports_reported_status_idx' },
 );
+UserReportSchema.index(
+  { reported_user_id: 1, reporter_id: 1 },
+  { name: 'user_reports_reported_reporter_idx' },
+);
 
 @Schema({ collection: 'events', versionKey: false })
 export class Event {

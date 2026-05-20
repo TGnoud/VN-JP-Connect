@@ -15,6 +15,18 @@ function countMock(value: number) {
   };
 }
 
+function emptyUserReportModel() {
+  return {
+    exists: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(null) }),
+  };
+}
+
+function blockedUserReportModel() {
+  return {
+    exists: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }) }),
+  };
+}
+
 describe('UsersService', () => {
   it.each([
     ['recent heartbeat', new Date(), true],
@@ -61,7 +73,7 @@ describe('UsersService', () => {
       userInterestModel as any,
       tagModel as any,
       matchModel as any,
-      {} as any,
+      emptyUserReportModel() as any,
       {} as any,
     );
 
@@ -75,5 +87,27 @@ describe('UsersService', () => {
       fullName: 'Tanaka Hiroshi',
       isOnline,
     });
+  });
+
+  it('hides a public profile when either user has reported the other', async () => {
+    const currentUserId = new Types.ObjectId().toString();
+    const targetUserId = new Types.ObjectId();
+    const userModel = {
+      findById: jest.fn(),
+    };
+    const service = new UsersService(
+      userModel as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      blockedUserReportModel() as any,
+      {} as any,
+    );
+
+    await expect(
+      service.getPublicProfile(currentUserId, targetUserId.toString()),
+    ).rejects.toThrow('user was not found');
+    expect(userModel.findById).not.toHaveBeenCalled();
   });
 });
