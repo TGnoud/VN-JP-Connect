@@ -127,6 +127,7 @@ export class HomeService {
     );
     const userFilter: Record<string, unknown> = {
       _id: { $nin: excludedUserIds },
+      status: { $ne: 'frozen' },
     };
     if (query.nationality) {
       userFilter.nationality = query.nationality;

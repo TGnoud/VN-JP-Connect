@@ -104,6 +104,53 @@ describe('HomeService', () => {
     ]);
   });
 
+  it('excludes frozen users from discover query', async () => {
+    const currentUserId = new Types.ObjectId().toString();
+    const activeUserId = new Types.ObjectId();
+    const userModel = {
+      find: jest.fn().mockReturnValue(queryMock([
+        {
+          _id: activeUserId,
+          full_name: 'Active User',
+          nationality: 'VN',
+          status: 'active',
+          created_at: new Date('2026-05-11T00:00:00.000Z'),
+        },
+      ])),
+    };
+    const profileModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const userInterestModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const tagModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+    };
+    const matchModel = {
+      find: jest.fn().mockReturnValue(queryMock([])),
+      aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+    };
+    const service = new HomeService(
+      userModel as any,
+      profileModel as any,
+      userInterestModel as any,
+      tagModel as any,
+      matchModel as any,
+      {} as any,
+      {} as any,
+      emptyUserReportModel() as any,
+    );
+
+    await service.discover(currentUserId, {});
+
+    expect(userModel.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: { $ne: 'frozen' },
+      }),
+    );
+  });
+
   it('omits users without profile data when filtering by gender', async () => {
     const currentUserId = new Types.ObjectId().toString();
     const missingProfileUserId = new Types.ObjectId();
