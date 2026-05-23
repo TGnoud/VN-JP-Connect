@@ -60,6 +60,7 @@ interface EditForm {
   description: string;
   date: string;
   startTime: string;
+  endDate: string;
   endTime: string;
   format: EventFormat;
   category: string;
@@ -188,7 +189,7 @@ function payloadFromEditForm(event: AdminEvent, form: EditForm): AdminEventPaylo
     onlineUrl: form.format !== "in-person" ? form.locationOrLink : "",
     startDate: form.date,
     startTime: form.startTime,
-    endDate: form.date,
+    endDate: form.endDate || form.date,
     endTime: form.endTime || form.startTime,
     capacity: form.capacity ? parseInt(form.capacity, 10) : null,
     coverImageUrl: form.coverImageUrl,
@@ -540,6 +541,7 @@ export default function AdminEventsPage() {
       description: event.description,
       date: event.startDate,
       startTime: event.startTime,
+      endDate: event.endDate || event.startDate,
       endTime: event.endTime,
       format: event.format,
       category: event.category,
@@ -1057,10 +1059,11 @@ export default function AdminEventsPage() {
                 <textarea value={editForm.description} onChange={(e) => setEditField("description", e.target.value)} rows={3} className={`${inputCls} resize-none`} />
               </div>
 
-              {/* 日付 | 開始 | 終了 */}
-              <div className="grid grid-cols-3 gap-3">
-                <div><FormLabel required>日付</FormLabel><input type="date" value={editForm.date} onChange={(e) => setEditField("date", e.target.value)} className={inputCls} /></div>
+              {/* 開始日 | 開始 | 終了日 | 終了 */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div><FormLabel required>開始日</FormLabel><input type="date" value={editForm.date} onChange={(e) => setEditField("date", e.target.value)} className={inputCls} /></div>
                 <div><FormLabel required>開始</FormLabel><input type="time" value={editForm.startTime} onChange={(e) => setEditField("startTime", e.target.value)} className={inputCls} /></div>
+                <div><FormLabel required>終了日</FormLabel><input type="date" value={editForm.endDate} onChange={(e) => setEditField("endDate", e.target.value)} className={inputCls} /></div>
                 <div><FormLabel>終了</FormLabel><input type="time" value={editForm.endTime} onChange={(e) => setEditField("endTime", e.target.value)} className={inputCls} /></div>
               </div>
 

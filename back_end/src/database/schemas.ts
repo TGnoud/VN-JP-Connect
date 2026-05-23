@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
 
 export const NATIONALITIES = ['JP', 'VN'] as const;
+export const USER_STATUSES = ['active', 'frozen'] as const;
 export const TAG_TYPES = ['interest', 'purpose'] as const;
 export const MATCH_STATUSES = ['pending', 'accepted', 'rejected'] as const;
 export const CONVERSATION_TYPES = ['direct', 'group'] as const;
@@ -31,6 +32,7 @@ export const USER_REPORT_STATUSES = [
 ] as const;
 
 export type Nationality = (typeof NATIONALITIES)[number];
+export type UserStatus = (typeof USER_STATUSES)[number];
 export type TagType = (typeof TAG_TYPES)[number];
 export type MatchStatus = (typeof MATCH_STATUSES)[number];
 export type ConversationType = (typeof CONVERSATION_TYPES)[number];
@@ -87,6 +89,17 @@ export class User {
   @Prop({ required: true, default: Date.now })
   created_at: Date;
 
+  @Prop({
+    required: true,
+    type: String,
+    enum: USER_STATUSES,
+    default: 'active',
+  })
+  status: UserStatus;
+
+  @Prop({ required: true, default: Date.now })
+  status_updated_at: Date;
+
   @Prop()
   last_seen_at?: Date;
 
@@ -99,6 +112,10 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.index({ email: 1 }, { unique: true, name: 'users_email_unique' });
+UserSchema.index(
+  { status: 1, status_updated_at: -1 },
+  { name: 'users_status_updated_at_idx' },
+);
 
 @Schema({ collection: 'password_reset_otps', versionKey: false })
 export class PasswordResetOtp {

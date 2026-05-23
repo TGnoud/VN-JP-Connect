@@ -575,6 +575,7 @@ function EditInfoModal({ current, socialLinks, onClose, onSave }: { current: UiP
   ];
 
   const inputCls = "w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:border-transparent hover:border-gray-300 transition-all";
+  const selectCls = "w-full border border-gray-200 rounded-xl pl-9 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:border-transparent hover:border-gray-300 transition-all bg-white appearance-none cursor-pointer";
 
   return (
     <Modal title="個人情報を編集" onClose={onClose} wide>
@@ -584,16 +585,32 @@ function EditInfoModal({ current, socialLinks, onClose, onSave }: { current: UiP
             <label className="text-xs font-medium text-gray-600 mb-1 block">{f.label}</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">{f.icon}</span>
-              <input
-                value={form[f.key]}
-                readOnly={f.key === "age"}
-                aria-readonly={f.key === "age"}
-                onChange={(e) => {
-                  if (f.key === "age") return;
-                  setForm((prev) => ({ ...prev, [f.key]: e.target.value }));
-                }}
-                className={inputCls}
-              />
+              {f.key === "gender" ? (
+                <>
+                  <select
+                    value={form.gender}
+                    onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value }))}
+                    className={selectCls}
+                  >
+                    <option value="">選択</option>
+                    <option value="男性">男性</option>
+                    <option value="女性">女性</option>
+                    <option value="その他">その他</option>
+                  </select>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="size-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                </>
+              ) : (
+                <input
+                  value={form[f.key]}
+                  readOnly={f.key === "age"}
+                  aria-readonly={f.key === "age"}
+                  onChange={(e) => {
+                    if (f.key === "age") return;
+                    setForm((prev) => ({ ...prev, [f.key]: e.target.value }));
+                  }}
+                  className={inputCls}
+                />
+              )}
             </div>
           </div>
         ))}

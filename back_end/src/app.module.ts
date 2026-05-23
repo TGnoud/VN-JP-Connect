@@ -8,6 +8,7 @@ import { HomeModule } from './home/home.module';
 import { UsersModule } from './users/users.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { DevModule } from './dev/dev.module';
+import { AdminDashboardModule } from './admin-dashboard/admin-dashboard.module';
 import { AdminEventsModule } from './admin-events/admin-events.module';
 import { EventsModule } from './events/events.module';
 
@@ -20,6 +21,7 @@ import { EventsModule } from './events/events.module';
     UsersModule,
     ConversationsModule,
     DevModule,
+    AdminDashboardModule,
     AdminEventsModule,
     EventsModule,
   ],
