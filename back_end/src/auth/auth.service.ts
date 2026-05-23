@@ -87,6 +87,10 @@ export class AuthService {
       throw new UnauthorizedException('invalid credentials');
     }
 
+    if (user.status === 'frozen') {
+      throw new UnauthorizedException('account is frozen');
+    }
+
     // This project uses x-user-id header auth. FE should store this userId.
     return {
       userId: user._id.toString(),
