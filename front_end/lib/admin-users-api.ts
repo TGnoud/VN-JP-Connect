@@ -185,13 +185,16 @@ export function getAdminUserReports({
 }: {
   page: number;
   pageSize: number;
-  status: AdminReportStatus;
+  status?: AdminReportStatus;
 }) {
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(pageSize),
-    status,
   });
+
+  if (status) {
+    params.set("status", status);
+  }
 
   return requestAdminUsersApi<AdminReportsResponse>(
     `/admin/users/reports?${params}`,
