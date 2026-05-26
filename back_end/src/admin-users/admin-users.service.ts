@@ -195,8 +195,11 @@ export class AdminUsersService {
       REPORT_PAGE_SIZE_DEFAULT,
       PAGE_SIZE_MAX,
     );
-    const status = this.reportStatus(query.status, 'pending');
-    const filter = { status };
+    const status = this.reportStatusFilter(query.status);
+    const filter: Record<string, unknown> = {};
+    if (status) {
+      filter.status = status;
+    }
     const skip = (page - 1) * pageSize;
 
     const [reports, totalItems, pendingCount] = await Promise.all([
@@ -382,17 +385,16 @@ export class AdminUsersService {
     return value as UserStatus;
   }
 
-  private reportStatus(
-    value: unknown,
-    fallback: UserReportStatus,
-  ): UserReportStatus {
-    const status = typeof value === 'string' && value ? value : fallback;
+  private reportStatusFilter(value: unknown): UserReportStatus | undefined {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
 
-    if (!USER_REPORT_STATUSES.includes(status as UserReportStatus)) {
+    if (!USER_REPORT_STATUSES.includes(value as UserReportStatus)) {
       throw new BadRequestException('report status is not supported');
     }
 
-    return status as UserReportStatus;
+    return value as UserReportStatus;
   }
 
   private reportAction(value: unknown) {

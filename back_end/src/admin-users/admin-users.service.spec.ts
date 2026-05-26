@@ -213,6 +213,44 @@ describe('AdminUsersService', () => {
     expect(users[0].status_updated_at).toBeInstanceOf(Date);
   });
 
+  it('lists all reports unless a report status filter is provided', async () => {
+    const reporterId = new Types.ObjectId();
+    const reportedUserId = new Types.ObjectId();
+    const users = [
+      user('Reporter', 'reporter@example.com', 'JP', 'active', reporterId),
+      user('Reported', 'reported@example.com', 'VN', 'active', reportedUserId),
+    ];
+    const reports = [
+      report(reporterId, reportedUserId, 'spam'),
+      {
+        ...report(reporterId, reportedUserId, 'harassment'),
+        status: 'reviewed',
+      },
+      {
+        ...report(reporterId, reportedUserId, 'other'),
+        status: 'dismissed',
+      },
+    ];
+    const service = newService({ users, reports });
+
+    const all = await service.listReports({ page: '1', pageSize: '10' });
+    const pendingOnly = await service.listReports({
+      page: '1',
+      pageSize: '10',
+      status: 'pending',
+    });
+
+    expect(all.reports.map((item) => item.status)).toEqual([
+      'pending',
+      'reviewed',
+      'dismissed',
+    ]);
+    expect(all.pagination.totalItems).toBe(3);
+    expect(all.stats.pendingCount).toBe(1);
+    expect(pendingOnly.reports).toHaveLength(1);
+    expect(pendingOnly.reports[0].status).toBe('pending');
+  });
+
   it('dismisses and freezes reports', async () => {
     const reporterId = new Types.ObjectId();
     const reportedUserId = new Types.ObjectId();

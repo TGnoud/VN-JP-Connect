@@ -917,7 +917,19 @@ export default function AdminUsersPage() {
   async function handleReportAction(report: AdminUserReport, action: AdminReportAction) {
     setActionReportId(report.id);
     try {
-      await updateAdminUserReport(report.id, action);
+      const updated = await updateAdminUserReport(report.id, action);
+      setReportsResponse((current) => current ? {
+        ...current,
+        reports: current.reports.some((r) => r.id === updated.id)
+          ? current.reports.map((r) => r.id === updated.id ? updated : r)
+          : [updated, ...current.reports],
+        stats: {
+          ...current.stats,
+          pendingCount: report.status === "pending"
+            ? Math.max(0, current.stats.pendingCount - 1)
+            : current.stats.pendingCount,
+        },
+      } : current);
       setToast(action === "freeze" ? "アカウントを凍結しました" : "報告を無視しました");
       setRefreshReportsKey((value) => value + 1);
       setRefreshUsersKey((value) => value + 1);
@@ -927,7 +939,12 @@ export default function AdminUsersPage() {
       setReportsResponse((current) => current ? {
         ...current,
         reports: current.reports.map((r) => r.id === report.id ? { ...r, status: newStatus } : r),
-        stats: { pendingCount: Math.max(0, (current.stats.pendingCount ?? 1) - 1) },
+        stats: {
+          ...current.stats,
+          pendingCount: report.status === "pending"
+            ? Math.max(0, (current.stats.pendingCount ?? 1) - 1)
+            : current.stats.pendingCount,
+        },
       } : current);
       setToast(action === "freeze" ? "アカウントを凍結しました" : "報告を無視しました");
     } finally {
