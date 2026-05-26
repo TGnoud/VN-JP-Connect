@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { login, setStoredUserId } from "@/lib/auth-api";
+import { getCurrentUser, login, setStoredUserId } from "@/lib/auth-api";
 
 interface FormErrors {
   identifier?: string;
@@ -39,7 +39,8 @@ export default function LoginPage() {
         password,
       });
       setStoredUserId(response.userId);
-      router.push("/profile");
+      const currentUser = await getCurrentUser();
+      router.push(currentUser.role === "admin" ? "/admin" : "/profile");
     } catch (error) {
       const rawMessage =
         error instanceof Error ? error.message : "ログインに失敗しました。";
