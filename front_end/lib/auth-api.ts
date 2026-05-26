@@ -8,12 +8,25 @@ export const API_BASE_URL =
 
 export const AUTH_USER_ID_KEY = "vn_jp_user_id";
 
+export type AuthUserRole = "customer" | "admin";
+export type AuthUserStatus = "active" | "frozen";
+
 export interface AuthResponse {
   userId: string;
   email?: string;
   fullName?: string;
   nationality?: "JP" | "VN";
   createdAt?: string;
+  role?: AuthUserRole;
+}
+
+export interface AuthMeResponse {
+  userId: string;
+  email: string;
+  fullName: string;
+  nationality: "JP" | "VN";
+  status: AuthUserStatus;
+  role: AuthUserRole;
 }
 
 export interface PresenceResponse {
@@ -140,6 +153,47 @@ async function requestAuthenticatedPost<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function requestAuthenticatedGet<T>(path: string): Promise<T> {
+  const userId = getStoredUserId();
+  if (!userId) {
+    throw new Error("Login is required before using authenticated requests.");
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: "GET",
+      headers: {
+        "x-user-id": userId,
+      },
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw new Error(
+      `Cannot reach backend API at ${API_BASE_URL}. ${
+        error instanceof Error ? error.message : "network error"
+      }`,
+    );
+  }
+
+  if (!response.ok) {
+    const fallback = `Request failed with status ${response.status}`;
+    let message = fallback;
+
+    try {
+      const errorBody: unknown = await response.json();
+      message = parseNestErrorMessage(errorBody, fallback);
+    } catch {
+      message = fallback;
+    }
+
+    throw new Error(Array.isArray(message) ? message.join(", ") : message);
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export function login(payload: { identifier: string; password: string }) {
   return requestAuth("/auth/login", payload);
 }
@@ -197,6 +251,10 @@ export function updatePresence() {
   }
 
   return requestAuthenticatedPost<PresenceResponse>("/auth/presence");
+}
+
+export function getCurrentUser() {
+  return requestAuthenticatedGet<AuthMeResponse>("/auth/me");
 }
 
 export function logout() {

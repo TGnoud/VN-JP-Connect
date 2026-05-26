@@ -9,8 +9,10 @@ import {
   Post,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { AdminOnlyGuard } from '../admin-auth/admin-only.guard';
 import { CurrentUserId } from '../profile/current-user-id.decorator';
 import { AdminEventsService } from './admin-events.service';
 
@@ -31,6 +33,7 @@ function coverImageFilter(
 }
 
 @Controller('admin/events')
+@UseGuards(AdminOnlyGuard)
 export class AdminEventsController {
   constructor(private readonly adminEventsService: AdminEventsService) {}
 

@@ -1,8 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { AdminOnlyGuard } from '../admin-auth/admin-only.guard';
 import { CurrentUserId } from '../profile/current-user-id.decorator';
 import { AdminUsersService } from './admin-users.service';
 
 @Controller('admin/users')
+@UseGuards(AdminOnlyGuard)
 export class AdminUsersController {
   constructor(private readonly adminUsersService: AdminUsersService) {}
 

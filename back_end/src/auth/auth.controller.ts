@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { CurrentUserId } from '../profile/current-user-id.decorator';
 import { AuthService } from './auth.service';
 import {
@@ -18,6 +18,11 @@ export class AuthController {
   @Post('login')
   login(@Body() body: unknown) {
     return this.authService.login(validateLoginBody(body));
+  }
+
+  @Get('me')
+  getMe(@CurrentUserId() currentUserId: string) {
+    return this.authService.getMe(currentUserId);
   }
 
   @Post('presence')

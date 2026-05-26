@@ -97,6 +97,24 @@ export class AuthService {
     };
   }
 
+  async getMe(currentUserId: string) {
+    const userObjectId = this.objectIdFromParam(currentUserId, 'currentUserId');
+    const user = await this.userModel.findById(userObjectId).lean().exec();
+
+    if (!user) {
+      throw new UnauthorizedException('user was not found');
+    }
+
+    return {
+      userId: user._id.toString(),
+      email: user.email,
+      fullName: user.full_name,
+      nationality: user.nationality,
+      status: user.status ?? 'active',
+      role: user.role ?? 'customer',
+    };
+  }
+
   async updatePresence(currentUserId: string) {
     const userObjectId = this.objectIdFromParam(currentUserId, 'currentUserId');
     const lastSeenAt = new Date();

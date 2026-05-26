@@ -80,6 +80,25 @@ export interface AdminReportsResponse {
 
 const DEV_USER_ID = process.env.NEXT_PUBLIC_DEV_USER_ID ?? "";
 
+export class AdminUsersApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "AdminUsersApiError";
+  }
+}
+
+export function isAdminUsersAuthError(
+  error: unknown,
+): error is AdminUsersApiError {
+  return (
+    error instanceof AdminUsersApiError &&
+    (error.status === 401 || error.status === 403)
+  );
+}
+
 function requireAdminUserId() {
   const storedUserId = getStoredUserId();
 
@@ -132,7 +151,10 @@ async function requestAdminUsersApi<T>(path: string, init: RequestInit = {}) {
       // Keep the status-based message when the response is not JSON.
     }
 
-    throw new Error(Array.isArray(message) ? message.join(", ") : message);
+    throw new AdminUsersApiError(
+      Array.isArray(message) ? message.join(", ") : message,
+      response.status,
+    );
   }
 
   return response.json() as Promise<T>;

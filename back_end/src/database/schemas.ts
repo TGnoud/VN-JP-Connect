@@ -3,6 +3,7 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export const NATIONALITIES = ['JP', 'VN'] as const;
 export const USER_STATUSES = ['active', 'frozen'] as const;
+export const USER_ROLES = ['customer', 'admin'] as const;
 export const TAG_TYPES = ['interest', 'purpose'] as const;
 export const MATCH_STATUSES = ['pending', 'accepted', 'rejected'] as const;
 export const CONVERSATION_TYPES = ['direct', 'group'] as const;
@@ -33,6 +34,7 @@ export const USER_REPORT_STATUSES = [
 
 export type Nationality = (typeof NATIONALITIES)[number];
 export type UserStatus = (typeof USER_STATUSES)[number];
+export type UserRole = (typeof USER_ROLES)[number];
 export type TagType = (typeof TAG_TYPES)[number];
 export type MatchStatus = (typeof MATCH_STATUSES)[number];
 export type ConversationType = (typeof CONVERSATION_TYPES)[number];
@@ -100,6 +102,14 @@ export class User {
   @Prop({ required: true, default: Date.now })
   status_updated_at: Date;
 
+  @Prop({
+    required: true,
+    type: String,
+    enum: USER_ROLES,
+    default: 'customer',
+  })
+  role: UserRole;
+
   @Prop()
   last_seen_at?: Date;
 
@@ -116,6 +126,7 @@ UserSchema.index(
   { status: 1, status_updated_at: -1 },
   { name: 'users_status_updated_at_idx' },
 );
+UserSchema.index({ role: 1 }, { name: 'users_role_idx' });
 
 @Schema({ collection: 'password_reset_otps', versionKey: false })
 export class PasswordResetOtp {

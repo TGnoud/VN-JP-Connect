@@ -5,6 +5,7 @@ import {
   getAdminUserDetail,
   getAdminUserReports,
   getAdminUsers,
+  isAdminUsersAuthError,
   resolveAdminUserEvidenceUrl,
   updateAdminUserReport,
   updateAdminUserStatus,
@@ -812,8 +813,13 @@ export default function AdminUsersPage() {
       .then((response) => {
         if (active) setUsersResponse(response);
       })
-      .catch(() => {
+      .catch((error) => {
         if (!active) return;
+        if (isAdminUsersAuthError(error)) {
+          setUsersResponse(null);
+          setUsersError(error.message);
+          return;
+        }
         const filtered = MOCK_USERS_RESPONSE.users.filter((u) => {
           const matchSearch = !debouncedSearch || u.name.toLowerCase().includes(debouncedSearch.toLowerCase()) || u.email.toLowerCase().includes(debouncedSearch.toLowerCase());
           const matchStatus = statusFilter === "all" || u.status === statusFilter;
@@ -848,8 +854,14 @@ export default function AdminUsersPage() {
       .then((response) => {
         if (active) setReportsResponse(response);
       })
-      .catch(() => {
-        if (active) setReportsResponse(MOCK_REPORTS_RESPONSE);
+      .catch((error) => {
+        if (!active) return;
+        if (isAdminUsersAuthError(error)) {
+          setReportsResponse(null);
+          setReportsError(error.message);
+          return;
+        }
+        setReportsResponse(MOCK_REPORTS_RESPONSE);
       })
       .finally(() => {
         if (active) setReportsLoading(false);
@@ -877,7 +889,11 @@ export default function AdminUsersPage() {
     setDrawerLoading(true);
     try {
       setDrawerDetail(await getAdminUserDetail(user.id));
-    } catch {
+    } catch (error) {
+      if (isAdminUsersAuthError(error)) {
+        setToast(error.message);
+        return;
+      }
       // mock detail when API unavailable
       setDrawerDetail({
         ...user,
@@ -900,7 +916,11 @@ export default function AdminUsersPage() {
       setDrawerUser((current) => current?.id === updated.id ? updated : current);
       setDrawerDetail((current) => current?.id === updated.id ? { ...current, ...updated } : current);
       setToast(nextStatus === "frozen" ? "アカウントを凍結しました" : "凍結を解除しました");
-    } catch {
+    } catch (error) {
+      if (isAdminUsersAuthError(error)) {
+        setToast(error.message);
+        return;
+      }
       // update local state when API unavailable
       const updated = { ...user, status: nextStatus };
       setUsersResponse((current) => current ? {
@@ -933,7 +953,11 @@ export default function AdminUsersPage() {
       setToast(action === "freeze" ? "アカウントを凍結しました" : "報告を無視しました");
       setRefreshReportsKey((value) => value + 1);
       setRefreshUsersKey((value) => value + 1);
-    } catch {
+    } catch (error) {
+      if (isAdminUsersAuthError(error)) {
+        setToast(error.message);
+        return;
+      }
       // update local state when API unavailable
       const newStatus = action === "freeze" ? "reviewed" : "dismissed";
       setReportsResponse((current) => current ? {

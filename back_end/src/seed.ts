@@ -91,6 +91,7 @@ async function seedUsers(db: Db, now: Date) {
       birth_date: new Date('1990-01-01T00:00:00.000Z'),
       is_verified: true,
       created_at: now,
+      role: 'admin',
     },
   );
 
@@ -106,6 +107,7 @@ async function seedUsers(db: Db, now: Date) {
       birth_date: new Date('1999-05-12T00:00:00.000Z'),
       is_verified: true,
       created_at: new Date('2024-06-01T00:00:00.000Z'),
+      role: 'customer',
     },
   );
 
@@ -121,6 +123,7 @@ async function seedUsers(db: Db, now: Date) {
       birth_date: new Date('2001-05-12T00:00:00.000Z'),
       is_verified: true,
       created_at: now,
+      role: 'customer',
     },
   );
 
@@ -136,6 +139,7 @@ async function seedUsers(db: Db, now: Date) {
       birth_date: new Date('1995-05-12T00:00:00.000Z'),
       is_verified: true,
       created_at: now,
+      role: 'customer',
     },
   );
 
