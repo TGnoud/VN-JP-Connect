@@ -19,9 +19,11 @@ interface EventItem {
   title: string;
   category: EventCategory;
   date: string;
+  endDate?: string;
   startTime: string;
   endTime: string;
   weekday: string;
+  endWeekday?: string;
   venue: string;
   address: string;
   maxParticipants: number;
@@ -172,6 +174,15 @@ function weekdayLabel(date: string) {
   return value.toLocaleDateString("ja-JP", { weekday: "short" });
 }
 
+function formatEventDateTimeRange(event: EventItem) {
+  const startDate = event.weekday ? `${event.date}（${event.weekday}）` : event.date;
+  const endDateValue = event.endDate ?? event.date;
+  const endWeekdayValue = event.endWeekday ?? event.weekday;
+  const endDate = endWeekdayValue ? `${endDateValue}（${endWeekdayValue}）` : endDateValue;
+
+  return `${startDate}(${event.startTime}) - ${endDate}(${event.endTime})`;
+}
+
 function eventVenue(event: UserEventData) {
   if (event.format === "online") {
     return "オンライン";
@@ -204,9 +215,11 @@ function mapUserEvent(event: UserEventData): EventItem {
     title: event.title,
     category: event.category || "その他",
     date: formatDateLabel(event.startDate),
+    endDate: formatDateLabel(event.endDate || event.startDate),
     startTime: event.startTime,
     endTime: event.endTime,
     weekday: weekdayLabel(event.startDate),
+    endWeekday: weekdayLabel(event.endDate || event.startDate),
     venue: eventVenue(event),
     address: eventAddress(event),
     maxParticipants: Math.max(capacity, event.currentParticipants, 1),
@@ -435,7 +448,7 @@ function EventListCard({
             <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
             </svg>
-            {event.date}（{event.weekday}） {event.startTime} - {event.endTime}
+            {formatEventDateTimeRange(event)}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
             <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -560,12 +573,12 @@ function EventDetail({
               </span>
               日時
             </div>
-            <p className="text-sm font-bold text-gray-900">{event.date}（{event.weekday}）</p>
+            <p className="text-sm font-bold text-gray-900">{formatEventDateTimeRange(event)}</p>
             <div className="flex items-center gap-1.5 mt-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-xs text-gray-500">{event.startTime} - {event.endTime}</p>
+              <p className="text-xs text-gray-500">開始から終了まで</p>
             </div>
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 p-4">
