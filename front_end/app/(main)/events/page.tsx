@@ -175,12 +175,20 @@ function weekdayLabel(date: string) {
 }
 
 function formatEventDateTimeRange(event: EventItem) {
+  return `${formatEventDateRange(event)} ${formatEventTimeRange(event)}`;
+}
+
+function formatEventDateRange(event: EventItem) {
   const startDate = event.weekday ? `${event.date}（${event.weekday}）` : event.date;
   const endDateValue = event.endDate ?? event.date;
   const endWeekdayValue = event.endWeekday ?? event.weekday;
   const endDate = endWeekdayValue ? `${endDateValue}（${endWeekdayValue}）` : endDateValue;
 
-  return `${startDate}(${event.startTime}) - ${endDate}(${event.endTime})`;
+  return `${startDate} - ${endDate}`;
+}
+
+function formatEventTimeRange(event: EventItem) {
+  return `${event.startTime} - ${event.endTime}`;
 }
 
 function eventVenue(event: UserEventData) {
@@ -573,12 +581,12 @@ function EventDetail({
               </span>
               日時
             </div>
-            <p className="text-sm font-bold text-gray-900">{formatEventDateTimeRange(event)}</p>
+            <p className="text-sm font-bold text-gray-900">{formatEventDateRange(event)}</p>
             <div className="flex items-center gap-1.5 mt-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-xs text-gray-500">開始から終了まで</p>
+              <p className="text-xs text-gray-500">{formatEventTimeRange(event)}</p>
             </div>
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 p-4">
