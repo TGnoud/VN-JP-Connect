@@ -606,7 +606,7 @@ function ReportCard({
           <p className={`text-sm font-bold ${isPending ? "text-gray-900" : "text-gray-500"}`}>{report.type}</p>
           {isPending && (
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#fef3c7", color: "#d97706" }}>
-              Pending
+              未処理
             </span>
           )}
           {isReviewed && (

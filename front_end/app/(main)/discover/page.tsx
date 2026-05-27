@@ -156,9 +156,9 @@ function ProfileCard({
   const displayName = displayProfileName(user.fullName);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex w-full" style={{ minHeight: 320 }}>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex w-full" style={{ minHeight: 440 }}>
       {/* Left: photo */}
-      <div className="relative shrink-0" style={{ width: "42%" }}>
+      <div className="relative shrink-0" style={{ width: "44%" }}>
         <Image
           src={user.avatarUrl}
           alt={displayName}
@@ -167,8 +167,8 @@ function ProfileCard({
           unoptimized
         />
         {/* Like rate badge */}
-        <div className="absolute top-3 left-3 flex items-center gap-1 bg-white rounded-full px-2.5 py-1 shadow text-xs font-bold text-gray-800">
-          <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5" style={{ color: "#1B4332" }} viewBox="0 0 20 20" fill="currentColor">
+        <div className="absolute top-4 left-4 flex items-center gap-1.5 bg-white rounded-full px-3.5 py-1.5 shadow text-sm font-bold text-gray-800">
+          <svg xmlns="http://www.w3.org/2000/svg" className="size-4" style={{ color: "#1B4332" }} viewBox="0 0 20 20" fill="currentColor">
             <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
           </svg>
           {user.likeRate}%
@@ -176,12 +176,12 @@ function ProfileCard({
       </div>
 
       {/* Right: info */}
-      <div className="flex-1 flex flex-col px-5 py-4 gap-3 min-w-0">
+      <div className="flex-1 flex flex-col px-8 py-6 gap-5 min-w-0">
         {/* Name & age */}
         <div>
-          <h2 className="text-xl font-bold text-gray-900 leading-tight">{displayName}, {age}</h2>
-          <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+          <h2 className="text-3xl font-bold text-gray-900 leading-tight">{displayName}, {age}</h2>
+          <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" />
             </svg>
             {user.nationality === "Japanese" ? "東京・日本" : "ハノイ・ベトナム"} · {user.city}在住
@@ -191,33 +191,33 @@ function ProfileCard({
         {/* バイブス */}
         {user.bio && (
           <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">バイブス</p>
-            <div className="border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
-              <p className="text-xs text-gray-700 line-clamp-3 leading-relaxed">{user.bio}</p>
+            <p className="text-sm font-semibold text-gray-500 mb-2">バイブス</p>
+            <div className="border border-gray-200 rounded-lg px-4 py-3 bg-gray-50">
+              <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">{user.bio}</p>
             </div>
           </div>
         )}
 
         {/* 話せる言語 ＆ 興味・関心 — 2 columns */}
-        <div className="flex gap-4">
+        <div className="flex gap-6">
           {/* 話せる言語 */}
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">話せる言語</p>
-            <div className="flex flex-col gap-1.5">
-              <div className="flex gap-1.5 flex-wrap">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">日本語</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">{user.japaneseLevel}</span>
+            <p className="text-sm font-semibold text-gray-500 mb-2">話せる言語</p>
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-sm px-3 py-1 rounded-full bg-green-100 text-green-700 font-bold">日本語</span>
+                <span className="text-sm px-3 py-1 rounded-full bg-green-100 text-green-700 font-bold">{user.japaneseLevel}</span>
               </div>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold w-fit">ベトナム語（{user.vietnameseLevel}）</span>
+              <span className="text-sm px-3 py-1 rounded-full bg-green-100 text-green-700 font-bold w-fit">ベトナム語（{user.vietnameseLevel}）</span>
             </div>
           </div>
 
           {/* 興味・関心 */}
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">興味・関心</p>
-            <div className="grid grid-cols-2 gap-1.5">
+            <p className="text-sm font-semibold text-gray-500 mb-2">興味・関心</p>
+            <div className="grid grid-cols-2 gap-2">
               {user.interests.slice(0, 4).map((i) => (
-                <span key={i} className="text-xs text-gray-700 rounded-md px-2 py-1 text-center truncate" style={{ backgroundColor: "#DDDDDD" }}>
+                <span key={i} className="text-sm text-gray-700 rounded-md px-3 py-1.5 text-center truncate" style={{ backgroundColor: "#DDDDDD" }}>
                   {i}
                 </span>
               ))}
@@ -226,20 +226,20 @@ function ProfileCard({
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2 mt-auto">
+        <div className="flex items-center gap-3 mt-auto">
           {/* スキップ */}
           <button
             onClick={onSkip}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-gray-200 text-gray-600 text-xs font-medium hover:bg-gray-50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
           >
             <span className="font-bold">×</span> スキップ
           </button>
           {/* プロフィール */}
           <button
             onClick={onViewDetail}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-gray-200 text-gray-700 text-xs font-medium hover:bg-gray-50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
             </svg>
             プロフィール
@@ -247,10 +247,10 @@ function ProfileCard({
           {/* つながる */}
           <button
             onClick={onLike}
-            className="flex-[1.25] min-w-36 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-white text-xs font-semibold leading-tight transition-colors"
+            className="flex-[1.25] min-w-44 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-white text-sm font-semibold leading-tight transition-colors"
             style={{ backgroundColor: "#1B4332" }}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
             </svg>
             <span className="min-w-0 text-center">
@@ -856,7 +856,7 @@ export default function DiscoverPage() {
       <div className="flex-1 flex min-h-0">
         {/* Card area */}
         <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-6 overflow-auto">
-          <div className="w-full max-w-2xl flex flex-col gap-3">
+          <div className="w-full max-w-4xl flex flex-col gap-4">
             {loading || !current ? (
               emptyState
             ) : (

@@ -53,7 +53,7 @@ export default function AdminSidebar() {
   }
 
   return (
-    <aside className="flex flex-col w-56 min-h-screen shrink-0 bg-white border-r border-gray-100">
+    <aside className="sticky top-0 flex h-screen flex-col w-56 shrink-0 bg-white border-r border-gray-100">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-gray-100">
         <div className="flex items-center gap-3">
@@ -73,7 +73,7 @@ export default function AdminSidebar() {
       </div>
 
       {/* Nav */}
-      <div className="flex-1 px-3 py-4">
+      <div className="flex-1 overflow-y-auto px-3 py-4">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2">
           メインメニュー
         </p>

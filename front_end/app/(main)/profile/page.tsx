@@ -165,7 +165,7 @@ function StarIcon() {
 
 /* ── Shared components ── */
 function SectionCard({ children }: { children: React.ReactNode }) {
-  return <div className="bg-white rounded-xl border border-gray-200 p-4">{children}</div>;
+  return <div className="bg-white rounded-xl border border-gray-200 p-6">{children}</div>;
 }
 function SectionHeader({ icon, title, action }: { icon?: React.ReactNode; title: string; action?: React.ReactNode }) {
   return (
@@ -1088,7 +1088,7 @@ export default function ProfilePage() {
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 pt-6 pb-5 flex flex-col gap-4">
+      <div className="max-w-4xl mx-auto px-6 pt-8 pb-8 flex flex-col gap-5">
         <div>
           <h1 className="text-2xl font-bold leading-tight text-gray-900">マイプロフィール</h1>
           <p className="mt-1 text-xs font-medium text-gray-400">個人情報の管理</p>
@@ -1096,7 +1096,7 @@ export default function ProfilePage() {
 
         {/* ── Hero card ── */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="relative h-40 bg-gradient-to-br from-emerald-100 to-gray-200">
+          <div className="relative h-56 bg-gradient-to-br from-emerald-100 to-gray-200">
             <Image
               src={coverSrc}
               alt="cover"
@@ -1110,14 +1110,14 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          <div className="px-5 pb-5">
-            <div className="relative -mt-10 mb-3 inline-block">
-              <div className="w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-100">
+          <div className="px-7 pb-7">
+            <div className="relative -mt-14 mb-4 inline-block">
+              <div className="w-28 h-28 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-100">
                 <Image
                   src={avatarSrc}
                   alt={profile.fullName}
-                  width={80}
-                  height={80}
+                  width={112}
+                  height={112}
                   className="object-cover w-full h-full"
                   unoptimized
                   onError={() => setFailedMedia((current) => ({ ...current, avatarUrl: profile.avatarUrl }))}
@@ -1130,8 +1130,8 @@ export default function ProfilePage() {
 
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">{profile.fullName}</h2>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-1">
+                <h2 className="text-2xl font-bold text-gray-900">{profile.fullName}</h2>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mt-2">
                   <span className="flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" /></svg>
                     {profile.city}
@@ -1145,18 +1145,18 @@ export default function ProfilePage() {
                     {profile.joinedAt}に参加
                   </span>
                 </div>
-                <div className="flex gap-2 mt-2.5">
-                  <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700">
+                <div className="flex gap-2.5 mt-3">
+                  <span className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" /></svg>
                     {profile.likeRate}% マッチ率
                   </span>
-                  <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700">
+                  <span className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg>
                     {profile.connectionsCount} コネクション
                   </span>
                 </div>
               </div>
-              <button onClick={() => setModal("editInfo")} className="shrink-0 flex items-center gap-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors">
+              <button onClick={() => setModal("editInfo")} className="shrink-0 flex items-center gap-1.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors">
                 <PencilIcon size={3.5} /> プロフィールを編集
               </button>
             </div>
@@ -1166,27 +1166,27 @@ export default function ProfilePage() {
         {/* ── プロフィール ── */}
         <SectionCard>
           <SectionHeader title="プロフィール" action={<EditBtn onClick={() => setModal("editBio")} />} />
-          <p className="text-sm text-gray-600 leading-relaxed">{bio}</p>
+          <p className="text-base text-gray-600 leading-relaxed">{bio}</p>
         </SectionCard>
 
         {/* ── 個人情報 ── */}
         <SectionCard>
           <SectionHeader icon={<UserIcon />} title="個人情報" action={<EditBtn onClick={() => setModal("editInfo")} />} />
-          <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-4 gap-3 mb-4">
             {INFO_FIELDS.map((item) => (
-              <div key={item.label} className="bg-gray-50 rounded-lg p-2.5 min-w-0">
+              <div key={item.label} className="bg-gray-50 rounded-lg p-3.5 min-w-0">
                 <div className="flex items-center gap-1 mb-1">{item.icon}<p className="text-xs text-gray-400">{item.label}</p></div>
-                <p className="text-xs font-medium text-gray-800 truncate">{item.value}</p>
+                <p className="text-sm font-medium text-gray-800 truncate">{item.value}</p>
               </div>
             ))}
           </div>
           <div>
             <p className="text-xs font-semibold text-gray-700 mb-2">SNSリンク</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-3">
               {SNS_FIELDS.map((s) => (
-                <div key={s.label} className="bg-gray-50 rounded-lg p-2.5">
+                <div key={s.label} className="bg-gray-50 rounded-lg p-3.5 min-w-0">
                   <div className="flex items-center gap-1 mb-1">{s.icon}<p className="text-xs text-gray-400">{s.label}</p></div>
-                  <p className="text-xs font-medium text-gray-800">{s.value}</p>
+                  <p className="text-sm font-medium text-gray-800 truncate">{s.value}</p>
                 </div>
               ))}
             </div>
@@ -1196,17 +1196,17 @@ export default function ProfilePage() {
         {/* ── 言語スキル ── */}
         <SectionCard>
           <SectionHeader icon={<LanguageIcon />} title="言語スキル" action={<AddBtn onClick={() => setModal("editLanguages")} />} />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {languages.map((l) => (
-              <div key={l.name} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              <div key={l.name} className="flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
                 {l.useFlag ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={l.flagSrc} alt={l.name} className="w-5 h-auto rounded-sm shrink-0" />
                 ) : (
                   <span style={{ color: l.dotColor }} className="text-sm leading-none shrink-0">●</span>
                 )}
-                <span className="text-xs font-semibold text-gray-800">{l.name}</span>
-                <span className="text-xs font-bold px-1.5 py-0.5 rounded border" style={{ color: "#1B4332", borderColor: "#bbf7d0", backgroundColor: "#f0fdf4" }}>
+                <span className="text-sm font-semibold text-gray-800">{l.name}</span>
+                <span className="text-sm font-bold px-2 py-0.5 rounded border" style={{ color: "#1B4332", borderColor: "#bbf7d0", backgroundColor: "#f0fdf4" }}>
                   {l.level}
                 </span>
               </div>
@@ -1240,7 +1240,7 @@ export default function ProfilePage() {
         {/* ── 写真 ── */}
         <SectionCard>
           <SectionHeader title={`写真(${photos.length}/9)`} action={<AddBtn onClick={() => setModal("addPhoto")} />} />
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-3">
             {photos.map((p, i) => (
               <div key={p} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
                 <Image src={p} alt={`photo-${i}`} fill className="object-cover" unoptimized />

@@ -71,7 +71,7 @@ export default function AdminPagination({
         onClick={() => goToPage(safePage - 1)}
         disabled={safePage === 1}
         className="w-10 h-10 rounded-xl border border-gray-100 bg-white flex items-center justify-center text-gray-400 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        aria-label="Previous page"
+        aria-label="前のページ"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -106,7 +106,7 @@ export default function AdminPagination({
         onClick={() => goToPage(safePage + 1)}
         disabled={safePage === safeTotalPages}
         className="w-10 h-10 rounded-xl border border-gray-100 bg-white flex items-center justify-center text-gray-400 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        aria-label="Next page"
+        aria-label="次のページ"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -123,15 +123,15 @@ export default function AdminPagination({
           onKeyDown={(event) => {
             if (event.key === "Enter") submitInput();
           }}
-          placeholder="Trang..."
+          placeholder="ページ..."
           className="w-28 px-3 text-sm text-gray-600 outline-none placeholder:text-gray-400"
-          aria-label="Go to page"
+          aria-label="ページへ移動"
         />
         <button
           type="button"
           onClick={submitInput}
           className="w-11 border-l border-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
-          aria-label="Go"
+          aria-label="移動"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
