@@ -51,6 +51,10 @@ export default function LoginPage() {
           submit:
             "メールアドレス（または電話番号）もしくはパスワードが正しくありません。",
         });
+      } else if (lower.includes("account is frozen")) {
+        setErrors({
+          submit: "このアカウントは凍結されています。管理者にお問い合わせください。",
+        });
       } else if (
         lower.includes("identifier") ||
         (lower.includes("email") && lower.includes("valid"))
