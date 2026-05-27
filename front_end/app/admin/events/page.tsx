@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { clsx } from "clsx";
+import AdminPagination from "@/components/ui/AdminPagination";
 import {
   createAdminEvent,
   deleteAdminEvent,
@@ -111,6 +112,7 @@ const FORMAT_OPTIONS: { value: EventFormat; label: string; sublabel: string; ico
 ];
 
 const FORMAT_LABELS: Record<EventFormat, string> = { "in-person": "対面", online: "オンライン", hybrid: "ハイブリッド" };
+const EVENTS_PAGE_SIZE = 5;
 
 const INITIAL_EVENTS: AdminEvent[] = [
   {
@@ -408,6 +410,7 @@ type View = "list" | "create";
 export default function AdminEventsPage() {
   const [view, setView]           = useState<View>("list");
   const [events, setEvents]       = useState<AdminEvent[]>([]);
+  const [eventsPage, setEventsPage] = useState(1);
   const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE);
   const [editModal, setEditModal] = useState<AdminEvent | null>(null);
   const [editForm, setEditForm]   = useState<EditForm | null>(null);
@@ -465,6 +468,12 @@ export default function AdminEventsPage() {
 
   const publishedCount = events.filter((e) => e.status === "published").length;
   const draftCount     = events.filter((e) => e.status === "draft").length;
+  const eventTotalPages = Math.max(1, Math.ceil(events.length / EVENTS_PAGE_SIZE));
+  const safeEventsPage = Math.min(eventsPage, eventTotalPages);
+  const pagedEvents = events.slice(
+    (safeEventsPage - 1) * EVENTS_PAGE_SIZE,
+    safeEventsPage * EVENTS_PAGE_SIZE,
+  );
 
   // ── Create ────────────────────────────────────────────────────────────────
 
@@ -496,6 +505,7 @@ export default function AdminEventsPage() {
     try {
       const created = await createAdminEvent(payloadFromCreateForm(createForm, status));
       setEvents((prev) => [created, ...prev]);
+      setEventsPage(1);
       setCreateForm(EMPTY_CREATE);
       setSubmitted(false);
       setView("list");
@@ -1012,9 +1022,14 @@ export default function AdminEventsPage() {
         {/* Event list */}
         <h2 className="text-base font-bold text-gray-900 mb-4">すべてのイベント</h2>
         <div className="flex flex-col gap-4">
-          {events.map((event) => (
+          {pagedEvents.map((event) => (
             <EventCard key={event.id} event={event} onEdit={() => openEdit(event)} onDelete={() => setDeleteId(event.id)} />
           ))}
+          <AdminPagination
+            page={safeEventsPage}
+            totalPages={eventTotalPages}
+            onPageChange={setEventsPage}
+          />
           {events.length === 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 py-20 text-center">
               <p className="text-4xl mb-3">📅</p>

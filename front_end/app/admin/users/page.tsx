@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AdminPagination from "@/components/ui/AdminPagination";
 import {
   getAdminUserDetail,
   getAdminUserReports,
@@ -20,7 +21,8 @@ import {
 } from "@/lib/admin-users-api";
 
 const PAGE_SIZE = 6;
-const REPORT_PAGE_SIZE = 20;
+const REPORT_FETCH_PAGE_SIZE = 100;
+const REPORT_ITEMS_PER_PAGE = 5;
 
 // ─── Mock data (fallback khi API chưa sẵn sàng) ───────────────────────────────
 
@@ -70,7 +72,7 @@ const MOCK_REPORTS_RESPONSE: AdminReportsResponse = {
       date: "2026-03-15", files: [], status: "dismissed",
     },
   ],
-  pagination: { page: 1, pageSize: REPORT_PAGE_SIZE, totalItems: 4, totalPages: 1 },
+  pagination: { page: 1, pageSize: REPORT_FETCH_PAGE_SIZE, totalItems: 4, totalPages: 1 },
   stats: { pendingCount: 2 },
 };
 
@@ -567,47 +569,13 @@ function AllUsersTab({
         )}
       </div>
 
-      {pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <span className="text-sm text-gray-400">
-            {pagination.totalItems}件中 {(pagination.page - 1) * pagination.pageSize + 1}-{Math.min(pagination.page * pagination.pageSize, pagination.totalItems)}件を表示
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => onPageChange(Math.max(1, page - 1))}
-              disabled={page === 1}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-            </button>
-            {Array.from({ length: pagination.totalPages }, (_, index) => index + 1).map((pageNumber) => (
-              <button
-                key={pageNumber}
-                onClick={() => onPageChange(pageNumber)}
-                className="w-8 h-8 rounded-lg text-sm font-medium transition-colors"
-                style={
-                  pageNumber === page
-                    ? { backgroundColor: "#1B4332", color: "#ffffff" }
-                    : { color: "#6b7280" }
-                }
-              >
-                {pageNumber}
-              </button>
-            ))}
-            <button
-              onClick={() => onPageChange(Math.min(pagination.totalPages, page + 1))}
-              disabled={page === pagination.totalPages}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+      <AdminPagination
+        className="mt-4"
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        onPageChange={onPageChange}
+        label={`${pagination.totalItems}件中 ${(pagination.page - 1) * pagination.pageSize + 1}-${Math.min(pagination.page * pagination.pageSize, pagination.totalItems)}件を表示`}
+      />
     </div>
   );
 }
@@ -704,9 +672,23 @@ function ViolationReportsTab({
   actionReportId: string | null;
 }) {
   const [evidenceReport, setEvidenceReport] = useState<AdminUserReport | null>(null);
+  const [pendingReportsPage, setPendingReportsPage] = useState(1);
+  const [processedReportsPage, setProcessedReportsPage] = useState(1);
   const allReports = reportsResponse?.reports ?? [];
   const pending = allReports.filter((r) => r.status === "pending");
   const processed = allReports.filter((r) => r.status !== "pending");
+  const pendingTotalPages = Math.max(1, Math.ceil(pending.length / REPORT_ITEMS_PER_PAGE));
+  const processedTotalPages = Math.max(1, Math.ceil(processed.length / REPORT_ITEMS_PER_PAGE));
+  const safePendingReportsPage = Math.min(pendingReportsPage, pendingTotalPages);
+  const safeProcessedReportsPage = Math.min(processedReportsPage, processedTotalPages);
+  const pagedPending = pending.slice(
+    (safePendingReportsPage - 1) * REPORT_ITEMS_PER_PAGE,
+    safePendingReportsPage * REPORT_ITEMS_PER_PAGE,
+  );
+  const pagedProcessed = processed.slice(
+    (safeProcessedReportsPage - 1) * REPORT_ITEMS_PER_PAGE,
+    safeProcessedReportsPage * REPORT_ITEMS_PER_PAGE,
+  );
 
   return (
     <div>
@@ -729,7 +711,7 @@ function ViolationReportsTab({
         </div>
       ) : (
         <div className="flex flex-col gap-3 mb-6">
-          {pending.map((report) => (
+          {pagedPending.map((report) => (
             <ReportCard
               key={report.id}
               report={report}
@@ -738,6 +720,11 @@ function ViolationReportsTab({
               actionReportId={actionReportId}
             />
           ))}
+          <AdminPagination
+            page={safePendingReportsPage}
+            totalPages={pendingTotalPages}
+            onPageChange={setPendingReportsPage}
+          />
         </div>
       )}
 
@@ -750,7 +737,7 @@ function ViolationReportsTab({
             <span className="text-xs text-gray-400 font-medium">{processed.length}件</span>
           </div>
           <div className="flex flex-col gap-3">
-            {processed.map((report) => (
+            {pagedProcessed.map((report) => (
               <ReportCard
                 key={report.id}
                 report={report}
@@ -758,6 +745,11 @@ function ViolationReportsTab({
                 actionReportId={actionReportId}
               />
             ))}
+            <AdminPagination
+              page={safeProcessedReportsPage}
+              totalPages={processedTotalPages}
+              onPageChange={setProcessedReportsPage}
+            />
           </div>
         </div>
       )}
@@ -849,7 +841,7 @@ export default function AdminUsersPage() {
 
     getAdminUserReports({
       page: 1,
-      pageSize: REPORT_PAGE_SIZE,
+      pageSize: REPORT_FETCH_PAGE_SIZE,
     })
       .then((response) => {
         if (active) setReportsResponse(response);
