@@ -1,7 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import * as dns from 'dns';
 import { AppModule } from './app.module';
+
+dns.setDefaultResultOrder('ipv4first');
+
 
 function allowedOrigins() {
   const configuredOrigins = process.env.CORS_ORIGINS?.split(',')
