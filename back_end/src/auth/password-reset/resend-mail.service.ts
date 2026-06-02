@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import * as dns from 'dns';
 import { buildPasswordResetEmailHtml } from './password-reset-email.template';
 
 export interface PasswordResetMailPayload {
@@ -64,6 +65,9 @@ export class ResendMailService {
             port,
             secure,
             family: 4, // Force IPv4 to avoid IPv6 ENETUNREACH issues
+            lookup: (hostname, options, callback) => {
+              dns.lookup(hostname, { ...options, family: 4 }, callback);
+            },
             auth: {
               user,
               pass,
