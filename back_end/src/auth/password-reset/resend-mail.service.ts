@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import * as dns from 'dns';
+import { isIP } from 'net';
 import { buildPasswordResetEmailHtml } from './password-reset-email.template';
 
 export interface PasswordResetMailPayload {
@@ -24,6 +25,66 @@ export function passwordResetUsesLogOnlyMail(): boolean {
 export class ResendMailService {
   private readonly logger = new Logger(ResendMailService.name);
   private smtpTransporter: nodemailer.Transporter | null = null;
+  private smtpTransporterKey: string | null = null;
+
+  private async createSmtpTransporter(options: {
+    host: string;
+    port: number;
+    secure: boolean;
+    user: string;
+    pass: string;
+  }) {
+    const { host, port, secure, user, pass } = options;
+    const cacheKey = `${host}:${port}:${secure}:${user}`;
+
+    if (this.smtpTransporter && this.smtpTransporterKey === cacheKey) {
+      return this.smtpTransporter;
+    }
+
+    const connectionHost = await this.resolveSmtpHostToIpv4(host);
+    this.smtpTransporter = nodemailer.createTransport({
+      host: connectionHost,
+      port,
+      secure,
+      auth: {
+        user,
+        pass,
+      },
+      tls: {
+        servername: host,
+      },
+    } as nodemailer.TransportOptions);
+    this.smtpTransporterKey = cacheKey;
+
+    if (connectionHost !== host) {
+      this.logger.log(
+        `SMTP transport resolved ${host}:${port} to IPv4 ${connectionHost}:${port}.`,
+      );
+    }
+
+    return this.smtpTransporter;
+  }
+
+  private async resolveSmtpHostToIpv4(host: string) {
+    if (isIP(host) === 4) {
+      return host;
+    }
+
+    try {
+      const addresses = await dns.promises.resolve4(host);
+      const address = addresses[0];
+
+      if (!address) {
+        throw new Error(`No IPv4 addresses returned for ${host}`);
+      }
+
+      return address;
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.logger.error(`SMTP IPv4 DNS resolution failed for "${host}": ${detail}`);
+      throw new ResendRequestFailedError(detail);
+    }
+  }
 
   async sendPasswordResetOtpMail(payload: PasswordResetMailPayload) {
     const mode = mailTransportMode();
@@ -59,23 +120,15 @@ export class ResendMailService {
       }
 
       try {
-        if (!this.smtpTransporter) {
-          this.smtpTransporter = nodemailer.createTransport({
-            host,
-            port,
-            secure,
-            family: 4, // Force IPv4 to avoid IPv6 ENETUNREACH issues
-            lookup: (hostname, options, callback) => {
-              dns.lookup(hostname, { ...options, family: 4 }, callback);
-            },
-            auth: {
-              user,
-              pass,
-            },
-          } as any);
-        }
+        const transporter = await this.createSmtpTransporter({
+          host,
+          port,
+          secure,
+          user,
+          pass,
+        });
 
-        const info = await this.smtpTransporter.sendMail({
+        const info = await transporter.sendMail({
           from: `"VN-JP Connect" <${user}>`,
           to: payload.to,
           subject,
