@@ -81,7 +81,10 @@ export type SendRegisterOtpInput = {
 };
 
 function requireOtp(value: unknown) {
-  const otp = requireString(value, 'otp');
+  const otp =
+    typeof value === 'number' && Number.isInteger(value)
+      ? String(value).padStart(6, '0')
+      : requireString(value, 'otp');
   if (!/^\d{6}$/.test(otp)) {
     throw new BadRequestException('otp must be a 6-digit code');
   }
