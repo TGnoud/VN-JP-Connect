@@ -38,6 +38,7 @@ import type {
 } from './password-reset.validation';
 import {
   MailTransportNotConfiguredError,
+  currentPasswordResetMailMode,
   passwordResetUsesLogOnlyMail,
   ResendMailService,
   ResendRequestFailedError,
@@ -58,6 +59,9 @@ export class PasswordResetService implements OnModuleInit {
 
   onModuleInit() {
     const pepper = process.env.PASSWORD_RESET_SECRET?.trim();
+    this.logger.log(
+      `PASSWORD_RESET_MAIL_MODE=${currentPasswordResetMailMode()}`,
+    );
 
     if (
       process.env.NODE_ENV === 'production' &&

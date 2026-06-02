@@ -10,11 +10,18 @@ export interface PasswordResetMailPayload {
   otpTtlMinutes: number;
 }
 
-function mailTransportMode(): 'resend' | 'log' | 'smtp' {
+function mailTransportMode(): 'resend' | 'log' | 'smtp' | 'gmail-api' {
   const raw = process.env.PASSWORD_RESET_MAIL_MODE?.trim().toLowerCase();
   if (raw === 'log') return 'log';
   if (raw === 'smtp') return 'smtp';
+  if (raw === 'gmail-api' || raw === 'gmail_api' || raw === 'gmail') {
+    return 'gmail-api';
+  }
   return 'resend';
+}
+
+export function currentPasswordResetMailMode() {
+  return mailTransportMode();
 }
 
 export function passwordResetUsesLogOnlyMail(): boolean {
@@ -89,6 +96,119 @@ export class ResendMailService {
     }
   }
 
+  private async getGmailApiAccessToken() {
+    const clientId = process.env.GMAIL_CLIENT_ID?.trim();
+    const clientSecret = process.env.GMAIL_CLIENT_SECRET?.trim();
+    const refreshToken = process.env.GMAIL_REFRESH_TOKEN?.trim();
+
+    if (!clientId || !clientSecret || !refreshToken) {
+      this.logger.warn(
+        'GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, or GMAIL_REFRESH_TOKEN is unset.',
+      );
+      throw new MailTransportNotConfiguredError();
+    }
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    const body = (await response.json().catch(() => null)) as
+      | { access_token?: string; error?: string; error_description?: string }
+      | null;
+
+    if (!response.ok || !body?.access_token) {
+      const message =
+        body?.error_description ??
+        body?.error ??
+        `Gmail OAuth token HTTP ${response.status}`;
+      throw new ResendRequestFailedError(message);
+    }
+
+    return body.access_token;
+  }
+
+  private buildGmailApiRawMessage(options: {
+    fromEmail: string;
+    toEmail: string;
+    subject: string;
+    html: string;
+  }) {
+    const encodedFromName = Buffer.from('VN-JP Connect', 'utf8').toString('base64');
+    const encodedSubject = Buffer.from(options.subject, 'utf8').toString('base64');
+    const encodedHtml = Buffer.from(options.html, 'utf8').toString('base64');
+
+    const message = [
+      `From: =?UTF-8?B?${encodedFromName}?= <${options.fromEmail}>`,
+      `To: ${options.toEmail}`,
+      `Subject: =?UTF-8?B?${encodedSubject}?=`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      encodedHtml,
+    ].join('\r\n');
+
+    return Buffer.from(message, 'utf8')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  }
+
+  private async sendWithGmailApi(options: {
+    to: string;
+    subject: string;
+    html: string;
+  }) {
+    const fromEmail = process.env.GMAIL_FROM_EMAIL?.trim() || process.env.SMTP_USER?.trim();
+
+    if (!fromEmail) {
+      this.logger.warn('GMAIL_FROM_EMAIL or SMTP_USER is unset.');
+      throw new MailTransportNotConfiguredError();
+    }
+
+    const accessToken = await this.getGmailApiAccessToken();
+    const raw = this.buildGmailApiRawMessage({
+      fromEmail,
+      toEmail: options.to,
+      subject: options.subject,
+      html: options.html,
+    });
+
+    const response = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ raw }),
+      },
+    );
+
+    const body = (await response.json().catch(() => null)) as
+      | { id?: string; error?: { message?: string } }
+      | null;
+
+    if (!response.ok || !body?.id) {
+      const message = body?.error?.message ?? `Gmail API HTTP ${response.status}`;
+      throw new ResendRequestFailedError(message);
+    }
+
+    this.logger.log(`Gmail API email sent to ${options.to}: messageId=${body.id}`);
+    return { id: body.id };
+  }
+
   async sendPasswordResetOtpMail(payload: PasswordResetMailPayload) {
     const mode = mailTransportMode();
 
@@ -107,7 +227,27 @@ export class ResendMailService {
 
     const subject = `[VN-JP Connect] パスワード再設定 — 確認コード（${payload.otpTtlMinutes}分有効）`;
 
-    // 2. SMTP Mode (e.g. Gmail SMTP)
+    // 2. Gmail API mode sends over HTTPS instead of SMTP, avoiding blocked SMTP ports.
+    if (mode === 'gmail-api') {
+      try {
+        this.logger.log(`Gmail API sending password reset OTP to ${payload.to}.`);
+        return await this.sendWithGmailApi({
+          to: payload.to,
+          subject,
+          html,
+        });
+      } catch (err: unknown) {
+        if (err instanceof MailTransportNotConfiguredError) {
+          throw err;
+        }
+
+        const detail = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Gmail API failed sending to ${payload.to}: ${detail}`);
+        throw new ResendRequestFailedError(detail);
+      }
+    }
+
+    // 3. SMTP Mode (e.g. Gmail SMTP)
     if (mode === 'smtp') {
       const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
       const port = Number(process.env.SMTP_PORT?.trim()) || 465;
@@ -151,7 +291,7 @@ export class ResendMailService {
       }
     }
 
-    // 3. Resend API Mode
+    // 4. Resend API Mode
     const apiKey = process.env.RESEND_API_KEY?.trim();
     if (!apiKey) {
       this.logger.warn(
