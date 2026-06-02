@@ -1,5 +1,5 @@
-/** Valid OTP lifetime (requirements: 1 minute). */
-export const OTP_TTL_MS = 60_000;
+/** Valid OTP lifetime. */
+export const OTP_TTL_MS = 5 * 60_000;
 
 export const OTP_TTL_MINUTES = Math.max(1, Math.round(OTP_TTL_MS / 60_000));
 
