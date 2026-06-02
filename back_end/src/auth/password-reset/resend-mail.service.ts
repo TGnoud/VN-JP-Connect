@@ -3,11 +3,27 @@ import * as nodemailer from 'nodemailer';
 import * as dns from 'dns';
 import { isIP } from 'net';
 import { buildPasswordResetEmailHtml } from './password-reset-email.template';
+import { buildRegisterOtpEmailHtml } from '../register-otp-email.template';
 
 export interface PasswordResetMailPayload {
   to: string;
   otp: string;
   otpTtlMinutes: number;
+}
+
+export interface RegisterOtpMailPayload {
+  to: string;
+  otp: string;
+  otpTtlMinutes: number;
+}
+
+interface PreparedMailPayload {
+  to: string;
+  subject: string;
+  html: string;
+  otp: string;
+  otpTtlMinutes: number;
+  purpose: string;
 }
 
 function mailTransportMode(): 'resend' | 'log' | 'smtp' | 'gmail-api' {
@@ -343,6 +359,148 @@ export class ResendMailService {
         maybeErr instanceof Error ? maybeErr.message : String(maybeErr);
       this.logger.error(
         `Resend threw (${payload.to}) from="${from}": ${detail}`,
+      );
+      throw new ResendRequestFailedError(detail);
+    }
+
+    return { id: data?.id ?? null };
+  }
+
+  async sendRegisterOtpMail(payload: RegisterOtpMailPayload) {
+    const mode = mailTransportMode();
+
+    if (mode === 'log') {
+      this.logger.warn(
+        `[PASSWORD_RESET_MAIL_MODE=log] Registration OTP for ${payload.to}: ${payload.otp} (expires in ${payload.otpTtlMinutes} min)`,
+      );
+      return { id: 'stdout-only' as const };
+    }
+
+    const html = buildRegisterOtpEmailHtml({
+      otp: payload.otp,
+      minutesValid: payload.otpTtlMinutes,
+    });
+    const subject = `[VN-JP Connect] Registration verification code (${payload.otpTtlMinutes} min)`;
+
+    if (mode === 'gmail-api') {
+      try {
+        this.logger.log(`Gmail API sending registration OTP to ${payload.to}.`);
+        return await this.sendWithGmailApi({
+          to: payload.to,
+          subject,
+          html,
+        });
+      } catch (err: unknown) {
+        if (err instanceof MailTransportNotConfiguredError) {
+          throw err;
+        }
+
+        const detail = err instanceof Error ? err.message : String(err);
+        this.logger.error(
+          `Gmail API failed sending registration OTP to ${payload.to}: ${detail}`,
+        );
+        throw new ResendRequestFailedError(detail);
+      }
+    }
+
+    if (mode === 'smtp') {
+      const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
+      const port = Number(process.env.SMTP_PORT?.trim()) || 465;
+      const secure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE.trim() === 'true' : port === 465;
+      const user = process.env.SMTP_USER?.trim();
+      const pass = process.env.SMTP_PASS?.trim();
+
+      if (!user || !pass) {
+        this.logger.warn(
+          'SMTP_USER or SMTP_PASS is unset; refusing to silently skip email delivery.',
+        );
+        throw new MailTransportNotConfiguredError();
+      }
+
+      try {
+        const transporter = await this.createSmtpTransporter({
+          host,
+          port,
+          secure,
+          user,
+          pass,
+        });
+
+        this.logger.log(
+          `SMTP sending registration OTP to ${payload.to} via ${host}:${port}.`,
+        );
+
+        const info = await transporter.sendMail({
+          from: `"VN-JP Connect" <${user}>`,
+          to: payload.to,
+          subject,
+          html,
+        });
+
+        this.logger.log(
+          `SMTP registration email sent to ${payload.to}: messageId=${info.messageId}`,
+        );
+        return { id: info.messageId };
+      } catch (err: unknown) {
+        const detail = err instanceof Error ? err.message : String(err);
+        this.logger.error(
+          `SMTP failed sending registration OTP to ${payload.to} via "${host}": ${detail}`,
+        );
+        throw new ResendRequestFailedError(detail);
+      }
+    }
+
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (!apiKey) {
+      this.logger.warn(
+        'RESEND_API_KEY is unset; refusing to silently skip email delivery.',
+      );
+      throw new MailTransportNotConfiguredError();
+    }
+
+    const from = process.env.RESEND_FROM_EMAIL?.trim();
+    if (!from) {
+      this.logger.warn('RESEND_FROM_EMAIL is unset.');
+      throw new MailTransportNotConfiguredError();
+    }
+
+    let data: { id?: string | null } | null = null;
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from,
+          to: payload.to,
+          subject,
+          html,
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as
+        | { id?: string | null; message?: string; error?: string }
+        | null;
+
+      if (!response.ok) {
+        const message =
+          body?.message ?? body?.error ?? `HTTP ${response.status}`;
+        this.logger.error(
+          `Resend API error (registration OTP to ${payload.to}) from="${from}": ${message}`,
+        );
+        throw new ResendRequestFailedError(message);
+      }
+
+      data = body;
+    } catch (maybeErr: unknown) {
+      if (maybeErr instanceof ResendRequestFailedError) {
+        throw maybeErr;
+      }
+      const detail =
+        maybeErr instanceof Error ? maybeErr.message : String(maybeErr);
+      this.logger.error(
+        `Resend threw (registration OTP to ${payload.to}) from="${from}": ${detail}`,
       );
       throw new ResendRequestFailedError(detail);
     }

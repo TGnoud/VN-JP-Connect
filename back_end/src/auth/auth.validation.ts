@@ -73,7 +73,30 @@ export type RegisterInput = {
   fullName: string;
   nationality: Nationality;
   birthDate: Date;
+  otp: string;
 };
+
+export type SendRegisterOtpInput = {
+  email: string;
+};
+
+function requireOtp(value: unknown) {
+  const otp = requireString(value, 'otp');
+  if (!/^\d{6}$/.test(otp)) {
+    throw new BadRequestException('otp must be a 6-digit code');
+  }
+  return otp;
+}
+
+export function validateSendRegisterOtpBody(body: unknown): SendRegisterOtpInput {
+  if (!isRecord(body)) {
+    throw new BadRequestException('body must be an object');
+  }
+
+  return {
+    email: requireEmail(requireString(body.email, 'email').toLowerCase()),
+  };
+}
 
 export function validateRegisterBody(body: unknown): RegisterInput {
   if (!isRecord(body)) {
@@ -89,8 +112,9 @@ export function validateRegisterBody(body: unknown): RegisterInput {
   const fullName = requireString(body.fullName, 'fullName');
   const nationality = requireNationality(requireString(body.nationality, 'nationality'));
   const birthDate = requireBirthDate(body.birthDate);
+  const otp = requireOtp(body.otp);
 
-  return { email, phoneNumber, password, fullName, nationality, birthDate };
+  return { email, phoneNumber, password, fullName, nationality, birthDate, otp };
 }
 
 export type LoginIdentifier =

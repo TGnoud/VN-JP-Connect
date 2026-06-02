@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
-import { register, setStoredUserId } from "@/lib/auth-api";
+import { register, sendRegisterOtp, setStoredUserId } from "@/lib/auth-api";
 import { INTERESTS, PURPOSES, JAPANESE_LEVELS, VIETNAMESE_LEVELS, CITIES } from "@/lib/mock-data";
 
 const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
@@ -118,6 +118,7 @@ export default function RegisterPage() {
         fullName: fullName.trim(),
         email: email.trim(),
         phoneNumber: phone.trim(),
+        otp,
         password,
         nationality: nationality === "日本" ? "JP" : "VN",
         birthDate,
@@ -163,12 +164,33 @@ export default function RegisterPage() {
     setErrors((current) => {
       const next = { ...current };
       delete next.email;
+      delete next.otp;
       return next;
     });
     setSendingOtp(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    setSendingOtp(false);
-    setOtpSent(true);
+    try {
+      await sendRegisterOtp({ email: email.trim() });
+      setOtpSent(true);
+    } catch (error) {
+      const rawMessage =
+        error instanceof Error ? error.message : "OTPの送信に失敗しました。";
+      const lower = rawMessage.toLowerCase();
+
+      if (lower.includes("email") && lower.includes("already")) {
+        setErrors((current) => ({
+          ...current,
+          email: "このメールアドレスは既に使用されています",
+        }));
+      } else {
+        setErrors((current) => ({
+          ...current,
+          otp: rawMessage,
+        }));
+      }
+      setOtpSent(false);
+    } finally {
+      setSendingOtp(false);
+    }
   }
 
   return (
@@ -234,7 +256,11 @@ export default function RegisterPage() {
                       type="email"
                       placeholder="メールアドレスを入力"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setOtp("");
+                        setOtpSent(false);
+                      }}
                       maxLength={255}
                       className={clsx(INPUT_CLS, errors.email && "border-red-400 bg-red-50")}
                     />
@@ -272,7 +298,8 @@ export default function RegisterPage() {
                     <button
                       type="button"
                       onClick={handleSendOtp}
-                      className="w-36 shrink-0 rounded-md text-sm font-semibold text-white transition-colors hover:bg-green-900"
+                      disabled={sendingOtp}
+                      className="w-36 shrink-0 rounded-md text-sm font-semibold text-white transition-colors hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-60"
                       style={{ backgroundColor: "#1B4332" }}
                     >
                       {sendingOtp ? "送信中..." : "OTPを送信"}

@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import {
   validateLoginBody,
   validateRegisterBody,
+  validateSendRegisterOtpBody,
 } from './auth.validation';
 
 @Controller('auth')
@@ -13,6 +14,11 @@ export class AuthController {
   @Post('register')
   register(@Body() body: unknown) {
     return this.authService.register(validateRegisterBody(body));
+  }
+
+  @Post('register/send-otp')
+  sendRegisterOtp(@Body() body: unknown) {
+    return this.authService.sendRegisterOtp(validateSendRegisterOtpBody(body));
   }
 
   @Post('login')

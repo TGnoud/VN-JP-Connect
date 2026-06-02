@@ -201,12 +201,17 @@ export function login(payload: { identifier: string; password: string }) {
 export function register(payload: {
   email: string;
   phoneNumber: string;
+  otp: string;
   password: string;
   fullName: string;
   nationality: "JP" | "VN";
   birthDate: string;
 }) {
   return requestAuth("/auth/register", payload);
+}
+
+export function sendRegisterOtp(payload: { email: string }) {
+  return requestJson<PasswordResetAck>("/auth/register/send-otp", payload);
 }
 
 export interface PasswordResetAck {

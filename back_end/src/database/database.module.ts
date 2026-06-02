@@ -23,6 +23,8 @@ import {
   PasswordResetSessionSchema,
   Profile,
   ProfileSchema,
+  RegisterOtp,
+  RegisterOtpSchema,
   Tag,
   TagSchema,
   User,
@@ -42,6 +44,7 @@ console.log(`MongoDB target: ${mongoConfig.target} (${mongoConfig.dbName})`);
     MongooseModule.forRoot(mongoConfig.uri, { dbName: mongoConfig.dbName }),
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
+      { name: RegisterOtp.name, schema: RegisterOtpSchema },
       { name: PasswordResetOtp.name, schema: PasswordResetOtpSchema },
       {
         name: PasswordResetSession.name,

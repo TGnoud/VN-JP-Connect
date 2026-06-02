@@ -49,6 +49,7 @@ export type UserReportReason = (typeof USER_REPORT_REASONS)[number];
 export type UserReportStatus = (typeof USER_REPORT_STATUSES)[number];
 
 export type UserDocument = HydratedDocument<User>;
+export type RegisterOtpDocument = HydratedDocument<RegisterOtp>;
 export type PasswordResetOtpDocument = HydratedDocument<PasswordResetOtp>;
 export type PasswordResetSessionDocument =
   HydratedDocument<PasswordResetSession>;
@@ -127,6 +128,31 @@ UserSchema.index(
   { name: 'users_status_updated_at_idx' },
 );
 UserSchema.index({ role: 1 }, { name: 'users_role_idx' });
+
+@Schema({ collection: 'register_otps', versionKey: false })
+export class RegisterOtp {
+  @Prop({ required: true, trim: true, lowercase: true })
+  email: string;
+
+  @Prop({ required: true })
+  otp_hash: string;
+
+  @Prop({ required: true })
+  expires_at: Date;
+
+  @Prop({ required: true, default: Date.now })
+  created_at: Date;
+}
+
+export const RegisterOtpSchema = SchemaFactory.createForClass(RegisterOtp);
+RegisterOtpSchema.index(
+  { email: 1, created_at: -1 },
+  { name: 'register_otps_email_created_idx' },
+);
+RegisterOtpSchema.index(
+  { expires_at: 1 },
+  { expireAfterSeconds: 0, name: 'register_otps_expires_ttl_idx' },
+);
 
 @Schema({ collection: 'password_reset_otps', versionKey: false })
 export class PasswordResetOtp {
