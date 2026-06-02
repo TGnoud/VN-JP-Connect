@@ -63,11 +63,12 @@ export class ResendMailService {
             host,
             port,
             secure,
+            family: 4, // Force IPv4 to avoid IPv6 ENETUNREACH issues
             auth: {
               user,
               pass,
             },
-          });
+          } as any);
         }
 
         const info = await this.smtpTransporter.sendMail({
