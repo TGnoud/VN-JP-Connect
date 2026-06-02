@@ -46,6 +46,9 @@ export class ResendMailService {
       host: connectionHost,
       port,
       secure,
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 30000,
       auth: {
         user,
         pass,
@@ -127,6 +130,8 @@ export class ResendMailService {
           user,
           pass,
         });
+
+        this.logger.log(`SMTP sending password reset OTP to ${payload.to} via ${host}:${port}.`);
 
         const info = await transporter.sendMail({
           from: `"VN-JP Connect" <${user}>`,
