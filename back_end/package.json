@@ -30,6 +30,8 @@
     "repair:profile-bios:atlas": "ts-node src/repair-profile-bios.ts --atlas",
     "repair:profile-images": "ts-node src/repair-profile-images.ts",
     "repair:profile-images:atlas": "ts-node src/repair-profile-images.ts --atlas",
+    "enrich:atlas:dry-run": "ts-node src/enrich-demo-data.ts --dry-run",
+    "enrich:atlas": "ts-node src/enrich-demo-data.ts --apply",
     "db:postgres:generate": "prisma generate",
     "db:postgres:migrate:dev": "prisma migrate dev",
     "db:postgres:migrate:deploy": "prisma migrate deploy"

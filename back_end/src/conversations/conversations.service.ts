@@ -820,6 +820,14 @@ export class ConversationsService {
       );
     }
 
+    const existingFeedback = await this.conversationFeedbackModel
+      .findOne({
+        conversation_id: conversation._id,
+        reviewer_id: currentObjectId,
+      })
+      .lean()
+      .exec();
+
     await this.conversationFeedbackModel
       .updateOne(
         { conversation_id: conversation._id, reviewer_id: currentObjectId },
@@ -834,7 +842,7 @@ export class ConversationsService {
       )
       .exec();
 
-    if (value === 'liked') {
+    if (value === 'liked' && existingFeedback?.value !== 'liked') {
       await this.profileModel
         .updateOne(
           {
@@ -846,6 +854,21 @@ export class ConversationsService {
           },
           {
             $inc: { match_rate: 1 },
+            $set: { updated_at: new Date() },
+          },
+        )
+        .exec();
+    }
+
+    if (value === 'skipped' && existingFeedback?.value === 'liked') {
+      await this.profileModel
+        .updateOne(
+          {
+            user_id: targetUserId,
+            match_rate: { $gt: 0 },
+          },
+          {
+            $inc: { match_rate: -1 },
             $set: { updated_at: new Date() },
           },
         )

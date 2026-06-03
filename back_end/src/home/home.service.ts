@@ -265,8 +265,8 @@ export class HomeService {
           interests,
           likeRate: profile?.match_rate ?? 100,
           connectionsCount:
-            profile?.connections_count ??
             connectionsCountByUserId.get(user._id.toString()) ??
+            profile?.connections_count ??
             0,
           joinedAt: user.created_at,
           updatedAt: profile?.updated_at ?? user.created_at,

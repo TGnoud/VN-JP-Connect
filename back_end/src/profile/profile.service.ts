@@ -472,7 +472,7 @@ export class ProfileService {
         uploadedAt: photo.uploaded_at,
       })),
       likeRate: profile.match_rate ?? 100,
-      connectionsCount: profile.connections_count ?? connectionsCount,
+      connectionsCount,
       joinedAt: user.created_at,
       updatedAt: profile.updated_at,
     };
