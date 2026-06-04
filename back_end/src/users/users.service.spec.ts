@@ -4,6 +4,7 @@ import { UsersService } from './users.service';
 
 function queryMock<T>(value: T) {
   return {
+    select: jest.fn().mockReturnThis(),
     lean: jest.fn().mockReturnThis(),
     exec: jest.fn().mockResolvedValue(value),
   };
@@ -18,12 +19,14 @@ function countMock(value: number) {
 function emptyUserReportModel() {
   return {
     exists: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(null) }),
+    find: jest.fn().mockReturnValue(queryMock([])),
   };
 }
 
 function blockedUserReportModel() {
   return {
     exists: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }) }),
+    find: jest.fn().mockReturnValue(queryMock([])),
   };
 }
 
@@ -64,7 +67,7 @@ describe('UsersService', () => {
     const tagModel = {
       find: jest.fn().mockReturnValue(queryMock([])),
     };
-    const matchModel = {
+    const conversationModel = {
       countDocuments: jest.fn().mockReturnValue(countMock(2)),
     };
     const service = new UsersService(
@@ -72,7 +75,7 @@ describe('UsersService', () => {
       profileModel as any,
       userInterestModel as any,
       tagModel as any,
-      matchModel as any,
+      conversationModel as any,
       emptyUserReportModel() as any,
       {} as any,
     );

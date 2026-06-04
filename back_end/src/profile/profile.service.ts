@@ -7,8 +7,8 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
-  Match,
-  MatchDocument,
+  Conversation,
+  ConversationDocument,
   Profile,
   ProfileDocument,
   Tag,
@@ -17,6 +17,8 @@ import {
   UserDocument,
   UserInterest,
   UserInterestDocument,
+  UserReport,
+  UserReportDocument,
 } from '../database/schemas';
 import { calculateAge, DEFAULT_LEGACY_AGE } from '../common/age';
 import {
@@ -33,6 +35,10 @@ import {
   ProfileImageStorageService,
   UploadedFileLike,
 } from './profile-image-storage.service';
+import { countDirectConnectionConversationsExcludingReports } from '../users/report-blocking';
+
+const LIKE_RATE_MIN = 60;
+const LIKE_RATE_MAX = 100;
 
 @Injectable()
 export class ProfileService {
@@ -42,7 +48,10 @@ export class ProfileService {
     @InjectModel(Tag.name) private readonly tagModel: Model<TagDocument>,
     @InjectModel(UserInterest.name)
     private readonly userInterestModel: Model<UserInterestDocument>,
-    @InjectModel(Match.name) private readonly matchModel: Model<MatchDocument>,
+    @InjectModel(Conversation.name)
+    private readonly conversationModel: Model<ConversationDocument>,
+    @InjectModel(UserReport.name)
+    private readonly userReportModel: Model<UserReportDocument>,
     private readonly profileImageStorage: ProfileImageStorageService,
   ) {}
 
@@ -427,12 +436,11 @@ export class ProfileService {
   }
 
   private countConnections(userId: Types.ObjectId) {
-    return this.matchModel
-      .countDocuments({
-        status: 'accepted',
-        $or: [{ requester_id: userId }, { receiver_id: userId }],
-      })
-      .exec();
+    return countDirectConnectionConversationsExcludingReports(
+      this.conversationModel,
+      this.userReportModel,
+      userId,
+    );
   }
 
   private toProfileResponse(
@@ -471,11 +479,19 @@ export class ProfileService {
         isMain: photo.is_main,
         uploadedAt: photo.uploaded_at,
       })),
-      likeRate: profile.match_rate ?? 100,
+      likeRate: this.displayLikeRate(profile.match_rate),
       connectionsCount,
       joinedAt: user.created_at,
       updatedAt: profile.updated_at,
     };
+  }
+
+  private displayLikeRate(value: unknown) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return 100;
+    }
+
+    return Math.min(LIKE_RATE_MAX, Math.max(LIKE_RATE_MIN, Math.round(value)));
   }
 
 }

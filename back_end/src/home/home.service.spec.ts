@@ -46,6 +46,12 @@ function blockedUserReportModel() {
   };
 }
 
+function emptyConversationModel() {
+  return {
+    find: jest.fn().mockReturnValue(queryMock([])),
+  };
+}
+
 describe('HomeService', () => {
   it('returns discover users with fallback fields when a profile document is missing', async () => {
     const currentUserId = new Types.ObjectId().toString();
@@ -73,7 +79,7 @@ describe('HomeService', () => {
       find: jest.fn().mockReturnValue(queryMock([])),
       aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
     };
-    const conversationModel = {};
+    const conversationModel = emptyConversationModel();
     const service = new HomeService(
       userModel as any,
       profileModel as any,
@@ -137,7 +143,7 @@ describe('HomeService', () => {
       userInterestModel as any,
       tagModel as any,
       matchModel as any,
-      {} as any,
+      emptyConversationModel() as any,
       {} as any,
       emptyUserReportModel() as any,
     );
@@ -198,7 +204,7 @@ describe('HomeService', () => {
       userInterestModel as any,
       tagModel as any,
       matchModel as any,
-      {} as any,
+      emptyConversationModel() as any,
       {} as any,
       emptyUserReportModel() as any,
     );
@@ -267,7 +273,7 @@ describe('HomeService', () => {
       userInterestModel as any,
       tagModel as any,
       matchModel as any,
-      {} as any,
+      emptyConversationModel() as any,
       {} as any,
       emptyUserReportModel() as any,
     );
@@ -383,7 +389,7 @@ describe('HomeService', () => {
       userInterestModel as any,
       tagModel as any,
       matchModel as any,
-      {} as any,
+      emptyConversationModel() as any,
       {} as any,
       emptyUserReportModel() as any,
     );
@@ -458,7 +464,7 @@ describe('HomeService', () => {
       userInterestModel as any,
       tagModel as any,
       matchModel as any,
-      {} as any,
+      emptyConversationModel() as any,
       {} as any,
       userReportModel as any,
     );
@@ -534,7 +540,7 @@ describe('HomeService', () => {
       userInterestModel as any,
       tagModel as any,
       matchModel as any,
-      {} as any,
+      emptyConversationModel() as any,
       {} as any,
       emptyUserReportModel() as any,
     );
@@ -581,7 +587,7 @@ describe('HomeService', () => {
       userInterestModel as any,
       tagModel as any,
       matchModel as any,
-      {} as any,
+      emptyConversationModel() as any,
       {} as any,
       emptyUserReportModel() as any,
     );
@@ -631,7 +637,7 @@ describe('HomeService', () => {
       {} as any,
       {} as any,
       matchModel as any,
-      {} as any,
+      emptyConversationModel() as any,
       {} as any,
       emptyUserReportModel() as any,
     );
@@ -665,7 +671,7 @@ describe('HomeService', () => {
       {} as any,
       {} as any,
       matchModel as any,
-      {} as any,
+      emptyConversationModel() as any,
       {} as any,
       blockedUserReportModel() as any,
     );

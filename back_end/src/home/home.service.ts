@@ -49,6 +49,8 @@ const HOME_DISTANCE_MAX = 200;
 const HOME_DISCOVER_LIMIT_MAX = 200;
 const HOME_DISCOVER_LIMIT_DEFAULT = HOME_DISCOVER_LIMIT_MAX;
 const HOME_JAPANESE_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1', 'Basic', 'Native'];
+const LIKE_RATE_MIN = 60;
+const LIKE_RATE_MAX = 100;
 
 @Injectable()
 export class HomeService {
@@ -263,7 +265,7 @@ export class HomeService {
             uploadedAt: p.uploaded_at,
           })),
           interests,
-          likeRate: profile?.match_rate ?? 100,
+          likeRate: this.displayLikeRate(profile?.match_rate),
           connectionsCount:
             connectionsCountByUserId.get(user._id.toString()) ??
             profile?.connections_count ??
@@ -463,6 +465,14 @@ export class HomeService {
     return filterLevels.includes(normalizedLevel);
   }
 
+  private displayLikeRate(value: unknown) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return 100;
+    }
+
+    return Math.min(LIKE_RATE_MAX, Math.max(LIKE_RATE_MIN, Math.round(value)));
+  }
+
   private async existingDiscoverRelationshipUserIds(
     currentObjectId: Types.ObjectId,
   ) {
@@ -557,32 +567,70 @@ export class HomeService {
       return new Map<string, number>();
     }
 
-    const counts = await this.matchModel
-      .aggregate<{ _id: Types.ObjectId; count: number }>([
-        {
-          $match: {
-            status: 'accepted',
-            $or: [
-              { requester_id: { $in: userIds } },
-              { receiver_id: { $in: userIds } },
-            ],
-          },
-        },
-        {
-          $project: {
-            participants: ['$requester_id', '$receiver_id'],
-          },
-        },
-        { $unwind: '$participants' },
-        { $group: { _id: '$participants', count: { $sum: 1 } } },
-      ])
+    const conversations = await this.conversationModel
+      .find({
+        type: 'direct',
+        participant_ids: { $in: userIds },
+      })
+      .select({ participant_ids: 1 })
+      .lean()
       .exec();
+    const participantIds = this.uniqueObjectIds(
+      conversations.flatMap((conversation) =>
+        (conversation.participant_ids ?? []).map(
+          (participantId: Types.ObjectId) =>
+            new Types.ObjectId(String(participantId)),
+        ),
+      ),
+    );
+    const reports = participantIds.length
+      ? await this.userReportModel
+          .find({
+            reporter_id: { $in: participantIds },
+            reported_user_id: { $in: participantIds },
+          })
+          .select({ reporter_id: 1, reported_user_id: 1 })
+          .lean()
+          .exec()
+      : [];
+    const blockedPairs = new Set(
+      reports.map((report) =>
+        this.connectionPairKey(
+          new Types.ObjectId(String(report.reporter_id)),
+          new Types.ObjectId(String(report.reported_user_id)),
+        ),
+      ),
+    );
+    const targetUserIdSet = new Set(userIds.map((id) => id.toString()));
+    const map = new Map(userIds.map((id) => [id.toString(), 0]));
 
-    const map = new Map<string, number>();
-    for (const row of counts) {
-      map.set(row._id.toString(), row.count);
+    for (const conversation of conversations) {
+      const conversationParticipantIds = (conversation.participant_ids ?? []).map(
+        (participantId: Types.ObjectId) =>
+          new Types.ObjectId(String(participantId)),
+      );
+      if (conversationParticipantIds.length !== 2) {
+        continue;
+      }
+
+      const [firstUserId, secondUserId] = conversationParticipantIds;
+      if (blockedPairs.has(this.connectionPairKey(firstUserId, secondUserId))) {
+        continue;
+      }
+
+      for (const participantId of conversationParticipantIds) {
+        const key = participantId.toString();
+        if (targetUserIdSet.has(key)) {
+          map.set(key, (map.get(key) ?? 0) + 1);
+        }
+      }
     }
+
     return map;
+  }
+
+  private connectionPairKey(firstUserId: Types.ObjectId, secondUserId: Types.ObjectId) {
+    return [firstUserId.toString(), secondUserId.toString()].sort().join(':');
   }
 
   private async ensureDirectConversationParticipants(

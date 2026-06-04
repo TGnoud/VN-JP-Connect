@@ -6,8 +6,8 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
-  Match,
-  MatchDocument,
+  Conversation,
+  ConversationDocument,
   Profile,
   ProfileDocument,
   Tag,
@@ -28,7 +28,10 @@ import {
 } from '../profile/profile-image-storage.service';
 import { MAX_BIO_LENGTH } from '../profile/profile.constants';
 import { isOnlineFromLastSeen } from '../auth/presence';
-import { hasUserReportBlock } from './report-blocking';
+import {
+  countDirectConnectionConversationsExcludingReports,
+  hasUserReportBlock,
+} from './report-blocking';
 
 export const REPORT_EVIDENCE_MAX_FILES = 5;
 export const REPORT_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
@@ -37,6 +40,8 @@ export const REPORT_EVIDENCE_MIME_TYPES = [
   'image/jpeg',
   'application/pdf',
 ];
+const LIKE_RATE_MIN = 60;
+const LIKE_RATE_MAX = 100;
 
 type ReportInput = {
   reason: UserReportReason;
@@ -51,7 +56,8 @@ export class UsersService {
     @InjectModel(UserInterest.name)
     private readonly userInterestModel: Model<UserInterestDocument>,
     @InjectModel(Tag.name) private readonly tagModel: Model<TagDocument>,
-    @InjectModel(Match.name) private readonly matchModel: Model<MatchDocument>,
+    @InjectModel(Conversation.name)
+    private readonly conversationModel: Model<ConversationDocument>,
     @InjectModel(UserReport.name)
     private readonly userReportModel: Model<UserReportDocument>,
     private readonly profileImageStorage: ProfileImageStorageService,
@@ -104,7 +110,7 @@ export class UsersService {
         isMain: photo.is_main,
         uploadedAt: photo.uploaded_at,
       })),
-      likeRate: profile?.match_rate ?? 100,
+      likeRate: this.displayLikeRate(profile?.match_rate),
       connectionsCount,
       joinedAt: targetUser.created_at,
       updatedAt: profile?.updated_at ?? targetUser.created_at,
@@ -215,11 +221,18 @@ export class UsersService {
   }
 
   private async countConnections(userId: Types.ObjectId) {
-    return this.matchModel
-      .countDocuments({
-        status: 'accepted',
-        $or: [{ requester_id: userId }, { receiver_id: userId }],
-      })
-      .exec();
+    return countDirectConnectionConversationsExcludingReports(
+      this.conversationModel,
+      this.userReportModel,
+      userId,
+    );
+  }
+
+  private displayLikeRate(value: unknown) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return 100;
+    }
+
+    return Math.min(LIKE_RATE_MAX, Math.max(LIKE_RATE_MIN, Math.round(value)));
   }
 }

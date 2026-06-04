@@ -99,6 +99,8 @@ const DEMO_EMAIL_PREFIX = 'demo.vn-jp.';
 const DEMO_EMAIL_DOMAIN = '@vn-jp-connect.local';
 const ENRICH_SEED_PREFIX = 'enrich-demo-data';
 const DEFAULT_PASSWORD_HASH = 'local-seed-password-hash';
+const MATCH_RATE_MIN = 60;
+const MATCH_RATE_MAX = 100;
 
 const VN_FAMILIES = [
   'Nguyen',
@@ -731,7 +733,7 @@ function profileForCustomer(
       is_main: photoIndex === 0,
       uploaded_at: now,
     })),
-    matchRate: 72 + ((ordinal * 11) % 29),
+    matchRate: 68 + ((ordinal * 11) % 33),
     connectionsCount: 5 + ((ordinal * 13) % 96),
     interestNames,
   };
@@ -779,6 +781,15 @@ function shouldRefreshBirthDate(user: Document) {
   return age === null || age < 18 || age > 45;
 }
 
+function deficientMatchRate(value: unknown) {
+  return (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    value < MATCH_RATE_MIN ||
+    value > MATCH_RATE_MAX
+  );
+}
+
 function profileNeedsEnrichment(profile: Document | undefined) {
   return (
     !profile ||
@@ -791,7 +802,8 @@ function profileNeedsEnrichment(profile: Document | undefined) {
     profile.photos.length === 0 ||
     deficientText(profile.location) ||
     deficientText(profile.occupation) ||
-    deficientText(profile.education)
+    deficientText(profile.education) ||
+    deficientMatchRate(profile.match_rate)
   );
 }
 
@@ -998,7 +1010,7 @@ function profileUpdateOps(
     if (!existing || typeof existing.age !== 'number' || plan.profileRequiresUpdate) {
       $set.age = plan.age;
     }
-    if (!existing || typeof existing.match_rate !== 'number' || plan.isDemo) {
+    if (!existing || deficientMatchRate(existing.match_rate) || plan.isDemo) {
       $set.match_rate = profile.matchRate;
     }
     if (

@@ -1,6 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
-import { UserReportDocument } from '../database/schemas';
+import {
+  ConversationDocument,
+  MatchDocument,
+  UserReportDocument,
+} from '../database/schemas';
 
 export const USER_REPORT_BLOCKED_MESSAGE =
   'このユーザーとは連絡できません。';
@@ -72,4 +76,40 @@ export async function blockedUserIdSetFor(
       id.toString(),
     ),
   );
+}
+
+export async function countAcceptedConnectionsExcludingReports(
+  matchModel: Model<MatchDocument>,
+  userReportModel: Model<UserReportDocument>,
+  userId: Types.ObjectId,
+) {
+  const blockedUserIds = await blockedUserIdsFor(userReportModel, userId);
+
+  return matchModel
+    .countDocuments({
+      status: 'accepted',
+      $or: [
+        { requester_id: userId, receiver_id: { $nin: blockedUserIds } },
+        { receiver_id: userId, requester_id: { $nin: blockedUserIds } },
+      ],
+    })
+    .exec();
+}
+
+export async function countDirectConnectionConversationsExcludingReports(
+  conversationModel: Model<ConversationDocument>,
+  userReportModel: Model<UserReportDocument>,
+  userId: Types.ObjectId,
+) {
+  const blockedUserIds = await blockedUserIdsFor(userReportModel, userId);
+
+  return conversationModel
+    .countDocuments({
+      type: 'direct',
+      $and: [
+        { participant_ids: userId },
+        { participant_ids: { $nin: blockedUserIds } },
+      ],
+    })
+    .exec();
 }
