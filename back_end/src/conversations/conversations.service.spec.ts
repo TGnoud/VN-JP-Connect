@@ -41,6 +41,8 @@ function blockedUserReportModel() {
 describe('ConversationsService', () => {
   const originalGeminiApiKey = process.env.GEMINI_API_KEY;
   const originalGeminiModel = process.env.GEMINI_TRANSLATE_MODEL;
+  const originalGeminiFallbackModels =
+    process.env.GEMINI_TRANSLATE_FALLBACK_MODELS;
 
   afterEach(() => {
     if (originalGeminiApiKey === undefined) {
@@ -52,6 +54,12 @@ describe('ConversationsService', () => {
       delete process.env.GEMINI_TRANSLATE_MODEL;
     } else {
       process.env.GEMINI_TRANSLATE_MODEL = originalGeminiModel;
+    }
+    if (originalGeminiFallbackModels === undefined) {
+      delete process.env.GEMINI_TRANSLATE_FALLBACK_MODELS;
+    } else {
+      process.env.GEMINI_TRANSLATE_FALLBACK_MODELS =
+        originalGeminiFallbackModels;
     }
     jest.restoreAllMocks();
   });
@@ -163,6 +171,7 @@ describe('ConversationsService', () => {
 
   it('does not return a fake translation when Gemini fails', async () => {
     process.env.GEMINI_API_KEY = 'test-key';
+    process.env.GEMINI_TRANSLATE_FALLBACK_MODELS = '';
     mockGeminiFetch('quota exceeded', false, 429);
     const service = serviceForTranslation();
     const currentUserId = new Types.ObjectId().toString();
@@ -170,6 +179,53 @@ describe('ConversationsService', () => {
     await expect(
       service.translate(currentUserId, { text: 'chào', direction: 'vi-ja' }),
     ).rejects.toThrow('Gemini translation failed: quota exceeded');
+  });
+
+  it('falls back to a lighter Gemini model when the primary model is overloaded', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    process.env.GEMINI_TRANSLATE_MODEL = 'gemini-primary';
+    process.env.GEMINI_TRANSLATE_FALLBACK_MODELS = 'gemini-fallback';
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: jest.fn().mockResolvedValue({
+          error: {
+            message:
+              'This model is currently experiencing high demand. Please try again later.',
+          },
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: 'こんにちは' }],
+              },
+            },
+          ],
+        }),
+      } as any);
+    const service = serviceForTranslation();
+    const currentUserId = new Types.ObjectId().toString();
+
+    await expect(
+      service.translate(currentUserId, { text: 'chào', direction: 'vi-ja' }),
+    ).resolves.toEqual({
+      direction: 'vi-ja',
+      translatedText: 'こんにちは',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-primary:generateContent',
+    );
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-fallback:generateContent',
+    );
   });
 
   it('returns localized language level and partner online state in conversation summaries', async () => {

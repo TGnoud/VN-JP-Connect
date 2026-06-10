@@ -133,6 +133,7 @@ const ALLOWED_AUDIO_EXTENSIONS = new Set([
 ]);
 const FAVORITE_PROMPT_MESSAGE_COUNT = 50;
 const DEFAULT_GEMINI_TRANSLATE_MODEL = 'gemini-3.5-flash';
+const DEFAULT_GEMINI_TRANSLATE_FALLBACK_MODELS = ['gemini-3.1-flash-lite'];
 const MESSAGE_TYPES: MessageType[] = [
   'text',
   'file',
@@ -1604,9 +1605,59 @@ export class ConversationsService {
       );
     }
 
-    const modelName =
+    const modelNames = this.geminiTranslateModels();
+    let lastError: unknown;
+
+    for (const modelName of modelNames) {
+      try {
+        return await this.requestGeminiTranslation(
+          text,
+          direction,
+          apiKey,
+          modelName,
+        );
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (lastError instanceof Error) {
+      throw lastError;
+    }
+
+    throw new BadGatewayException('Gemini translation failed');
+  }
+
+  private geminiTranslateModels() {
+    const primaryModel =
       process.env.GEMINI_TRANSLATE_MODEL?.trim() ||
       DEFAULT_GEMINI_TRANSLATE_MODEL;
+    const fallbackValue = process.env.GEMINI_TRANSLATE_FALLBACK_MODELS;
+    const fallbackModels =
+      fallbackValue === undefined
+        ? DEFAULT_GEMINI_TRANSLATE_FALLBACK_MODELS
+        : fallbackValue
+            .split(',')
+            .map((model) => model.trim())
+            .filter(Boolean);
+    const seen = new Set<string>();
+
+    return [primaryModel, ...fallbackModels].filter((model) => {
+      if (seen.has(model)) {
+        return false;
+      }
+
+      seen.add(model);
+      return true;
+    });
+  }
+
+  private async requestGeminiTranslation(
+    text: string,
+    direction: TranslationDirection,
+    apiKey: string,
+    modelName: string,
+  ) {
     const modelPath = modelName.startsWith('models/')
       ? modelName
       : `models/${modelName}`;
