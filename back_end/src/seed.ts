@@ -146,38 +146,100 @@ async function seedUsers(db: Db, now: Date) {
   return { adminId, vnStudentId, jpStudentId, organizerId };
 }
 
+async function migrateTagNames(db: Db) {
+  const tags = db.collection('tags');
+  const userInterests = db.collection('user_interests');
+  const renames: Array<{ from: string; to: string; type: string }> = [
+    // Originally English interest tags (seed.ts)
+    { from: 'Language Exchange',  to: '言語交換',       type: 'interest' },
+    { from: 'Culture',            to: '文化',           type: 'interest' },
+    // Originally English purpose tags (seed.ts)
+    { from: 'Job Hunting',        to: '就職活動',       type: 'purpose'  },
+    { from: 'Study Abroad',       to: '留学',           type: 'purpose'  },
+    // Same names but as interest type (enrich-demo-data.ts)
+    { from: 'Job Hunting',        to: '就職活動',       type: 'interest' },
+    { from: 'Study Abroad',       to: '留学',           type: 'interest' },
+    // English tags from enrich-demo-data.ts
+    { from: 'Japanese Culture',   to: '日本文化',       type: 'interest' },
+    { from: 'Vietnamese Culture', to: 'ベトナム文化',   type: 'interest' },
+    { from: 'Vietnamese Cuisine', to: 'ベトナム料理',   type: 'interest' },
+    { from: 'Japanese Food',      to: '日本料理',       type: 'interest' },
+    { from: 'Anime',              to: 'アニメ',         type: 'interest' },
+    { from: 'Manga',              to: 'マンガ',         type: 'interest' },
+    { from: 'Travel',             to: '旅行',           type: 'interest' },
+    { from: 'Photography',        to: '写真',           type: 'interest' },
+    { from: 'Coffee',             to: 'コーヒー',       type: 'interest' },
+    { from: 'Books',              to: '読書',           type: 'interest' },
+    { from: 'Movies',             to: '映画',           type: 'interest' },
+    { from: 'Music',              to: '音楽',           type: 'interest' },
+    { from: 'Cooking',            to: '料理',           type: 'interest' },
+    { from: 'Hiking',             to: 'ハイキング',     type: 'interest' },
+    { from: 'Technology',         to: 'テクノロジー',   type: 'interest' },
+    { from: 'Design',             to: 'デザイン',       type: 'interest' },
+    { from: 'Startups',           to: 'スタートアップ', type: 'interest' },
+    { from: 'Volunteering',       to: 'ボランティア',   type: 'interest' },
+    { from: 'Karaoke',            to: 'カラオケ',       type: 'interest' },
+    { from: 'Running',            to: 'ランニング',     type: 'interest' },
+    { from: 'Yoga',               to: 'ヨガ',           type: 'interest' },
+    { from: 'Tea Ceremony',       to: '茶道',           type: 'interest' },
+    { from: 'Calligraphy',        to: '書道',           type: 'interest' },
+    { from: 'Local Events',       to: '地域イベント',   type: 'interest' },
+    { from: 'Career Exchange',    to: 'キャリア交流',   type: 'interest' },
+  ];
+  for (const { from, to, type } of renames) {
+    const oldTag = await tags.findOne({ name: from, type });
+    if (!oldTag) continue;
+    const newTag = await tags.findOne({ name: to, type });
+    if (newTag) {
+      // Japanese tag already exists — delete old English user_interests (user may already have JP tag),
+      // then re-point any remaining refs, then delete old tag
+      const usersWithBoth = await userInterests
+        .find({ tag_id: newTag._id })
+        .map((doc) => doc.user_id)
+        .toArray();
+      if (usersWithBoth.length > 0) {
+        await userInterests.deleteMany({ tag_id: oldTag._id, user_id: { $in: usersWithBoth } });
+      }
+      await userInterests.updateMany({ tag_id: oldTag._id }, { $set: { tag_id: newTag._id } });
+      await tags.deleteOne({ _id: oldTag._id });
+    } else {
+      await tags.updateOne({ _id: oldTag._id }, { $set: { name: to } });
+    }
+  }
+}
+
 async function seedTags(db: Db) {
   const tags = db.collection('tags');
 
   const languageExchangeId = await upsertAndGetId(tags, {
-    name: 'Language Exchange',
+    name: '言語交換',
     type: 'interest',
   }, {
-    name: 'Language Exchange',
+    name: '言語交換',
     type: 'interest',
   });
 
   const jobHuntingId = await upsertAndGetId(tags, {
-    name: 'Job Hunting',
+    name: '就職活動',
     type: 'purpose',
   }, {
-    name: 'Job Hunting',
+    name: '就職活動',
     type: 'purpose',
   });
 
   const cultureId = await upsertAndGetId(tags, {
-    name: 'Culture',
+    name: '文化',
     type: 'interest',
   }, {
-    name: 'Culture',
+    name: '文化',
     type: 'interest',
   });
 
   const studyAbroadId = await upsertAndGetId(tags, {
-    name: 'Study Abroad',
+    name: '留学',
     type: 'purpose',
   }, {
-    name: 'Study Abroad',
+    name: '留学',
     type: 'purpose',
   });
 
@@ -511,6 +573,7 @@ async function seed() {
 
     const db = client.db(databaseName);
     const now = new Date();
+    await migrateTagNames(db);
     const users = await seedUsers(db, now);
     const tags = await seedTags(db);
     await seedProfiles(db, users, now);
