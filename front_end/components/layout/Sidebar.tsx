@@ -55,6 +55,7 @@ export default function Sidebar() {
   const router = useRouter();
   const mountedRef = useRef(false);
   const pathnameRef = useRef(pathname);
+  const [collapsed, setCollapsed] = useState(false);
   const [navSummary, setNavSummary] = useState({
     unreadMessagesCount: 0,
     unreadEventsCount: 0,
@@ -159,16 +160,37 @@ export default function Sidebar() {
   }, []);
 
   return (
-    <aside className="flex flex-col w-56 min-h-screen shrink-0 bg-white border-r border-gray-100">
-      {/* Logo */}
-      <div className="px-5 py-5">
-        <Link href="/discover" className="block">
-          <span className="text-gray-900 font-bold text-sm leading-tight">Connect VN-JP</span>
-        </Link>
+    <aside
+      className="flex flex-col min-h-screen shrink-0 bg-white border-r border-gray-100 overflow-hidden"
+      style={{
+        width: collapsed ? 64 : 224,
+        transition: "width 0.25s cubic-bezier(.4,0,.2,1)",
+      }}
+    >
+      {/* Logo + toggle */}
+      <div className="flex items-center justify-between px-3 py-5" style={{ minHeight: 60 }}>
+        {!collapsed && (
+          <Link href="/discover" className="block px-2">
+            <span className="text-gray-900 font-bold text-sm leading-tight whitespace-nowrap">Connect VN-JP</span>
+          </Link>
+        )}
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
+          title={collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
+          style={{ marginLeft: collapsed ? "auto" : undefined, marginRight: collapsed ? "auto" : undefined }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            {collapsed
+              ? <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              : <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            }
+          </svg>
+        </button>
       </div>
 
       {/* Nav links */}
-      <nav className="flex flex-col gap-1 px-3 flex-1">
+      <nav className="flex flex-col gap-1 px-2 flex-1">
         {NAV_ITEMS.map((item) => {
           const badge =
             item.href === "/chat"
@@ -177,14 +199,15 @@ export default function Sidebar() {
                 ? navSummary.unreadEventsCount
                 : item.badge;
           const isActive =
-          pathname === item.href ||
-          pathname.startsWith(item.href + "/") ||
-          ("extraPaths" in item && (item as { extraPaths: string[] }).extraPaths.some((p) => pathname.startsWith(p)));
+            pathname === item.href ||
+            pathname.startsWith(item.href + "/") ||
+            ("extraPaths" in item && (item as { extraPaths: string[] }).extraPaths.some((p) => pathname.startsWith(p)));
           return (
             <Link
               key={item.href}
               href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
+              title={collapsed ? item.label : undefined}
+              className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
               style={
                 isActive
                   ? { backgroundColor: "#1B4332", color: "#ffffff" }
@@ -197,12 +220,21 @@ export default function Sidebar() {
                 if (!isActive) e.currentTarget.style.backgroundColor = "";
               }}
             >
-              {item.icon}
-              <span>{item.label}</span>
-              {badge > 0 && (
-                <span className="ml-auto text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" style={{ backgroundColor: "#1B4332" }}>
-                  {badge}
-                </span>
+              <span className="relative shrink-0">
+                {item.icon}
+                {badge > 0 && collapsed && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500" />
+                )}
+              </span>
+              {!collapsed && (
+                <>
+                  <span className="whitespace-nowrap">{item.label}</span>
+                  {badge > 0 && (
+                    <span className="ml-auto text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center" style={{ backgroundColor: "#1B4332" }}>
+                      {badge}
+                    </span>
+                  )}
+                </>
               )}
             </Link>
           );
@@ -210,15 +242,16 @@ export default function Sidebar() {
       </nav>
 
       {/* Logout */}
-      <div className="px-3 py-4">
+      <div className="px-2 py-4">
         <button
           onClick={() => { void handleLogout(); }}
+          title={collapsed ? "ログアウト" : undefined}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all w-full"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
           </svg>
-          <span>ログアウト</span>
+          {!collapsed && <span className="whitespace-nowrap">ログアウト</span>}
         </button>
       </div>
     </aside>

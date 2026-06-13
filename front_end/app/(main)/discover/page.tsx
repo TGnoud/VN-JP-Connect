@@ -17,7 +17,7 @@ import type { User, FilterState } from "@/types";
 
 const JP_FILTER_LEVELS = ["N1", "N2", "N3", "N4", "N5", "なし", "母語レベル"] as const;
 
-const FILTER_INTERESTS = ["旅行", "アニメ", "食べ歩き", "写真", "言語学習", "音楽", "映画", "スポーツ", "テクノロジー", "料理"];
+const FILTER_INTERESTS = ["旅行", "言語学習", "料理", "音楽", "アニメ", "映画", "スポーツ", "写真"];
 
 const DEFAULT_FILTER: FilterState = {
   gender: "all",
@@ -154,11 +154,32 @@ function ProfileCard({
 }) {
   const age = calcAge(user.birthDate);
   const displayName = displayProfileName(user.fullName);
+  const [exitAnim, setExitAnim] = React.useState<"skip" | "like" | null>(null);
+
+  function handleSkip() {
+    if (exitAnim) return;
+    setExitAnim("skip");
+    setTimeout(() => { setExitAnim(null); onSkip(); }, 380);
+  }
+
+  function handleLike() {
+    if (exitAnim) return;
+    setExitAnim("like");
+    setTimeout(() => { setExitAnim(null); onLike(); }, 380);
+  }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex w-full" style={{ minHeight: 440 }}>
+    <div
+      className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex w-full"
+      style={{
+        minHeight: 440,
+        transition: "transform 0.35s cubic-bezier(.4,0,.2,1), opacity 0.35s ease",
+        transform: exitAnim === "skip" ? "translateX(-60px) rotate(-2deg)" : exitAnim === "like" ? "translateX(60px) rotate(2deg)" : "none",
+        opacity: exitAnim ? 0 : 1,
+      }}
+    >
       {/* Left: photo */}
-      <div className="relative shrink-0" style={{ width: "44%" }}>
+      <div className="relative shrink-0" style={{ width: "38%" }}>
         <Image
           src={user.avatarUrl}
           alt={displayName}
@@ -179,7 +200,18 @@ function ProfileCard({
       <div className="flex-1 flex flex-col px-8 py-6 gap-5 min-w-0">
         {/* Name & age */}
         <div>
-          <h2 className="text-3xl font-bold text-gray-900 leading-tight">{displayName}, {age}</h2>
+          <div className="flex items-center gap-2 leading-tight">
+            <h2 className="text-3xl font-bold text-gray-900">{displayName}, {age}</h2>
+            {user.gender === "male" && (
+              <span className="text-2xl font-bold" style={{ color: "#3b82f6" }} title="男性">♂</span>
+            )}
+            {user.gender === "female" && (
+              <span className="text-2xl font-bold" style={{ color: "#ec4899" }} title="女性">♀</span>
+            )}
+            {user.gender === "other" && (
+              <span className="text-2xl font-bold" style={{ color: "#8b5cf6" }} title="その他">⚧</span>
+            )}
+          </div>
           <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" />
@@ -226,10 +258,11 @@ function ProfileCard({
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-3 mt-auto">
+        <div className="flex items-stretch gap-3 mt-auto">
           {/* スキップ */}
           <button
-            onClick={onSkip}
+            onClick={handleSkip}
+            disabled={!!exitAnim}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
           >
             <span className="font-bold">×</span> スキップ
@@ -237,6 +270,7 @@ function ProfileCard({
           {/* プロフィール */}
           <button
             onClick={onViewDetail}
+            disabled={!!exitAnim}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -246,17 +280,15 @@ function ProfileCard({
           </button>
           {/* つながる */}
           <button
-            onClick={onLike}
-            className="flex-[1.25] min-w-44 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-white text-sm font-semibold leading-tight transition-colors"
+            onClick={handleLike}
+            disabled={!!exitAnim}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-white text-sm font-semibold transition-colors"
             style={{ backgroundColor: "#1B4332" }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
             </svg>
-            <span className="min-w-0 text-center">
-              <span className="block truncate">{getFirstName(user.fullName)}さんと</span>
-              <span className="block">つながる</span>
-            </span>
+            <span className="truncate">{getFirstName(user.fullName)}さんとつながる</span>
           </button>
         </div>
       </div>
@@ -432,9 +464,12 @@ function FilterPanel({
   const japaneseLevelOptions = filterOptions?.japaneseLevels?.length
     ? filterOptions.japaneseLevels
     : [...JP_FILTER_LEVELS];
-  const interestOptions = filterOptions?.interests?.length
-    ? filterOptions.interests.map((interest) => interest.name)
-    : FILTER_INTERESTS;
+  const isJapaneseName = (name: string) => /[　-鿿＀-￯]/u.test(name);
+  const interestOptions = (
+    filterOptions?.interests?.length
+      ? filterOptions.interests.map((interest) => interest.name).filter(isJapaneseName)
+      : FILTER_INTERESTS
+  ).slice(0, 10);
   const genderOptions = [
     "all",
     ...(filterOptions?.genders?.length

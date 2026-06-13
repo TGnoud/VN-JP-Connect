@@ -13,6 +13,10 @@
   --color-sidebar: #0d1f17;
 }
 
+html {
+  font-size: 106%;
+}
+
 * {
   box-sizing: border-box;
 }
