@@ -200,7 +200,18 @@ function ProfileCard({
       <div className="flex-1 flex flex-col px-8 py-6 gap-5 min-w-0">
         {/* Name & age */}
         <div>
-          <h2 className="text-3xl font-bold text-gray-900 leading-tight">{displayName}, {age}</h2>
+          <div className="flex items-center gap-2 leading-tight">
+            <h2 className="text-3xl font-bold text-gray-900">{displayName}, {age}</h2>
+            {user.gender === "male" && (
+              <span className="text-2xl font-bold" style={{ color: "#3b82f6" }} title="男性">♂</span>
+            )}
+            {user.gender === "female" && (
+              <span className="text-2xl font-bold" style={{ color: "#ec4899" }} title="女性">♀</span>
+            )}
+            {user.gender === "other" && (
+              <span className="text-2xl font-bold" style={{ color: "#8b5cf6" }} title="その他">⚧</span>
+            )}
+          </div>
           <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" />
