@@ -714,6 +714,27 @@ export class ConversationsService {
     await this.assertNoBlockedGroupParticipants([currentObjectId, ...memberIds]);
     await this.assertUsersAreMatched(currentObjectId, memberIds);
 
+    const allParticipantIds = [currentObjectId, ...memberIds];
+    const allParticipantStrings = allParticipantIds.map((id) => id.toString()).sort();
+    const existingGroups = await this.conversationModel
+      .find({ type: 'group', participant_ids: { $all: allParticipantIds, $size: allParticipantIds.length } })
+      .lean()
+      .exec();
+    const duplicate = existingGroups.find((group) => {
+      const groupParticipants = (group.participant_ids as Types.ObjectId[])
+        .map((id) => id.toString())
+        .sort();
+      return (
+        groupParticipants.length === allParticipantStrings.length &&
+        groupParticipants.every((id, i) => id === allParticipantStrings[i])
+      );
+    });
+    if (duplicate) {
+      throw new BadRequestException(
+        '同じメンバーのグループがすでに存在します。',
+      );
+    }
+
     const now = new Date();
     const conversation = await this.conversationModel.create({
       match_id: new Types.ObjectId(),
