@@ -132,8 +132,6 @@ const ALLOWED_AUDIO_EXTENSIONS = new Set([
   '.webm',
 ]);
 const FAVORITE_PROMPT_MESSAGE_COUNT = 50;
-const DEFAULT_GEMINI_TRANSLATE_MODEL = 'gemini-3.5-flash';
-const DEFAULT_GEMINI_TRANSLATE_FALLBACK_MODELS = ['gemini-3.1-flash-lite'];
 const MESSAGE_TYPES: MessageType[] = [
   'text',
   'file',
@@ -787,7 +785,7 @@ export class ConversationsService {
 
     return {
       direction,
-      translatedText: await this.translateWithGemini(text, direction),
+      translatedText: await this.translateWithDeepL(text, direction),
     };
   }
 
@@ -1594,176 +1592,48 @@ export class ConversationsService {
     return uniqueIds;
   }
 
-  private async translateWithGemini(
+  private async translateWithDeepL(
     text: string,
     direction: TranslationDirection,
   ) {
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    const apiKey = process.env.DEEPL_API_KEY?.trim();
     if (!apiKey) {
-      throw new ServiceUnavailableException(
-        'GEMINI_API_KEY is not configured',
-      );
+      throw new ServiceUnavailableException('DEEPL_API_KEY is not configured');
     }
 
-    const modelNames = this.geminiTranslateModels();
-    let lastError: unknown;
+    const sourceLang = direction === 'ja-vi' ? 'JA' : 'VI';
+    const targetLang = direction === 'ja-vi' ? 'VI' : 'JA';
 
-    for (const modelName of modelNames) {
-      try {
-        return await this.requestGeminiTranslation(
-          text,
-          direction,
-          apiKey,
-          modelName,
-        );
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    if (lastError instanceof Error) {
-      throw lastError;
-    }
-
-    throw new BadGatewayException('Gemini translation failed');
-  }
-
-  private geminiTranslateModels() {
-    const primaryModel =
-      process.env.GEMINI_TRANSLATE_MODEL?.trim() ||
-      DEFAULT_GEMINI_TRANSLATE_MODEL;
-    const fallbackValue = process.env.GEMINI_TRANSLATE_FALLBACK_MODELS;
-    const fallbackModels =
-      fallbackValue === undefined
-        ? DEFAULT_GEMINI_TRANSLATE_FALLBACK_MODELS
-        : fallbackValue
-            .split(',')
-            .map((model) => model.trim())
-            .filter(Boolean);
-    const seen = new Set<string>();
-
-    return [primaryModel, ...fallbackModels].filter((model) => {
-      if (seen.has(model)) {
-        return false;
-      }
-
-      seen.add(model);
-      return true;
-    });
-  }
-
-  private async requestGeminiTranslation(
-    text: string,
-    direction: TranslationDirection,
-    apiKey: string,
-    modelName: string,
-  ) {
-    const modelPath = modelName.startsWith('models/')
-      ? modelName
-      : `models/${modelName}`;
-    const sourceLanguage =
-      direction === 'ja-vi' ? 'Japanese' : 'Vietnamese';
-    const targetLanguage =
-      direction === 'ja-vi' ? 'Vietnamese' : 'Japanese';
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [
-              {
-                text:
-                  'You are a precise Japanese-Vietnamese translation engine. ' +
-                  'Return only the translated text. Do not add explanations, labels, markdown, quotes, romanization, alternatives, or notes.',
-              },
-            ],
-          },
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  text:
-                    `Translate from ${sourceLanguage} to ${targetLanguage}.\n` +
-                    `Source language: ${sourceLanguage}\n` +
-                    `Target language: ${targetLanguage}\n` +
-                    'Text:\n' +
-                    text,
-                },
-              ],
-            },
-          ],
-        }),
+    const response = await fetch('https://api-free.deepl.com/v2/translate', {
+      method: 'POST',
+      headers: {
+        Authorization: `DeepL-Auth-Key ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-    );
+      body: JSON.stringify({
+        text: [text],
+        source_lang: sourceLang,
+        target_lang: targetLang,
+      }),
+    });
 
     const body = (await response.json().catch(() => null)) as
       | Record<string, any>
       | null;
 
     if (!response.ok) {
-      const message =
-        body?.error?.message ??
-        body?.message ??
-        `HTTP ${response.status}`;
-      throw new BadGatewayException(`Gemini translation failed: ${message}`);
+      const message = body?.message ?? `HTTP ${response.status}`;
+      throw new BadGatewayException(`DeepL translation failed: ${message}`);
     }
 
-    const rawText = this.extractGeminiText(body);
-    const translatedText = this.normalizeGeminiTranslation(rawText);
+    const translatedText: string =
+      body?.translations?.[0]?.text?.trim() ?? '';
 
     if (!translatedText) {
-      throw new BadGatewayException('Gemini translation returned empty text');
+      throw new BadGatewayException('DeepL translation returned empty text');
     }
 
     return translatedText;
-  }
-
-  private extractGeminiText(body: Record<string, any> | null) {
-    const parts = body?.candidates?.[0]?.content?.parts;
-
-    if (!Array.isArray(parts)) {
-      return '';
-    }
-
-    return parts
-      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
-      .join('')
-      .trim();
-  }
-
-  private normalizeGeminiTranslation(value: string) {
-    let text = value.trim();
-
-    text = text
-      .replace(/^```[\w-]*\s*/u, '')
-      .replace(/\s*```$/u, '')
-      .trim();
-
-    const labelPatterns = [
-      /^translation\s*[:：]\s*/iu,
-      /^translated text\s*[:：]\s*/iu,
-      /^翻訳\s*[:：]\s*/iu,
-      /^日本語訳?\s*[:：]\s*/iu,
-      /^ベトナム語訳?\s*[:：]\s*/iu,
-      /^japanese\s*[:：]\s*/iu,
-      /^vietnamese\s*[:：]\s*/iu,
-      /^\[(?:JP|VI)\]\s*/iu,
-    ];
-
-    for (const pattern of labelPatterns) {
-      text = text.replace(pattern, '').trim();
-    }
-
-    return text
-      .replace(/^["'“”「『]+/u, '')
-      .replace(/["'“”」』]+$/u, '')
-      .trim();
   }
 
   private objectIdFromParam(value: string, name: string) {

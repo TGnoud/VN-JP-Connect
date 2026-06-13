@@ -1569,7 +1569,8 @@ export default function ChatPage() {
           </div>
           <button
             onClick={handleHeaderProfileClick}
-            disabled={!isActiveGroup && !activeRoom.partnerId}
+            disabled={!isActiveGroup && !activeRoom.partnerId ? true : undefined}
+            suppressHydrationWarning
             className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-40"
           >
             {isActiveGroup ? (
