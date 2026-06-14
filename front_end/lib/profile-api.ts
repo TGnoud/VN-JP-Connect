@@ -129,6 +129,7 @@ export interface ChatConversation {
   participants: ChatParticipant[];
   createdAt: string;
   updatedAt: string;
+  createdBy?: string | null;
 }
 
 export interface ChatAttachment {
@@ -539,6 +540,16 @@ export function leaveGroupConversation(conversationId: string) {
     left: boolean;
     remainingParticipantCount: number;
   }>(`/conversations/${conversationId}/leave`, {
+    method: "POST",
+  });
+}
+
+export function kickGroupMember(conversationId: string, memberId: string) {
+  return requestApi<{
+    conversationId: string;
+    kickedMemberId: string;
+    remainingParticipantCount: number;
+  }>(`/conversations/${conversationId}/kick/${memberId}`, {
     method: "POST",
   });
 }

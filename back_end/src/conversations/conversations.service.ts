@@ -794,6 +794,69 @@ export class ConversationsService {
     };
   }
 
+  async kickMember(
+    currentUserId: string,
+    conversationId: string,
+    memberId: string,
+  ) {
+    const currentObjectId = this.objectIdFromParam(
+      currentUserId,
+      'currentUserId',
+    );
+    const memberObjectId = this.objectIdFromParam(memberId, 'memberId');
+    const conversation = await this.requireConversationAccess(
+      currentObjectId,
+      conversationId,
+    );
+
+    if (conversation.type !== 'group') {
+      throw new BadRequestException(
+        'only members in group conversations can be kicked',
+      );
+    }
+
+    if (
+      !conversation.created_by ||
+      !conversation.created_by.equals(currentObjectId)
+    ) {
+      throw new ForbiddenException('only the group owner can kick members');
+    }
+
+    if (currentObjectId.equals(memberObjectId)) {
+      throw new BadRequestException(
+        'you cannot kick yourself, use leaveGroup instead',
+      );
+    }
+
+    const isMemberParticipant = conversation.participant_ids.some(
+      (participantId: Types.ObjectId) => participantId.equals(memberObjectId),
+    );
+
+    if (!isMemberParticipant) {
+      throw new BadRequestException('user is not a participant of this group');
+    }
+
+    const remainingParticipantCount = conversation.participant_ids.filter(
+      (participantId: Types.ObjectId) => !participantId.equals(memberObjectId),
+    ).length;
+
+    await this.conversationModel
+      .updateOne(
+        { _id: conversation._id },
+        {
+          $pull: { participant_ids: memberObjectId },
+          $set: { updated_at: new Date() },
+        },
+      )
+      .exec();
+
+    return {
+      conversationId: conversation._id.toString(),
+      kickedMemberId: memberId,
+      remainingParticipantCount,
+    };
+  }
+
   async translate(currentUserId: string, payload: TranslatePayload) {
     this.objectIdFromParam(currentUserId, 'currentUserId');
     const text = this.requiredTrimmedString(
@@ -1230,6 +1293,7 @@ export class ConversationsService {
       type: conversation.type ?? 'direct',
       matchId: isGroup ? null : (conversation.match_id?.toString?.() ?? null),
       partnerId: isGroup ? null : (primaryPartner?.id ?? null),
+      createdBy: conversation.created_by?.toString() ?? undefined,
       name,
       location: isGroup
         ? `${participants.length} members`
