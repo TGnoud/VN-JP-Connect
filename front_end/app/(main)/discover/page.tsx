@@ -203,13 +203,13 @@ function ProfileCard({
           <div className="flex items-center gap-2 leading-tight">
             <h2 className="text-3xl font-bold text-gray-900">{displayName}, {age}</h2>
             {user.gender === "male" && (
-              <span className="text-2xl font-bold" style={{ color: "#3b82f6" }} title="男性">♂</span>
+              <span className="flex items-center justify-center bg-blue-100 text-blue-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="男性">♂ 男性</span>
             )}
             {user.gender === "female" && (
-              <span className="text-2xl font-bold" style={{ color: "#ec4899" }} title="女性">♀</span>
+              <span className="flex items-center justify-center bg-pink-100 text-pink-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="女性">♀ 女性</span>
             )}
             {user.gender === "other" && (
-              <span className="text-2xl font-bold" style={{ color: "#8b5cf6" }} title="その他">⚧</span>
+              <span className="flex items-center justify-center bg-purple-100 text-purple-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="その他">⚧ その他</span>
             )}
           </div>
           <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-2">
@@ -234,22 +234,22 @@ function ProfileCard({
         <div className="flex gap-6">
           {/* 話せる言語 */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-500 mb-2">話せる言語</p>
+            <p className="text-base font-semibold text-gray-500 mb-2">話せる言語</p>
             <div className="flex flex-col gap-2">
               <div className="flex gap-2 flex-wrap">
-                <span className="text-sm px-3 py-1 rounded-full bg-green-100 text-green-700 font-bold">日本語</span>
-                <span className="text-sm px-3 py-1 rounded-full bg-green-100 text-green-700 font-bold">{user.japaneseLevel}</span>
+                <span className="text-base px-4 py-2 rounded-full bg-green-100 text-green-700 font-bold">日本語</span>
+                <span className="text-base px-4 py-2 rounded-full bg-green-100 text-green-700 font-bold">{user.japaneseLevel}</span>
               </div>
-              <span className="text-sm px-3 py-1 rounded-full bg-green-100 text-green-700 font-bold w-fit">ベトナム語（{user.vietnameseLevel}）</span>
+              <span className="text-base px-4 py-2 rounded-full bg-green-100 text-green-700 font-bold w-fit">ベトナム語（{user.vietnameseLevel}）</span>
             </div>
           </div>
 
           {/* 興味・関心 */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-500 mb-2">興味・関心</p>
+            <p className="text-base font-semibold text-gray-500 mb-2">興味・関心</p>
             <div className="grid grid-cols-2 gap-2">
               {user.interests.slice(0, 4).map((i) => (
-                <span key={i} className="text-sm text-gray-700 rounded-md px-3 py-1.5 text-center truncate" style={{ backgroundColor: "#DDDDDD" }}>
+                <span key={i} className="text-base text-gray-700 rounded-md px-4 py-2 text-center truncate" style={{ backgroundColor: "#DDDDDD" }}>
                   {i}
                 </span>
               ))}
@@ -484,7 +484,7 @@ function FilterPanel({
   };
 
   return (
-    <div className="w-80 xl:w-96 shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-hidden">
+    <div className="w-72 xl:w-80 shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
         <span className="text-sm font-semibold text-gray-900">フィルター</span>

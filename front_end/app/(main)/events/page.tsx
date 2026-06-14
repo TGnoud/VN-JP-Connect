@@ -11,6 +11,7 @@ import {
   type UserEventData,
   type UserEventParticipantPreview,
 } from "@/lib/events-api";
+import { getConversations, sendConversationMessage, type ChatConversation } from "@/lib/profile-api";
 
 type EventCategory = string;
 
@@ -130,6 +131,7 @@ const INITIAL_EVENTS: EventItem[] = [
 const AVATAR_SEEDS = ["hiroshi", "minhanh", "yuki", "kenji", "linh", "duc", "sakura"];
 
 const SHARE_OPTIONS = [
+  { label: "チャット", bg: "#1B4332", text: "💬" },
   { label: "LINE", bg: "#06C755", text: "L" },
   { label: "Facebook", bg: "#1877F2", text: "f" },
   { label: "X (Twitter)", bg: "#000000", text: "X" },
@@ -284,10 +286,12 @@ function ShareDropdown({
   eventTitle,
   shareUrl,
   onClose,
+  onShareViaChat,
 }: {
   eventTitle: string;
   shareUrl: string;
   onClose: () => void;
+  onShareViaChat?: (url: string, title: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
@@ -322,6 +326,12 @@ function ShareDropdown({
   }
 
   function handleShare(label: string) {
+    if (label === "チャット") {
+      onShareViaChat?.(absoluteShareUrl(), eventTitle);
+      onClose();
+      return;
+    }
+
     const url = encodeURIComponent(absoluteShareUrl());
     const title = encodeURIComponent(eventTitle);
     const shareTargets: Record<string, string> = {
@@ -481,10 +491,12 @@ function EventDetail({
   event,
   onToggleJoin,
   onToggleBookmark,
+  onShareViaChat,
 }: {
   event: EventItem;
   onToggleJoin: (id: string) => void;
   onToggleBookmark: (id: string) => void;
+  onShareViaChat: (url: string, title: string) => void;
 }) {
   const [showShare, setShowShare] = useState(false);
   const spotsLeft = Math.max(event.maxParticipants - event.currentParticipants, 0);
@@ -565,6 +577,7 @@ function EventDetail({
                 eventTitle={event.title}
                 shareUrl={event.shareUrl}
                 onClose={() => setShowShare(false)}
+                onShareViaChat={onShareViaChat}
               />
             )}
           </div>
@@ -678,6 +691,83 @@ function EventDetail({
   );
 }
 
+function ShareViaChatModal({
+  url,
+  title,
+  onClose,
+}: {
+  url: string;
+  title: string;
+  onClose: () => void;
+}) {
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getConversations().then((data) => {
+      setConversations(data.conversations);
+      setLoading(false);
+    }).catch((err) => {
+      console.error(err);
+      setLoading(false);
+    });
+  }, []);
+
+  async function handleSend(convId: string) {
+    setSendingId(convId);
+    try {
+      await sendConversationMessage(convId, { content: `イベントを見てみてください: ${url}` });
+      alert("チャットで送信しました！");
+      onClose();
+    } catch (err) {
+      alert("送信に失敗しました");
+    } finally {
+      setSendingId(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-bold text-gray-900">チャットで送信</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold px-2 py-1 leading-none rounded hover:bg-gray-100">&times;</button>
+        </div>
+        <div className="p-4 overflow-y-auto flex-1">
+          {loading ? (
+            <p className="text-sm text-gray-500 text-center py-4">読み込み中...</p>
+          ) : conversations.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">チャットがありません</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {conversations.map((conv) => (
+                <div key={conv.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0">
+                    <img src={conv.avatar || `https://api.dicebear.com/7.x/personas/svg?seed=${conv.id}`} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{conv.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{conv.lastMessage || "メッセージを送る"}</p>
+                  </div>
+                  <button
+                    onClick={() => handleSend(conv.id)}
+                    disabled={sendingId === conv.id}
+                    className="px-4 py-1.5 rounded-full text-xs font-bold text-white transition-colors shrink-0"
+                    style={{ backgroundColor: sendingId === conv.id ? "#9ca3af" : "#1B4332" }}
+                  >
+                    {sendingId === conv.id ? "送信中" : "送信"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const CATEGORY_FILTERS = ["すべて", "文化交流", "料理", "言語学習", "ワークショップ"] as const;
 type CategoryFilter = (typeof CATEGORY_FILTERS)[number];
 
@@ -694,6 +784,7 @@ export default function EventsPage() {
   const [pendingEventIds, setPendingEventIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [shareChatData, setShareChatData] = useState<{ url: string; title: string } | null>(null);
 
   const selectedEvent = events.find((e) => e.id === selectedId) ?? events[0];
   const filteredEvents = showBookmarkedOnly ? events.filter((e) => e.isBookmarked) : events;
@@ -960,9 +1051,18 @@ export default function EventsPage() {
               event={selectedEvent}
               onToggleJoin={handleToggleJoin}
               onToggleBookmark={handleToggleBookmark}
+              onShareViaChat={(url, title) => setShareChatData({ url, title })}
             />
           )}
         </div>
+      )}
+
+      {shareChatData && (
+        <ShareViaChatModal
+          url={shareChatData.url}
+          title={shareChatData.title}
+          onClose={() => setShareChatData(null)}
+        />
       )}
     </div>
   );

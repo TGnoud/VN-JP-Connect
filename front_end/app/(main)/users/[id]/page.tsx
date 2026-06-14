@@ -672,7 +672,18 @@ export default function UserDetailPage() {
               {/* Name + buttons: start cleanly in white section */}
               <div className="flex flex-1 items-start justify-between gap-2 mt-2">
                 <div className="min-w-0">
-                  <h1 className="text-xl font-bold text-gray-900 leading-tight">{user.fullName}</h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-gray-900 leading-tight">{user.fullName}</h1>
+                    {user.gender === "male" && (
+                      <span className="flex items-center justify-center bg-blue-100 text-blue-600 rounded-full px-2 py-0.5 text-xs font-bold shadow-sm" title="男性">♂ 男性</span>
+                    )}
+                    {user.gender === "female" && (
+                      <span className="flex items-center justify-center bg-pink-100 text-pink-600 rounded-full px-2 py-0.5 text-xs font-bold shadow-sm" title="女性">♀ 女性</span>
+                    )}
+                    {user.gender === "other" && (
+                      <span className="flex items-center justify-center bg-purple-100 text-purple-600 rounded-full px-2 py-0.5 text-xs font-bold shadow-sm" title="その他">⚧ その他</span>
+                    )}
+                  </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-0.5">
                     <span className="flex items-center gap-1"><PinIcon />{user.location}</span>
                     <span className="flex items-center gap-1"><BriefcaseIcon />{user.occupation}</span>
@@ -723,8 +734,8 @@ export default function UserDetailPage() {
           {/* 自己紹介 */}
           {user.bio && (
             <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <p className="text-xs text-gray-400 mb-1.5">自己紹介</p>
-              <p className="text-sm text-gray-700 leading-relaxed">{user.bio}</p>
+              <p className="text-sm text-gray-400 mb-1.5">自己紹介</p>
+              <p className="text-base text-gray-700 leading-relaxed">{user.bio}</p>
             </div>
           )}
 
@@ -737,8 +748,8 @@ export default function UserDetailPage() {
             <div className="grid grid-cols-4 gap-2">
               {infoItems.map((item) => (
                 <div key={item.label} className="bg-gray-50 rounded-lg p-2.5 text-center">
-                  <p className="text-xs text-gray-400 mb-1">{item.label}</p>
-                  <p className="text-xs font-semibold text-gray-800">{item.value}</p>
+                  <p className="text-sm text-gray-400 mb-1">{item.label}</p>
+                  <p className="text-base font-semibold text-gray-800">{item.value}</p>
                 </div>
               ))}
             </div>
@@ -759,19 +770,19 @@ export default function UserDetailPage() {
                     ? { color: "#c2410c", borderColor: "#fed7aa", backgroundColor: "#fff7ed" }
                     : { color: "#1d4ed8", borderColor: "#bfdbfe", backgroundColor: "#eff6ff" };
                 return (
-                  <div key={l.name} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  <div key={l.name} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
                     {l.useFlag ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={l.flagSrc} alt={l.name} className="w-5 h-auto rounded-sm shrink-0" />
                     ) : (
                       <span style={{ color: l.dotColor }} className="text-sm leading-none shrink-0">●</span>
                     )}
-                    <span className="text-xs font-semibold text-gray-800">{l.name}</span>
+                    <span className="text-base font-semibold text-gray-800">{l.name}</span>
                     <div className="flex flex-col items-start gap-0.5">
-                      <span className="text-xs font-bold px-1.5 py-0.5 rounded border leading-tight" style={badgeStyle}>
+                      <span className="text-base font-bold px-1.5 py-0.5 rounded border leading-tight" style={badgeStyle}>
                         {l.level}
                       </span>
-                      {l.sub && <span className="text-xs text-gray-400">{l.sub}</span>}
+                      {l.sub && <span className="text-sm text-gray-400">{l.sub}</span>}
                     </div>
                   </div>
                 );
@@ -786,9 +797,9 @@ export default function UserDetailPage() {
                 <HeartIcon />
                 <h2 className="text-sm font-semibold text-gray-900">趣味・関心</h2>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {user.interests.map((interest) => (
-                  <span key={interest.id} className="text-xs px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
+                  <span key={interest.id} className="text-base px-4 py-2 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium">
                     {interest.name}
                   </span>
                 ))}

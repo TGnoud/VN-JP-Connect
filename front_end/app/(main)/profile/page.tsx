@@ -1150,7 +1150,18 @@ export default function ProfilePage() {
 
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">{profile.fullName}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-bold text-gray-900">{profile.fullName}</h2>
+                  {profile.gender === "男性" && (
+                    <span className="flex items-center justify-center bg-blue-100 text-blue-600 rounded-full px-2 py-0.5 text-xs font-bold shadow-sm" title="男性">♂ 男性</span>
+                  )}
+                  {profile.gender === "女性" && (
+                    <span className="flex items-center justify-center bg-pink-100 text-pink-600 rounded-full px-2 py-0.5 text-xs font-bold shadow-sm" title="女性">♀ 女性</span>
+                  )}
+                  {profile.gender === "その他" && (
+                    <span className="flex items-center justify-center bg-purple-100 text-purple-600 rounded-full px-2 py-0.5 text-xs font-bold shadow-sm" title="その他">⚧ その他</span>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mt-2">
                   <span className="flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" /></svg>
@@ -1195,18 +1206,18 @@ export default function ProfilePage() {
           <div className="grid grid-cols-4 gap-3 mb-4">
             {INFO_FIELDS.map((item) => (
               <div key={item.label} className="bg-gray-50 rounded-lg p-3.5 min-w-0">
-                <div className="flex items-center gap-1 mb-1">{item.icon}<p className="text-xs text-gray-400">{item.label}</p></div>
-                <p className="text-sm font-medium text-gray-800 truncate">{item.value}</p>
+                <div className="flex items-center gap-1 mb-1">{item.icon}<p className="text-sm text-gray-400">{item.label}</p></div>
+                <p className="text-base font-medium text-gray-800 truncate">{item.value}</p>
               </div>
             ))}
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-700 mb-2">SNSリンク</p>
+            <p className="text-sm font-semibold text-gray-700 mb-2">SNSリンク</p>
             <div className="grid grid-cols-3 gap-3">
               {SNS_FIELDS.map((s) => (
                 <div key={s.label} className="bg-gray-50 rounded-lg p-3.5 min-w-0">
-                  <div className="flex items-center gap-1 mb-1">{s.icon}<p className="text-xs text-gray-400">{s.label}</p></div>
-                  <p className="text-sm font-medium text-gray-800 truncate">{s.value}</p>
+                  <div className="flex items-center gap-1 mb-1">{s.icon}<p className="text-sm text-gray-400">{s.label}</p></div>
+                  <p className="text-base font-medium text-gray-800 truncate">{s.value}</p>
                 </div>
               ))}
             </div>
@@ -1225,8 +1236,8 @@ export default function ProfilePage() {
                 ) : (
                   <span style={{ color: l.dotColor }} className="text-sm leading-none shrink-0">●</span>
                 )}
-                <span className="text-sm font-semibold text-gray-800">{l.name}</span>
-                <span className="text-sm font-bold px-2 py-0.5 rounded border" style={{ color: "#1B4332", borderColor: "#bbf7d0", backgroundColor: "#f0fdf4" }}>
+                <span className="text-base font-semibold text-gray-800">{l.name}</span>
+                <span className="text-base font-bold px-2.5 py-1 rounded border" style={{ color: "#1B4332", borderColor: "#bbf7d0", backgroundColor: "#f0fdf4" }}>
                   {l.level}
                 </span>
               </div>
@@ -1237,20 +1248,20 @@ export default function ProfilePage() {
         {/* ── 趣味 ── */}
         <SectionCard>
           <SectionHeader title="趣味" action={<EditBtn onClick={() => setModal("selectInterests")} />} />
-          <p className="text-xs text-gray-500 mb-2">選択されている趣味({interests.length}):</p>
-          <div className="flex flex-wrap gap-1.5 mb-3">
+          <p className="text-sm text-gray-500 mb-3">選択されている趣味({interests.length}):</p>
+          <div className="flex flex-wrap gap-2 mb-4">
             {interests.map((i) => (
-              <span key={i} className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: "#1B4332" }}>
+              <span key={i} className="flex items-center gap-1.5 text-base font-medium px-4 py-2 rounded-full text-white" style={{ backgroundColor: "#1B4332" }}>
                 {i}
                 <button onClick={() => { void removeInterest(i).catch((error) => { console.error(error); alert(errorMessage(error)); }); }} className="ml-0.5 opacity-80 hover:opacity-100 leading-none">×</button>
               </span>
             ))}
-            <button onClick={() => setModal("selectInterests")} className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">+ 追加</button>
+            <button onClick={() => setModal("selectInterests")} className="text-base font-medium px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">+ 追加</button>
           </div>
-          <p className="text-xs text-gray-500 mb-2">おすすめ</p>
-          <div className="flex flex-wrap gap-1.5">
+          <p className="text-sm text-gray-500 mb-3">おすすめ</p>
+          <div className="flex flex-wrap gap-2">
             {ALL_INTERESTS.slice(8, 13).filter((s) => !interests.includes(s)).map((s) => (
-              <button key={s} onClick={() => { void addRecommendedInterest(s).catch((error) => { console.error(error); alert(errorMessage(error)); }); }} className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+              <button key={s} onClick={() => { void addRecommendedInterest(s).catch((error) => { console.error(error); alert(errorMessage(error)); }); }} className="text-base font-medium px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
                 + {s}
               </button>
             ))}

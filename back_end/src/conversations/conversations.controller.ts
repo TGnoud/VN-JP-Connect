@@ -51,6 +51,19 @@ export class ConversationsController {
     return this.conversationsService.leaveGroup(currentUserId, conversationId);
   }
 
+  @Post(':conversationId/kick/:memberId')
+  kickMember(
+    @CurrentUserId() currentUserId: string,
+    @Param('conversationId') conversationId: string,
+    @Param('memberId') memberId: string,
+  ) {
+    return this.conversationsService.kickMember(
+      currentUserId,
+      conversationId,
+      memberId,
+    );
+  }
+
   @Post('translate')
   translate(
     @CurrentUserId() currentUserId: string,

@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
+import { getStoredUserId } from "@/lib/auth-api";
 import {
   createGroupConversation,
   getConversationMessages,
   getConversations,
   getMatchedConversationUsers,
   leaveGroupConversation,
+  kickGroupMember,
   markConversationRead,
   resolveMediaUrl,
   sendConversationAttachment,
@@ -42,6 +44,7 @@ interface MockRoom {
   lastMessageAt?: string;
   unread: number;
   participants?: ChatParticipant[];
+  createdBy?: string | null;
 }
 
 interface Msg {
@@ -234,6 +237,7 @@ function mapConversation(conversation: ChatConversation): MockRoom {
     lastMessageAt: conversation.lastMessageAt,
     unread: conversation.unreadCount,
     participants: conversation.participants,
+    createdBy: conversation.createdBy,
   };
 }
 
@@ -518,6 +522,27 @@ function MessageStatusIcon({ status }: { status: Msg["status"] }) {
   );
 }
 
+function renderMessageContent(content: string, isMe: boolean) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = content.split(urlRegex);
+  return parts.map((part, i) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noreferrer"
+          className={clsx("underline transition-colors break-all", isMe ? "text-green-200 hover:text-green-100" : "text-blue-600 hover:text-blue-700")}
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 function MsgBubble({
   msg,
   onTranslate,
@@ -543,7 +568,7 @@ function MsgBubble({
           className={clsx("px-4 py-2.5 rounded-2xl text-sm leading-relaxed", isMe ? "text-white rounded-br-sm" : "bg-white text-gray-800 rounded-bl-sm shadow-sm")}
           style={isMe ? { backgroundColor: "#1B4332" } : undefined}
         >
-          {showText && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+          {showText && <p className="whitespace-pre-wrap break-words">{renderMessageContent(msg.content, isMe)}</p>}
           {hasAttachments && (
             <div className="flex flex-col gap-2">
               {attachments.map((attachment) => (
@@ -677,6 +702,7 @@ export default function ChatPage() {
   const [search, setSearch] = useState("");
   const [translations, setTranslations] = useState<Record<string, TranslationState>>({});
   const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [groupModal, setGroupModal] = useState<GroupModalState>({
     open: false,
     name: "",
@@ -727,6 +753,7 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
+    setCurrentUserId(getStoredUserId());
     activeRoomIdRef.current = activeRoomId;
   }, [activeRoomId]);
 
@@ -1398,6 +1425,28 @@ export default function ChatPage() {
     }
   }
 
+  async function handleKickMember(memberId: string) {
+    if (!activeRoomId || !isActiveGroup) return;
+    if (!window.confirm("このメンバーをグループから削除しますか？")) return;
+
+    try {
+      await kickGroupMember(activeRoomId, memberId);
+      
+      setRooms((prev) => prev.map((room) => {
+        if (room.id === activeRoomId) {
+          return {
+            ...room,
+            participants: (room.participants ?? []).filter((p) => p.id !== memberId)
+          };
+        }
+        return room;
+      }));
+    } catch (error) {
+      console.error(error);
+      window.alert(error instanceof Error ? error.message : "メンバーを削除できませんでした。");
+    }
+  }
+
   async function handleFavoriteFeedbackLike() {
     if (!activeFeedbackConversationId || isSubmittingFeedback) return;
 
@@ -1775,13 +1824,16 @@ export default function ChatPage() {
               {activeParticipants.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-gray-400">メンバーがいません</div>
               ) : (
-                activeParticipants.map((member) => (
-                  <button
-                    key={member.id}
-                    onClick={() => router.push(`/users/${member.id}`)}
-                    className="flex w-full items-center gap-3 px-3 py-3 text-left hover:bg-gray-50 transition-colors"
-                  >
-                    <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-200">
+                activeParticipants.map((member) => {
+                  const isOwner = member.id === activeRoom.createdBy;
+                  const canKick = currentUserId === activeRoom.createdBy && !isOwner;
+                  
+                  return (
+                  <div key={member.id} className="flex w-full items-center gap-3 px-3 py-3 hover:bg-gray-50 transition-colors">
+                    <button
+                      onClick={() => router.push(`/users/${member.id}`)}
+                      className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-200 focus:outline-none"
+                    >
                       <Image
                         src={resolveMediaUrl(member.avatarUrl, 160) || EMPTY_ROOM.avatar}
                         alt={member.fullName}
@@ -1789,18 +1841,39 @@ export default function ChatPage() {
                         className="object-cover"
                         unoptimized
                       />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-gray-900">{member.fullName}</span>
+                    </button>
+                    <button
+                      onClick={() => router.push(`/users/${member.id}`)}
+                      className="min-w-0 flex-1 text-left focus:outline-none"
+                    >
+                      <span className="flex items-center gap-1.5 truncate text-sm font-semibold text-gray-900">
+                        {member.fullName}
+                        {isOwner && <span title="グループ作成者" className="text-amber-400">👑</span>}
+                      </span>
                       <span className="block truncate text-xs text-gray-400">
                         {[member.location, member.level].filter(Boolean).join(" · ")}
                       </span>
-                    </span>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                    </svg>
-                  </button>
-                ))
+                    </button>
+                    
+                    {canKick ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void handleKickMember(member.id); }}
+                        className="shrink-0 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                      >
+                        削除
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => router.push(`/users/${member.id}`)}
+                        className="shrink-0 focus:outline-none"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )})
               )}
             </div>
 
