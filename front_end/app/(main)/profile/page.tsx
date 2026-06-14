@@ -322,6 +322,15 @@ const LANG_OPTIONS = [
   { name: "フランス語", useFlag: true,  flagSrc: "https://flagcdn.com/20x15/fr.png",  dotColor: "" },
   { name: "スペイン語", useFlag: true,  flagSrc: "https://flagcdn.com/20x15/es.png",  dotColor: "" },
 ];
+const LANG_LEVELS: Record<string, string[]> = {
+  "日本語":     ["母語", "N1", "N2", "N3", "N4", "N5"],
+  "ベトナム語": ["母語", "C2", "C1", "B2", "B1", "A2", "A1", "Basic"],
+  "英語":       ["母語", "C2", "C1", "B2", "B1", "A2", "A1", "IELTS 7.0", "IELTS 6.5", "Basic"],
+  "中国語":     ["母語", "HSK 6", "HSK 5", "HSK 4", "HSK 3", "HSK 2", "HSK 1", "Basic"],
+  "韓国語":     ["母語", "TOPIK 6", "TOPIK 5", "TOPIK 4", "TOPIK 3", "TOPIK 2", "TOPIK 1", "Basic"],
+  "フランス語": ["母語", "C2", "C1", "B2", "B1", "A2", "A1", "Basic"],
+  "スペイン語": ["母語", "C2", "C1", "B2", "B1", "A2", "A1", "Basic"],
+};
 const LEVEL_OPTIONS = ["母語", "N1", "N2", "N3", "N4", "N5", "Basic", "A1", "A2", "B1", "B2", "C1", "C2", "IELTS 7.0", "IELTS 6.5"];
 
 type LangEntry = typeof LANGUAGES[0];
@@ -457,6 +466,12 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
   const [list, setList] = useState<LangEntry[]>([...current]);
   const [newLang, setNewLang] = useState("");
   const [newLevel, setNewLevel] = useState("");
+  const levelOptions = newLang ? (LANG_LEVELS[newLang] ?? LEVEL_OPTIONS) : [];
+
+  function handleLangChange(lang: string) {
+    setNewLang(lang);
+    setNewLevel("");
+  }
 
   function removeLang(name: string) {
     setList((arr) => arr.filter((l) => l.name !== name));
@@ -504,7 +519,7 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1.5 block">言語</label>
             <div className="relative">
-              <select value={newLang} onChange={(e) => setNewLang(e.target.value)} className={`${selectCls} ${!newLang ? "text-gray-400" : "text-gray-800"}`}>
+              <select value={newLang} onChange={(e) => handleLangChange(e.target.value)} className={`${selectCls} ${!newLang ? "text-gray-400" : "text-gray-800"}`}>
                 <option value="">選択...</option>
                 {LANG_OPTIONS.filter((o) => !list.some((l) => l.name === o.name)).map((o) => (
                   <option key={o.name} value={o.name}>{o.name}</option>
@@ -516,9 +531,14 @@ function EditLanguagesModal({ current, onClose, onSave }: { current: LangEntry[]
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1.5 block">レベル</label>
             <div className="relative">
-              <select value={newLevel} onChange={(e) => setNewLevel(e.target.value)} className={`${selectCls} ${!newLevel ? "text-gray-400" : "text-gray-800"}`}>
-                <option value="">選択...</option>
-                {LEVEL_OPTIONS.map((lv) => (
+              <select
+                value={newLevel}
+                onChange={(e) => setNewLevel(e.target.value)}
+                disabled={!newLang}
+                className={`${selectCls} ${!newLevel ? "text-gray-400" : "text-gray-800"} ${!newLang ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <option value="">{newLang ? "選択..." : "言語を先に選択"}</option>
+                {levelOptions.map((lv) => (
                   <option key={lv} value={lv}>{lv}</option>
                 ))}
               </select>

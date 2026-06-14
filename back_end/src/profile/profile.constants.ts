@@ -35,6 +35,18 @@ export const PROFILE_LANGUAGE_LEVEL_OPTIONS = [
   'C2',
   'IELTS 6.5',
   'IELTS 7.0',
+  'HSK 1',
+  'HSK 2',
+  'HSK 3',
+  'HSK 4',
+  'HSK 5',
+  'HSK 6',
+  'TOPIK 1',
+  'TOPIK 2',
+  'TOPIK 3',
+  'TOPIK 4',
+  'TOPIK 5',
+  'TOPIK 6',
 ] as const;
 
 export const MAX_BIO_LENGTH = 300;
