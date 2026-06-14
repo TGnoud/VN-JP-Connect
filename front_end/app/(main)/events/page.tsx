@@ -706,7 +706,7 @@ function ShareViaChatModal({
 
   useEffect(() => {
     getConversations().then((data) => {
-      setConversations(data.conversations);
+      setConversations(data);
       setLoading(false);
     }).catch((err) => {
       console.error(err);
