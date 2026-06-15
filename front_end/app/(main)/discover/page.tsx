@@ -776,13 +776,39 @@ export default function DiscoverPage() {
     let active = true;
     const requestId = nextDiscoverRequestId();
 
-    async function loadDiscoverProfiles() {
+    async function initDiscoverProfiles() {
+      let initialFilter = { ...DEFAULT_FILTER };
+      try {
+        const stored = sessionStorage.getItem("discover_filter");
+        if (stored) {
+          initialFilter = JSON.parse(stored);
+          setFilter(initialFilter);
+        }
+      } catch (e) {
+        console.error("Failed to load filter", e);
+      }
+
       setLoading(true);
       setDiscoverError("");
 
       try {
-        const options = await getHomeFilters();
-        const profiles = await getDiscoverProfiles({ limit: DISCOVER_PROFILE_LIMIT });
+        const hasCustomAgeRange = initialFilter.ageMin !== DEFAULT_FILTER.ageMin || initialFilter.ageMax !== DEFAULT_FILTER.ageMax;
+        const hasCustomDistance = initialFilter.distanceMax !== DEFAULT_FILTER.distanceMax;
+        
+        const [options, profiles] = await Promise.all([
+          getHomeFilters(),
+          getDiscoverProfiles({
+            gender: initialFilter.gender === "all" ? undefined : initialFilter.gender,
+            nationality: nationalityToApi(initialFilter.nationality),
+            ageMin: hasCustomAgeRange ? initialFilter.ageMin : undefined,
+            ageMax: hasCustomAgeRange ? initialFilter.ageMax : undefined,
+            distanceMax: hasCustomDistance ? initialFilter.distanceMax : undefined,
+            interestNames: initialFilter.interests,
+            japaneseLevels: initialFilter.japaneseLevel,
+            limit: DISCOVER_PROFILE_LIMIT,
+          }),
+        ]);
+
         if (!active || !isLatestDiscoverRequest(requestId)) return;
         setFilterOptions(options);
         applyDiscoverProfiles(profiles);
@@ -796,7 +822,7 @@ export default function DiscoverPage() {
       }
     }
 
-    void loadDiscoverProfiles();
+    void initDiscoverProfiles();
 
     return () => {
       active = false;
@@ -886,11 +912,13 @@ export default function DiscoverPage() {
   async function handleApplyFilter(nextFilter: FilterState) {
     setFilter(nextFilter);
     setShowFilter(false);
+    sessionStorage.setItem("discover_filter", JSON.stringify(nextFilter));
     await loadDiscoverProfiles(nextFilter, excludedUserIds, filterOptions);
   }
 
   async function handleResetFilter() {
     setFilter({ ...DEFAULT_FILTER });
+    sessionStorage.removeItem("discover_filter");
     await loadDiscoverProfiles({ ...DEFAULT_FILTER }, excludedUserIds, filterOptions);
   }
 
