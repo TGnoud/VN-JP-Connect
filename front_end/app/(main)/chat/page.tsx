@@ -119,6 +119,11 @@ const MOCK_MESSAGES: Record<string, Msg[]> = {
   ],
 };
 
+const EMOJIS = [
+  "😀", "😂", "🥰", "😎", "🥺", "😭", "😡", "👍", "🙏", "❤️",
+  "✨", "🔥", "🎉", "💯", "👋", "👀", "🙌", "🤔", "😊", "🥳"
+];
+
 const INTEREST_TRANSLATIONS: Record<string, string> = {
   "旅行": "Du lịch",
   "言語学習": "Học ngoại ngữ",
@@ -775,6 +780,7 @@ export default function ChatPage() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [feedbackDismissed, setFeedbackDismissed] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -813,6 +819,13 @@ export default function ChatPage() {
     setCurrentUserId(getStoredUserId());
     activeRoomIdRef.current = activeRoomId;
   }, [activeRoomId]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
+    }
+  }, [inputText]);
 
   useEffect(() => {
     let active = true;
@@ -1150,6 +1163,9 @@ export default function ChatPage() {
     );
     if (messageType === "text") {
       setInputText("");
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
     }
 
     try {
@@ -1892,7 +1908,7 @@ export default function ChatPage() {
           )}
 
           {/* Toolbar */}
-          <div className="bg-white border-t border-gray-100 px-4 py-3 flex items-center gap-2">
+          <div className="bg-white border-t border-gray-100 px-4 py-3 flex items-end gap-2">
             {TOOLBAR_BTNS.map((btn) => (
               <button
                 key={btn.id}
@@ -1903,14 +1919,18 @@ export default function ChatPage() {
                 {btn.icon}
               </button>
             ))}
-            <textarea
-              value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={handleKeyDown} maxLength={2000}
-              placeholder="メッセージを入力..." rows={1}
-              className="flex-1 resize-none rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent placeholder:text-gray-400 max-h-32 bg-gray-50"
-            />
+            <div className="flex-1 flex">
+              <textarea
+                ref={textareaRef}
+                value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={handleKeyDown} maxLength={2000}
+                placeholder="メッセージを入力..." rows={1}
+                className="flex-1 resize-none rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent placeholder:text-gray-400 max-h-32 bg-gray-50 overflow-y-auto"
+              />
+            </div>
             <button
               onClick={() => void sendMessage(inputText)}
-              disabled={!inputText.trim() || !activeRoomId}
+              disabled={(!inputText.trim() || !activeRoomId) ? true : undefined}
+              suppressHydrationWarning
               className={clsx("shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity", inputText.trim() ? "opacity-100" : "opacity-40")}
               style={{ backgroundColor: "#1B4332" }}
             >
