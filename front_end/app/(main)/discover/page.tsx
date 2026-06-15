@@ -198,26 +198,38 @@ function ProfileCard({
 
       {/* Right: info */}
       <div className="flex-1 flex flex-col px-8 py-6 gap-5 min-w-0">
-        {/* Name & age */}
-        <div>
-          <div className="flex items-center gap-2 leading-tight">
-            <h2 className="text-3xl font-bold text-gray-900">{displayName}, {age}</h2>
-            {user.gender === "male" && (
-              <span className="flex items-center justify-center bg-blue-100 text-blue-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="男性">♂ 男性</span>
-            )}
-            {user.gender === "female" && (
-              <span className="flex items-center justify-center bg-pink-100 text-pink-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="女性">♀ 女性</span>
-            )}
-            {user.gender === "other" && (
-              <span className="flex items-center justify-center bg-purple-100 text-purple-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="その他">⚧ その他</span>
-            )}
+        {/* Name, age, and profile button */}
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 leading-tight">
+              <h2 className="text-3xl font-bold text-gray-900">{displayName}, {age}</h2>
+              {user.gender === "male" && (
+                <span className="flex items-center justify-center bg-blue-100 text-blue-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="男性">♂ 男性</span>
+              )}
+              {user.gender === "female" && (
+                <span className="flex items-center justify-center bg-pink-100 text-pink-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="女性">♀ 女性</span>
+              )}
+              {user.gender === "other" && (
+                <span className="flex items-center justify-center bg-purple-100 text-purple-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="その他">⚧ その他</span>
+              )}
+            </div>
+            <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" />
+              </svg>
+              {user.nationality === "Japanese" ? "東京・日本" : "ハノイ・ベトナム"} · {user.city}在住
+            </p>
           </div>
-          <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" />
+          <button
+            onClick={onViewDetail}
+            disabled={!!exitAnim}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium border border-gray-200 rounded-lg shadow-sm transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
             </svg>
-            {user.nationality === "Japanese" ? "東京・日本" : "ハノイ・ベトナム"} · {user.city}在住
-          </p>
+            詳細
+          </button>
         </div>
 
         {/* バイブス */}
@@ -238,7 +250,11 @@ function ProfileCard({
             <div className="flex flex-col gap-2">
               <div className="flex gap-2 flex-wrap">
                 <span className="text-base px-4 py-2 rounded-full bg-green-100 text-green-700 font-bold">日本語</span>
-                <span className="text-base px-4 py-2 rounded-full bg-green-100 text-green-700 font-bold">{user.japaneseLevel}</span>
+                {user.japaneseLevel && user.japaneseLevel !== "Basic" && (
+                  <span className="text-base px-4 py-2 rounded-full bg-green-100 text-green-700 font-bold">
+                    {displayJapaneseLevel(user.japaneseLevel)}
+                  </span>
+                )}
               </div>
               <span className="text-base px-4 py-2 rounded-full bg-green-100 text-green-700 font-bold w-fit">ベトナム語（{user.vietnameseLevel}）</span>
             </div>
@@ -267,17 +283,7 @@ function ProfileCard({
           >
             <span className="font-bold">×</span> スキップ
           </button>
-          {/* プロフィール */}
-          <button
-            onClick={onViewDetail}
-            disabled={!!exitAnim}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
-            </svg>
-            プロフィール
-          </button>
+
           {/* つながる */}
           <button
             onClick={handleLike}

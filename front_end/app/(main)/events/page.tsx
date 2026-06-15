@@ -662,7 +662,7 @@ function EventDetail({
         {/* About */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <h4 className="font-bold text-gray-900 text-sm mb-2">イベントについて</h4>
-          <p className="text-sm text-gray-500 leading-relaxed">{event.about}</p>
+          <p className="text-base text-gray-700 leading-relaxed whitespace-pre-wrap">{event.about}</p>
         </div>
 
         {/* Expectations */}
@@ -671,7 +671,7 @@ function EventDetail({
             <h4 className="font-bold text-gray-900 text-sm mb-3">期待できること</h4>
             <div className="flex flex-col gap-2.5">
               {event.expectations.map((item, i) => (
-                <div key={i} className="flex items-start gap-3 text-sm text-gray-600">
+                <div key={i} className="flex items-start gap-3 text-base text-gray-700">
                   <span
                     className="rounded-full flex items-center justify-center shrink-0 mt-0.5"
                     style={{ backgroundColor: "#d1fae5", width: 20, height: 20 }}

@@ -10,6 +10,7 @@ import {
   getConversationMessages,
   getConversations,
   getMatchedConversationUsers,
+  getUserPublicProfile,
   leaveGroupConversation,
   kickGroupMember,
   markConversationRead,
@@ -118,15 +119,69 @@ const MOCK_MESSAGES: Record<string, Msg[]> = {
   ],
 };
 
-const EMOJIS = ["😀","😂","❤️","👍","🎉","🙏","🥰","🔥","✨","🌸","🍜","🇻🇳","🇯🇵","☕","📚","⭐","💪","🤝","😁","🥹"];
+const INTEREST_TRANSLATIONS: Record<string, string> = {
+  "旅行": "Du lịch",
+  "言語学習": "Học ngoại ngữ",
+  "料理": "Nấu ăn",
+  "音楽": "Âm nhạc",
+  "アニメ": "Anime",
+  "映画": "Phim ảnh",
+  "スポーツ": "Thể thao",
+  "写真": "Nhiếp ảnh",
+  "言語交換": "Trao đổi ngôn ngữ",
+  "テクノロジー": "Công nghệ",
+  "ベトナム料理": "Món ăn Việt Nam",
+  "コーヒー": "Cà phê",
+  "読書": "Đọc sách",
+  "ゲーム": "Trò chơi điện tử",
+  "アニメ/漫画": "Anime/Manga",
+  "グルメ探索": "Khám phá ẩm thực",
+  "コーヒーを飲みながらチャット": "Cà phê tán gẫu",
+};
 
-const TOPICS = [
-  { emoji: "🍳", label: "おすすめの料理" },
-  { emoji: "🌸", label: "文化の違い" },
-  { emoji: "📚", label: "言語学習のコツ" },
-  { emoji: "✈️", label: "旅行の話" },
-  { emoji: "🎪", label: "イベント情報" },
-  { emoji: "💼", label: "仕事の話題" },
+const BILINGUAL_TOPICS = [
+  { 
+    emoji: "🍳", 
+    ja: "おすすめの料理", 
+    vi: "Các món ăn gợi ý", 
+    jaMessage: "最近食べた美味しい料理はありますか？おすすめがあれば教えてください！",
+    viMessage: "Dạo này bạn có ăn món gì ngon không? Nếu có món nào ngon thì gợi ý cho mình với nhé!"
+  },
+  { 
+    emoji: "🌸", 
+    ja: "文化の違い", 
+    vi: "Sự khác biệt văn hóa",
+    jaMessage: "ベトナムと日本の文化で一番驚いたことは何ですか？",
+    viMessage: "Điều bạn cảm thấy ngạc nhiên nhất về sự khác biệt văn hóa giữa Việt Nam và Nhật Bản là gì?"
+  },
+  { 
+    emoji: "📚", 
+    ja: "言語学習のコツ", 
+    vi: "Mẹo học ngoại ngữ",
+    jaMessage: "語学の勉強で一番効果的だった方法は何ですか？",
+    viMessage: "Phương pháp học ngoại ngữ hiệu quả nhất mà bạn từng áp dụng là gì?"
+  },
+  { 
+    emoji: "✈️", 
+    ja: "旅行の話", 
+    vi: "Chuyện đi du lịch",
+    jaMessage: "今まで行った旅行先で一番良かった場所はどこですか？",
+    viMessage: "Địa điểm du lịch nào bạn từng đi mà bạn thấy thích nhất?"
+  },
+  { 
+    emoji: "🎪", 
+    ja: "イベント情報", 
+    vi: "Thông tin sự kiện",
+    jaMessage: "最近、面白いイベントやフェスティバルに行きましたか？",
+    viMessage: "Gần đây bạn có tham gia sự kiện hay lễ hội nào thú vị không?"
+  },
+  { 
+    emoji: "💼", 
+    ja: "仕事の話題", 
+    vi: "Chủ đề về công việc",
+    jaMessage: "お仕事はどんなことをされていますか？",
+    viMessage: "Công việc hiện tại của bạn là gì vậy?"
+  },
 ];
 
 // ─── Toolbar button definitions ───────────────────────────────────────────────
@@ -565,7 +620,7 @@ function MsgBubble({
     <div className={clsx("flex", isMe ? "justify-end" : "justify-start")}>
       <div className={clsx("flex flex-col max-w-xs lg:max-w-md", isMe ? "items-end" : "items-start")}>
         <div
-          className={clsx("px-4 py-2.5 rounded-2xl text-sm leading-relaxed", isMe ? "text-white rounded-br-sm" : "bg-white text-gray-800 rounded-bl-sm shadow-sm")}
+          className={clsx("px-4 py-2.5 rounded-2xl text-base leading-relaxed", isMe ? "text-white rounded-br-sm" : "bg-white text-gray-800 rounded-bl-sm shadow-sm")}
           style={isMe ? { backgroundColor: "#1B4332" } : undefined}
         >
           {showText && <p className="whitespace-pre-wrap break-words">{renderMessageContent(msg.content, isMe)}</p>}
@@ -583,15 +638,15 @@ function MsgBubble({
           {canTranslate && (translation || isTranslating) && (
             <>
               <div className={clsx("border-t my-2", isMe ? "border-white/20" : "border-gray-100")} />
-              <p className={clsx("text-xs font-medium mb-0.5", isMe ? "text-white/60" : "text-gray-400")}>
+              <p className={clsx("text-sm font-medium mb-0.5", isMe ? "text-white/60" : "text-gray-400")}>
                 {translationLabel(shownDirection)}
               </p>
               {isTranslating ? (
-                <p className={clsx("text-xs italic", isMe ? "text-white/50" : "text-gray-400")}>翻訳中...</p>
+                <p className={clsx("text-sm italic", isMe ? "text-white/50" : "text-gray-400")}>翻訳中...</p>
               ) : translation?.error ? (
-                <p className={clsx("text-xs", isMe ? "text-red-100" : "text-red-500")}>{translation.error}</p>
+                <p className={clsx("text-sm", isMe ? "text-red-100" : "text-red-500")}>{translation.error}</p>
               ) : (
-                <p className={clsx("text-xs", isMe ? "text-white/90" : "text-gray-600")}>{translation?.text}</p>
+                <p className={clsx("text-sm", isMe ? "text-white/90" : "text-gray-600")}>{translation?.text}</p>
               )}
             </>
           )}
@@ -710,6 +765,8 @@ export default function ChatPage() {
     selectedIds: new Set(),
     submitting: false,
   });
+  const [suggestionLang, setSuggestionLang] = useState<"ja" | "vi">("ja");
+  const [partnerInterests, setPartnerInterests] = useState<string[]>([]);
   const [groupDetailsOpen, setGroupDetailsOpen] = useState(false);
   const [isLeavingGroup, setIsLeavingGroup] = useState(false);
   const [messageCounts, setMessageCounts] = useState<Record<string, number>>({});
@@ -756,6 +813,22 @@ export default function ChatPage() {
     setCurrentUserId(getStoredUserId());
     activeRoomIdRef.current = activeRoomId;
   }, [activeRoomId]);
+
+  useEffect(() => {
+    let active = true;
+    if (activeRoom.type === "direct" && activeRoom.partnerId) {
+      getUserPublicProfile(activeRoom.partnerId)
+        .then((profile) => {
+          if (active) setPartnerInterests(profile.interests.map((i) => i.name));
+        })
+        .catch(() => {
+          if (active) setPartnerInterests([]);
+        });
+    } else {
+      setPartnerInterests([]);
+    }
+    return () => { active = false; };
+  }, [activeRoom.partnerId, activeRoom.type]);
 
   useEffect(() => {
     roomsRef.current = rooms;
@@ -1714,14 +1787,69 @@ export default function ChatPage() {
 
           {openTool === "suggestions" && (
             <div className="absolute bottom-full left-0 right-0 bg-white border-t border-gray-100 shadow-lg z-10 px-5 py-4">
-              <PanelHeader title="会話トピックの提案" onClose={() => setOpenTool(null)} />
-              <p className="text-xs text-gray-400 mb-3 -mt-1">クリックするとメッセージとして送信されます</p>
-              <div className="flex flex-wrap gap-2">
-                {TOPICS.map((t) => (
-                  <button key={t.label} onClick={() => { setInputText(t.label); setOpenTool(null); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 text-sm text-gray-700 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 transition-all">
-                    <span>{t.emoji}</span>{t.label}
+              <PanelHeader title={suggestionLang === "ja" ? "会話トピックの提案" : "Gợi ý chủ đề trò chuyện"} onClose={() => setOpenTool(null)} />
+              
+              <div className="flex items-center justify-between mb-3 -mt-1">
+                <p className="text-xs text-gray-400">
+                  {suggestionLang === "ja" ? "クリックするとメッセージとして送信されます" : "Click để đưa vào ô nhập tin nhắn"}
+                </p>
+                <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg">
+                  <button
+                    onClick={() => setSuggestionLang("ja")}
+                    className={clsx("px-2 py-1 text-xs font-bold rounded-md transition-colors", suggestionLang === "ja" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                  >
+                    JP
                   </button>
-                ))}
+                  <button
+                    onClick={() => setSuggestionLang("vi")}
+                    className={clsx("px-2 py-1 text-xs font-bold rounded-md transition-colors", suggestionLang === "vi" ? "bg-white text-emerald-700 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                  >
+                    VN
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {partnerInterests.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 mb-2">
+                      {suggestionLang === "ja" ? "相手の興味・関心" : "Sở thích của đối phương"}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {partnerInterests.map((interest) => {
+                        const viInterest = INTEREST_TRANSLATIONS[interest] || interest;
+                        const label = suggestionLang === "ja" ? `話題: ${interest}` : `Chủ đề: ${viInterest}`;
+                        
+                        const msgJa = `${interest}が好きだとプロフィールに書いてありましたが、具体的にどんなものが好きですか？`;
+                        const msgVi = `Mình thấy trên profile bạn có sở thích là ${viInterest}, bạn có thể chia sẻ thêm về nó được không?`;
+                        const message = suggestionLang === "ja" ? msgJa : msgVi;
+
+                        return (
+                          <button key={interest} onClick={() => { setInputText(message); setOpenTool(null); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 transition-all text-left">
+                            <span className="shrink-0">💡</span><span className="truncate">{label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-xs font-bold text-gray-500 mb-2">
+                    {suggestionLang === "ja" ? "一般的な話題" : "Chủ đề phổ biến"}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {BILINGUAL_TOPICS.map((t) => {
+                      const label = suggestionLang === "ja" ? t.ja : t.vi;
+                      const message = suggestionLang === "ja" ? t.jaMessage : t.viMessage;
+                      return (
+                        <button key={label} onClick={() => { setInputText(message); setOpenTool(null); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 text-sm text-gray-700 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50 transition-all text-left">
+                          <span className="shrink-0">{t.emoji}</span><span className="truncate">{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           )}
