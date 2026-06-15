@@ -208,6 +208,7 @@ export interface DiscoverQueryParams {
   distanceMax?: number;
   japaneseLevels?: string[];
   interestTagIds?: string[];
+  interestNames?: string[];
   excludeUserIds?: string[];
   limit?: number;
 }
@@ -406,6 +407,7 @@ export function getDiscoverProfiles(query: DiscoverQueryParams = {}) {
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   appendCsvParam(params, "japaneseLevels", query.japaneseLevels);
   appendCsvParam(params, "interestTagIds", query.interestTagIds);
+  appendCsvParam(params, "interestNames", query.interestNames);
   appendCsvParam(params, "excludeUserIds", query.excludeUserIds);
 
   const queryString = params.toString();

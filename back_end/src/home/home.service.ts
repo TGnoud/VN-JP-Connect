@@ -142,10 +142,11 @@ export class HomeService {
     }
 
     let allowedUserIds: Types.ObjectId[] | null = null;
-
     let tagObjectIdsToFilter: Types.ObjectId[] = [];
+    let hasInterestFilter = false;
 
     if (query.interestTagIds?.length) {
+      hasInterestFilter = true;
       const tagObjectIds = query.interestTagIds.map((id) => {
         if (!Types.ObjectId.isValid(id)) {
           throw new BadRequestException('interestTagIds must be valid ObjectIds');
@@ -163,6 +164,7 @@ export class HomeService {
     }
 
     if (query.interestNames?.length) {
+      hasInterestFilter = true;
       const tags = await this.tagModel.find({ type: 'interest', name: { $in: query.interestNames } }).exec();
       tagObjectIdsToFilter = [
         ...tagObjectIdsToFilter,
@@ -170,11 +172,15 @@ export class HomeService {
       ];
     }
 
-    if (tagObjectIdsToFilter.length > 0) {
-      const userIds = await this.userInterestModel
-        .distinct('user_id', { tag_id: { $in: tagObjectIdsToFilter } })
-        .exec();
-      allowedUserIds = userIds.map((id) => new Types.ObjectId(String(id)));
+    if (hasInterestFilter) {
+      if (tagObjectIdsToFilter.length > 0) {
+        const userIds = await this.userInterestModel
+          .distinct('user_id', { tag_id: { $in: tagObjectIdsToFilter } })
+          .exec();
+        allowedUserIds = userIds.map((id) => new Types.ObjectId(String(id)));
+      } else {
+        allowedUserIds = []; // No tags matched, so no users will match
+      }
       userFilter._id = { $nin: excludedUserIds, $in: allowedUserIds };
     }
 

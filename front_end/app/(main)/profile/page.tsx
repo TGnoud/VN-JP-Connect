@@ -450,7 +450,7 @@ function profileFromApi(profile: ProfileData): UiProfile {
     bio: profile.bio.slice(0, MAX_PROFILE_BIO_LENGTH),
     avatarUrl: resolveMediaUrl(profile.avatarUrl, 256) || defaultAvatarUrl(profile),
     coverUrl: resolveMediaUrl(profile.coverUrl, 1400) || COVER_PHOTOS[0],
-    photos: profile.photos.map((photo) => ({ id: photo._id, url: resolveMediaUrl(photo.url, 700) || "" })).filter(p => p.url),
+    photos: profile.photos.map((photo) => ({ id: photo.id, url: resolveMediaUrl(photo.url, 700) || "" })).filter(p => p.url),
     interests: profile.interests.map((interest) => interest.name),
   };
 }
@@ -976,7 +976,7 @@ export default function ProfilePage() {
         setBio(uiProfile.bio);
         setInterests(uiProfile.interests);
         setLanguages(apiProfile.languages.map((item) => languageFromApi(item.language, item.level)));
-        setPhotos(apiProfile.photos.map((photo) => ({ id: photo._id, url: resolveMediaUrl(photo.url, 700) || "" })).filter(p => p.url));
+        setPhotos(apiProfile.photos.map((photo) => ({ id: photo.id, url: resolveMediaUrl(photo.url, 700) || "" })).filter(p => p.url));
         setSocialLinks(socialLinksFromApi(apiProfile));
       } catch (error) {
         if (error instanceof Error && error.message.includes("Login is required")) {
@@ -1000,7 +1000,7 @@ export default function ProfilePage() {
     setBio(uiProfile.bio);
     setInterests(uiProfile.interests);
     setLanguages(apiProfile.languages.map((item) => languageFromApi(item.language, item.level)));
-    setPhotos(apiProfile.photos.map((photo) => ({ id: photo._id, url: resolveMediaUrl(photo.url, 700) || "" })).filter(p => p.url));
+    setPhotos(apiProfile.photos.map((photo) => ({ id: photo.id, url: resolveMediaUrl(photo.url, 700) || "" })).filter(p => p.url));
     setSocialLinks(socialLinksFromApi(apiProfile));
   }
 
