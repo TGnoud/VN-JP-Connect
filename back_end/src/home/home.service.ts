@@ -35,6 +35,7 @@ type DiscoverQuery = {
   gender?: string;
   nationality?: string;
   interestTagIds?: string[];
+  interestNames?: string[];
   japaneseLevels?: string[];
   excludeUserIds?: string[];
   ageMin?: number;
@@ -141,12 +142,13 @@ export class HomeService {
     }
 
     let allowedUserIds: Types.ObjectId[] | null = null;
+
+    let tagObjectIdsToFilter: Types.ObjectId[] = [];
+
     if (query.interestTagIds?.length) {
       const tagObjectIds = query.interestTagIds.map((id) => {
         if (!Types.ObjectId.isValid(id)) {
-          throw new BadRequestException(
-            'interestTagIds must be valid ObjectIds',
-          );
+          throw new BadRequestException('interestTagIds must be valid ObjectIds');
         }
         return new Types.ObjectId(id);
       });
@@ -155,13 +157,22 @@ export class HomeService {
         .countDocuments({ _id: { $in: tagObjectIds }, type: 'interest' })
         .exec();
       if (existingCount !== tagObjectIds.length) {
-        throw new BadRequestException(
-          'interestTagIds must reference existing interest tags',
-        );
+        throw new BadRequestException('interestTagIds must reference existing interest tags');
       }
+      tagObjectIdsToFilter = [...tagObjectIds];
+    }
 
+    if (query.interestNames?.length) {
+      const tags = await this.tagModel.find({ type: 'interest', name: { $in: query.interestNames } }).exec();
+      tagObjectIdsToFilter = [
+        ...tagObjectIdsToFilter,
+        ...tags.map((t) => t._id as Types.ObjectId),
+      ];
+    }
+
+    if (tagObjectIdsToFilter.length > 0) {
       const userIds = await this.userInterestModel
-        .distinct('user_id', { tag_id: { $in: tagObjectIds } })
+        .distinct('user_id', { tag_id: { $in: tagObjectIdsToFilter } })
         .exec();
       allowedUserIds = userIds.map((id) => new Types.ObjectId(String(id)));
       userFilter._id = { $nin: excludedUserIds, $in: allowedUserIds };

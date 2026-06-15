@@ -452,6 +452,17 @@ function FilterPanel({
     }));
   }
 
+  function handleAddCustomInterest(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const val = e.currentTarget.value.trim();
+      if (val && !local.interests.includes(val)) {
+        setLocal((prev) => ({ ...prev, interests: [...prev.interests, val] }));
+      }
+      e.currentTarget.value = "";
+    }
+  }
+
   function handleApply() {
     const nat = natArr.length === 1 ? (natArr[0] as FilterState["nationality"]) : "all";
     onApply({ ...local, nationality: nat });
@@ -615,13 +626,36 @@ function FilterPanel({
                   style={local.interests.includes(interest) ? { backgroundColor: "#1B4332" } : undefined}
                 >
                   {local.interests.includes(interest) && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="size-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                    <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
-                  {interest}
+                  <span className="truncate">{interest}</span>
                 </button>
               ))}
+              {local.interests.filter((i) => !interestOptions.includes(i)).map((customInterest) => (
+                <button
+                  key={customInterest}
+                  onClick={() => toggleInterest(customInterest)}
+                  className={clsx(pillBase, "flex items-center gap-1", pillActive)}
+                  style={{ backgroundColor: "#1B4332" }}
+                >
+                  <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="truncate">{customInterest}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {open.interests && (
+            <div className="mt-3">
+              <input
+                type="text"
+                placeholder="または自由に趣味を入力してEnter..."
+                onKeyDown={handleAddCustomInterest}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B4332]/20 focus:border-[#1B4332] transition-all bg-gray-50 placeholder-gray-400"
+              />
             </div>
           )}
         </div>
@@ -719,8 +753,8 @@ export default function DiscoverPage() {
         ageMin: hasCustomAgeRange ? nextFilter.ageMin : undefined,
         ageMax: hasCustomAgeRange ? nextFilter.ageMax : undefined,
         distanceMax: hasCustomDistance ? nextFilter.distanceMax : undefined,
+        interestNames: nextFilter.interests,
         japaneseLevels: nextFilter.japaneseLevel,
-        interestTagIds: selectedInterestTagIds(nextFilter, nextFilterOptions?.interests ?? []),
         excludeUserIds: nextExcludedUserIds,
         limit: DISCOVER_PROFILE_LIMIT,
       });

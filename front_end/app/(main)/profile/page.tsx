@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   addPhotoUrls,
+  deletePhoto,
   getMyProfile,
   replaceInterests,
   replaceLanguages,
@@ -334,7 +335,7 @@ const LANG_LEVELS: Record<string, string[]> = {
 const LEVEL_OPTIONS = ["母語", "N1", "N2", "N3", "N4", "N5", "Basic", "A1", "A2", "B1", "B2", "C1", "C2", "IELTS 7.0", "IELTS 6.5"];
 
 type LangEntry = typeof LANGUAGES[0];
-type UiProfile = Omit<typeof PROFILE, "age"> & { age: number | null };
+type UiProfile = Omit<typeof PROFILE, "age" | "photos"> & { age: number | null; photos: { id: string; url: string }[] };
 const EMPTY_PROFILE: UiProfile = {
   fullName: "",
   email: "",
@@ -449,7 +450,7 @@ function profileFromApi(profile: ProfileData): UiProfile {
     bio: profile.bio.slice(0, MAX_PROFILE_BIO_LENGTH),
     avatarUrl: resolveMediaUrl(profile.avatarUrl, 256) || defaultAvatarUrl(profile),
     coverUrl: resolveMediaUrl(profile.coverUrl, 1400) || COVER_PHOTOS[0],
-    photos: profile.photos.map((photo) => resolveMediaUrl(photo.url, 700)),
+    photos: profile.photos.map((photo) => ({ id: photo._id, url: resolveMediaUrl(photo.url, 700) || "" })).filter(p => p.url),
     interests: profile.interests.map((interest) => interest.name),
   };
 }
@@ -954,9 +955,10 @@ export default function ProfilePage() {
   const [interests, setInterests] = useState<string[]>([]);
   const [bio, setBio] = useState("");
   const [languages, setLanguages] = useState<LangEntry[]>([]);
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<{ id: string; url: string }[]>([]);
   const [modal, setModal] = useState<ModalType | null>(null);
   const [failedMedia, setFailedMedia] = useState({ avatarUrl: "", coverUrl: "" });
+  const [saving, setSaving] = useState(false);
 
   function close() { setModal(null); }
 
@@ -974,7 +976,7 @@ export default function ProfilePage() {
         setBio(uiProfile.bio);
         setInterests(uiProfile.interests);
         setLanguages(apiProfile.languages.map((item) => languageFromApi(item.language, item.level)));
-        setPhotos(uiProfile.photos);
+        setPhotos(apiProfile.photos.map((photo) => ({ id: photo._id, url: resolveMediaUrl(photo.url, 700) || "" })).filter(p => p.url));
         setSocialLinks(socialLinksFromApi(apiProfile));
       } catch (error) {
         if (error instanceof Error && error.message.includes("Login is required")) {
@@ -998,7 +1000,7 @@ export default function ProfilePage() {
     setBio(uiProfile.bio);
     setInterests(uiProfile.interests);
     setLanguages(apiProfile.languages.map((item) => languageFromApi(item.language, item.level)));
-    setPhotos(uiProfile.photos);
+    setPhotos(apiProfile.photos.map((photo) => ({ id: photo._id, url: resolveMediaUrl(photo.url, 700) || "" })).filter(p => p.url));
     setSocialLinks(socialLinksFromApi(apiProfile));
   }
 
@@ -1081,6 +1083,20 @@ export default function ProfilePage() {
 
     if (apiProfile) {
       applyApiProfile(apiProfile);
+    }
+  }
+
+  async function handleDeletePhoto(photoId: string) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const apiProfile = await deletePhoto(photoId);
+      applyApiProfile(apiProfile);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete photo");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -1273,8 +1289,17 @@ export default function ProfilePage() {
           <SectionHeader title={`写真(${photos.length}/9)`} action={<AddBtn onClick={() => setModal("addPhoto")} />} />
           <div className="grid grid-cols-4 gap-3">
             {photos.map((p, i) => (
-              <div key={p} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
-                <Image src={p} alt={`photo-${i}`} fill className="object-cover" unoptimized />
+              <div key={p.id} className="aspect-[3/4] relative rounded-2xl overflow-hidden bg-gray-100 group">
+                <Image src={p.url} alt={`photo-${i}`} fill className="object-cover" unoptimized />
+                <button
+                  onClick={(e) => { e.stopPropagation(); void handleDeletePhoto(p.id); }}
+                  className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                  disabled={saving}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
                 {i === 0 && (
                   <span className="absolute top-1 left-1 text-xs bg-white/90 text-gray-700 font-medium px-1.5 py-0.5 rounded leading-tight">メイン</span>
                 )}
