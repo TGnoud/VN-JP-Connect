@@ -200,17 +200,17 @@ function ProfileCard({
       <div className="flex-1 flex flex-col px-8 py-6 gap-5 min-w-0">
         {/* Name, age, and profile button */}
         <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 leading-tight">
-              <h2 className="text-3xl font-bold text-gray-900">{displayName}, {age}</h2>
+          <div className="flex-1 min-w-0 pr-4">
+            <div className="leading-tight">
+              <h2 className="inline text-3xl font-bold text-gray-900 mr-2">{displayName}, {age}</h2>
               {user.gender === "male" && (
-                <span className="flex items-center justify-center bg-blue-100 text-blue-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="男性">♂ 男性</span>
+                <span className="whitespace-nowrap shrink-0 inline-flex items-center justify-center bg-blue-100 text-blue-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm align-middle mb-1" title="男性">♂ 男性</span>
               )}
               {user.gender === "female" && (
-                <span className="flex items-center justify-center bg-pink-100 text-pink-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="女性">♀ 女性</span>
+                <span className="whitespace-nowrap shrink-0 inline-flex items-center justify-center bg-pink-100 text-pink-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm align-middle mb-1" title="女性">♀ 女性</span>
               )}
               {user.gender === "other" && (
-                <span className="flex items-center justify-center bg-purple-100 text-purple-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm" title="その他">⚧ その他</span>
+                <span className="whitespace-nowrap shrink-0 inline-flex items-center justify-center bg-purple-100 text-purple-600 rounded-full px-2 py-0.5 text-sm font-bold shadow-sm align-middle mb-1" title="その他">⚧ その他</span>
               )}
             </div>
             <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-2">
@@ -223,7 +223,7 @@ function ProfileCard({
           <button
             onClick={onViewDetail}
             disabled={!!exitAnim}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium border border-gray-200 rounded-lg shadow-sm transition-colors"
+            className="shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium border border-gray-200 rounded-lg shadow-sm transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
@@ -263,9 +263,9 @@ function ProfileCard({
           {/* 興味・関心 */}
           <div className="flex-1 min-w-0">
             <p className="text-base font-semibold text-gray-500 mb-2">興味・関心</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-wrap gap-2">
               {user.interests.slice(0, 4).map((i) => (
-                <span key={i} className="text-base text-gray-700 rounded-md px-4 py-2 text-center truncate" style={{ backgroundColor: "#DDDDDD" }}>
+                <span key={i} className="text-base text-gray-700 rounded-md px-4 py-2 text-center" style={{ backgroundColor: "#DDDDDD" }}>
                   {i}
                 </span>
               ))}
@@ -482,11 +482,10 @@ function FilterPanel({
     ? filterOptions.japaneseLevels
     : [...JP_FILTER_LEVELS];
   const isJapaneseName = (name: string) => /[　-鿿＀-￯]/u.test(name);
-  const interestOptions = (
-    filterOptions?.interests?.length
-      ? filterOptions.interests.map((interest) => interest.name).filter(isJapaneseName)
-      : FILTER_INTERESTS
-  ).slice(0, 10);
+  const backendInterests = filterOptions?.interests?.length
+    ? filterOptions.interests.map((interest) => interest.name).filter(isJapaneseName)
+    : [];
+  const interestOptions = Array.from(new Set([...FILTER_INTERESTS, ...backendInterests])).slice(0, 10);
   const genderOptions = [
     "all",
     ...(filterOptions?.genders?.length
@@ -932,9 +931,6 @@ export default function DiscoverPage() {
           <p className="text-xs text-gray-400">新しい出会いを探す</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm">
-            {profileCounterText}
-          </span>
           <button
             onClick={() => setShowFilter((v) => !v)}
             className={clsx(
