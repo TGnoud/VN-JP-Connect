@@ -203,7 +203,7 @@ const DOCUMENT_MIME_TYPES = new Set([
   "text/plain",
 ]);
 const DOCUMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"];
-const FAVORITE_PROMPT_MESSAGE_COUNT = 50;
+const FAVORITE_PROMPT_MESSAGE_COUNT = 5;
 const CHAT_LANGUAGE_LABELS: Record<string, string> = {
   Japanese: "日本語",
   Vietnamese: "ベトナム語",
