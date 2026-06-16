@@ -23,7 +23,7 @@ const DEFAULT_FILTER: FilterState = {
   gender: "all",
   ageMin: 18,
   ageMax: 35,
-  distanceMax: 50,
+  distanceMax: 15,
   japaneseLevel: [],
   nationality: "all",
   interests: [],
@@ -115,6 +115,7 @@ function userFromDiscoverProfile(profile: DiscoverProfileData): User {
     birthDate: birthDateFromAge(profile.age),
     occupation: profile.occupation,
     city: profile.location,
+    distanceKm: profile.distanceKm,
     japaneseLevel: normalizeJapaneseLevel(japaneseLanguage?.level),
     vietnameseLevel: normalizeVietnameseLevel(vietnameseLanguage?.level),
     purposes: [],
@@ -217,7 +218,14 @@ function ProfileCard({
               <svg xmlns="http://www.w3.org/2000/svg" className="size-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 15.327 17 12.993 17 10a7 7 0 10-14 0c0 2.993 1.698 5.327 3.354 6.985a21.485 21.485 0 002.273 1.765 11.44 11.44 0 00.757.433 5.741 5.741 0 00.28.14l.019.008.006.002zM10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clipRule="evenodd" />
               </svg>
-              {user.nationality === "Japanese" ? "東京・日本" : "ハノイ・ベトナム"} · {user.city}在住
+              {(() => {
+                const vnHometowns = ["ハノイ", "ホーチミン", "ダナン", "フエ", "ハイフォン"];
+                const jpHometowns = ["東京", "大阪", "京都", "福岡", "北海道"];
+                const hash = user.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                return user.nationality === "Japanese" 
+                  ? `${jpHometowns[hash % jpHometowns.length]}・日本` 
+                  : `${vnHometowns[hash % vnHometowns.length]}・ベトナム`;
+              })()} · {user.city}在住{user.distanceKm !== undefined ? ` · 約${user.distanceKm}km` : ""}
             </p>
           </div>
           <button
@@ -413,7 +421,7 @@ function FilterPanel({
   );
   const [open, setOpen] = useState({ gender: true, age: true, distance: true, jpLevel: true, nationality: true, interests: true });
   const AGE_MIN = 18, AGE_MAX = 65;
-  const DIST_MIN = 0, DIST_MAX = 200;
+  const DIST_MIN = 0, DIST_MAX = 30;
 
   function toggleSection(key: keyof typeof open) {
     setOpen((prev) => ({ ...prev, [key]: !prev[key] }));

@@ -80,6 +80,7 @@ export interface DiscoverProfileData {
   age: number | null;
   gender: "male" | "female" | "other" | null;
   location: string;
+  distanceKm?: number;
   occupation: string;
   bio: string;
   avatarUrl: string;

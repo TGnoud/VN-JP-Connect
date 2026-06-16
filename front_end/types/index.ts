@@ -14,6 +14,7 @@ export interface User {
   birthDate: string;
   occupation: string;
   city: string;
+  distanceKm?: number;
   japaneseLevel: JapaneseLevel;
   vietnameseLevel: VietnameseLevel;
   purposes: Purpose[];

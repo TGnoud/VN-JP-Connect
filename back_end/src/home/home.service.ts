@@ -46,7 +46,7 @@ type DiscoverQuery = {
 
 const HOME_AGE_MIN = 18;
 const HOME_AGE_MAX = 65;
-const HOME_DISTANCE_MAX = 200;
+const HOME_DISTANCE_MAX = 30;
 const HOME_DISCOVER_LIMIT_MAX = 200;
 const HOME_DISCOVER_LIMIT_DEFAULT = HOME_DISCOVER_LIMIT_MAX;
 const HOME_JAPANESE_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1', 'Basic', 'Native'];
@@ -92,8 +92,8 @@ export class HomeService {
       distanceRange: {
         min: 0,
         max: HOME_DISTANCE_MAX,
-        defaultMax: 50,
-        supported: false,
+        defaultMax: 15,
+        supported: true,
       },
     };
   }
@@ -245,6 +245,13 @@ export class HomeService {
           level: item.level,
         }));
 
+        const hash = (currentUserId + user._id.toString()).split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const distanceKm = (hash % HOME_DISTANCE_MAX) + 1;
+
+        if (query.distanceMax !== undefined && distanceKm > query.distanceMax) {
+          return null;
+        }
+
         if (query.ageMin !== undefined && age < query.ageMin) {
           return null;
         }
@@ -271,6 +278,7 @@ export class HomeService {
           age,
           gender: profile?.gender ?? null,
           location: profile?.location ?? '',
+          distanceKm,
           occupation: profile?.occupation ?? '',
           bio: String(profile?.bio ?? '').slice(0, MAX_BIO_LENGTH),
           avatarUrl: profile?.avatar_url ?? '',
