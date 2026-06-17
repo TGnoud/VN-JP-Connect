@@ -335,7 +335,7 @@ const LANG_LEVELS: Record<string, string[]> = {
 const LEVEL_OPTIONS = ["母語", "N1", "N2", "N3", "N4", "N5", "Basic", "A1", "A2", "B1", "B2", "C1", "C2", "IELTS 7.0", "IELTS 6.5"];
 
 type LangEntry = typeof LANGUAGES[0];
-type UiProfile = Omit<typeof PROFILE, "age" | "photos"> & { age: number | null; photos: { id: string; url: string }[] };
+type UiProfile = Omit<typeof PROFILE, "age" | "photos" | "likeRate"> & { age: number | null; likeRate: number | null; photos: { id: string; url: string }[] };
 const EMPTY_PROFILE: UiProfile = {
   fullName: "",
   email: "",
@@ -346,7 +346,7 @@ const EMPTY_PROFILE: UiProfile = {
   occupation: "",
   school: "",
   joinedAt: "",
-  likeRate: 100,
+  likeRate: null,
   connectionsCount: 0,
   bio: "",
   avatarUrl: "",
