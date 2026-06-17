@@ -52,6 +52,7 @@ const HOME_DISCOVER_LIMIT_DEFAULT = HOME_DISCOVER_LIMIT_MAX;
 const HOME_JAPANESE_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1', 'Basic', 'Native'];
 const LIKE_RATE_MIN = 60;
 const LIKE_RATE_MAX = 100;
+const LIKE_RATE_MIN_CONNECTIONS = 5;
 
 @Injectable()
 export class HomeService {
@@ -290,7 +291,12 @@ export class HomeService {
             uploadedAt: p.uploaded_at,
           })),
           interests,
-          likeRate: this.displayLikeRate(profile?.match_rate),
+          likeRate: this.displayLikeRate(
+            profile?.match_rate,
+            connectionsCountByUserId.get(user._id.toString()) ??
+              profile?.connections_count ??
+              0,
+          ),
           connectionsCount:
             connectionsCountByUserId.get(user._id.toString()) ??
             profile?.connections_count ??
@@ -490,12 +496,16 @@ export class HomeService {
     return filterLevels.includes(normalizedLevel);
   }
 
-  private displayLikeRate(value: unknown) {
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
-      return 100;
+  private displayLikeRate(likesReceived: unknown, connectionsCount: number) {
+    if (connectionsCount < LIKE_RATE_MIN_CONNECTIONS) {
+      return null; // Not enough data to show a meaningful rate
     }
 
-    return Math.min(LIKE_RATE_MAX, Math.max(LIKE_RATE_MIN, Math.round(value)));
+    const likes = typeof likesReceived === 'number' && Number.isFinite(likesReceived)
+      ? likesReceived
+      : 0;
+    const rawRate = Math.round((likes / connectionsCount) * 100);
+    return Math.min(LIKE_RATE_MAX, Math.max(LIKE_RATE_MIN, rawRate));
   }
 
   private async existingDiscoverRelationshipUserIds(

@@ -713,7 +713,7 @@ export default function UserDetailPage() {
             <div className="flex items-center gap-6 pt-3 border-t border-gray-100">
               <div className="flex items-center gap-1.5">
                 <ThumbsUpIcon />
-                <span className="text-sm font-bold text-gray-900">{user.likeRate}%</span>
+                <span className="text-sm font-bold text-gray-900">{user.likeRate !== null ? `${user.likeRate}%` : "新規"}</span>
                 <span className="text-xs text-gray-400">高評価</span>
               </div>
               <div className="flex items-center gap-1.5">

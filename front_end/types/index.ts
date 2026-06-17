@@ -23,7 +23,7 @@ export interface User {
   avatarUrl: string;
   coverUrl?: string;
   photos?: string[];
-  likeRate: number;
+  likeRate: number | null;
   connectionsCount: number;
   joinedAt: string;
 }

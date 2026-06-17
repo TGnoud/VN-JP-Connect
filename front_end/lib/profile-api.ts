@@ -44,7 +44,7 @@ export interface ProfileData {
   languages: ProfileLanguage[];
   interests: ProfileTag[];
   photos: ProfilePhoto[];
-  likeRate: number;
+  likeRate: number | null;
   connectionsCount: number;
   joinedAt: string;
   updatedAt: string;
@@ -65,7 +65,7 @@ export interface PublicProfileData {
   languages: ProfileLanguage[];
   interests: ProfileTag[];
   photos: ProfilePhoto[];
-  likeRate: number;
+  likeRate: number | null;
   connectionsCount: number;
   joinedAt: string;
   updatedAt: string;
@@ -87,7 +87,7 @@ export interface DiscoverProfileData {
   languages: ProfileLanguage[];
   photos: ProfilePhoto[];
   interests: ProfileTag[];
-  likeRate: number;
+  likeRate: number | null;
   connectionsCount: number;
   joinedAt: string;
 }

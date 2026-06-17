@@ -445,7 +445,7 @@ function profileFromApi(profile: ProfileData): UiProfile {
     occupation: profile.occupation,
     school: profile.education,
     joinedAt: profile.joinedAt ? formatJoinedAt(profile.joinedAt) : "",
-    likeRate: profile.likeRate ?? 100,
+    likeRate: profile.likeRate ?? null,
     connectionsCount: profile.connectionsCount ?? 0,
     bio: profile.bio.slice(0, MAX_PROFILE_BIO_LENGTH),
     avatarUrl: resolveMediaUrl(profile.avatarUrl, 256) || defaultAvatarUrl(profile),
@@ -1195,7 +1195,7 @@ export default function ProfilePage() {
                 <div className="flex gap-2.5 mt-3">
                   <span className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" /></svg>
-                    {profile.likeRate}% マッチ率
+                    {profile.likeRate !== null ? `${profile.likeRate}%` : "新規"} マッチ率
                   </span>
                   <span className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full bg-green-50 border border-green-200 text-green-700">
                     <svg xmlns="http://www.w3.org/2000/svg" className="size-3" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg>

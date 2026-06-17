@@ -42,6 +42,7 @@ export const REPORT_EVIDENCE_MIME_TYPES = [
 ];
 const LIKE_RATE_MIN = 60;
 const LIKE_RATE_MAX = 100;
+const LIKE_RATE_MIN_CONNECTIONS = 5;
 
 type ReportInput = {
   reason: UserReportReason;
@@ -110,7 +111,7 @@ export class UsersService {
         isMain: photo.is_main,
         uploadedAt: photo.uploaded_at,
       })),
-      likeRate: this.displayLikeRate(profile?.match_rate),
+      likeRate: this.displayLikeRate(profile?.match_rate, connectionsCount),
       connectionsCount,
       joinedAt: targetUser.created_at,
       updatedAt: profile?.updated_at ?? targetUser.created_at,
@@ -228,11 +229,15 @@ export class UsersService {
     );
   }
 
-  private displayLikeRate(value: unknown) {
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
-      return 100;
+  private displayLikeRate(likesReceived: unknown, connectionsCount: number) {
+    if (connectionsCount < LIKE_RATE_MIN_CONNECTIONS) {
+      return null;
     }
 
-    return Math.min(LIKE_RATE_MAX, Math.max(LIKE_RATE_MIN, Math.round(value)));
+    const likes = typeof likesReceived === 'number' && Number.isFinite(likesReceived)
+      ? likesReceived
+      : 0;
+    const rawRate = Math.round((likes / connectionsCount) * 100);
+    return Math.min(LIKE_RATE_MAX, Math.max(LIKE_RATE_MIN, rawRate));
   }
 }
